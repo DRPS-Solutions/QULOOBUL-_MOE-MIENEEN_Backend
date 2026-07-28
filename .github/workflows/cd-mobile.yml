@@ -1,0 +1,74 @@
+name: CD Mobile
+
+# Separate deployable: a failing mobile build does not block an API or web release.
+# Path-filtered, so it stays dormant until the MAUI project exists.
+on:
+  push:
+    branches: [main, master, develop, dev]
+    paths:
+      - 'src/Npo.Mobile/**'
+      - 'src/Npo.Shared/**'
+      - '.github/workflows/cd-mobile.yml'
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    env:
+      MOBILE_PROJECT: src/Npo.Mobile/Npo.Mobile.csproj
+      SHARED_TESTS: tests/Npo.Shared.Tests/Npo.Shared.Tests.csproj
+      KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install MAUI Android workload
+        run: dotnet workload install maui-android
+
+      - name: Restore
+        run: dotnet restore "$MOBILE_PROJECT"
+
+      - name: Build
+        run: dotnet build "$MOBILE_PROJECT" -f net10.0-android -c Release --no-restore -warnaserror
+
+      - name: Test shared library
+        run: |
+          if [ ! -f "$SHARED_TESTS" ]; then
+            echo "::warning::No shared-library test project yet — the test gate is inactive."
+            exit 0
+          fi
+          dotnet test "$SHARED_TESTS" -c Release
+
+      - name: Decode signing keystore
+        if: ${{ env.KEYSTORE_B64 != '' }}
+        run: echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/npo.keystore"
+
+      - name: Publish signed APK
+        if: ${{ env.KEYSTORE_B64 != '' }}
+        run: |
+          dotnet publish "$MOBILE_PROJECT" -f net10.0-android -c Release -o ./apk \
+            -p:AndroidKeyStore=true \
+            -p:AndroidSigningKeyStore="$RUNNER_TEMP/npo.keystore" \
+            -p:AndroidSigningKeyAlias='${{ secrets.ANDROID_KEY_ALIAS }}' \
+            -p:AndroidSigningKeyPass='${{ secrets.ANDROID_KEY_PASSWORD }}' \
+            -p:AndroidSigningStorePass='${{ secrets.ANDROID_KEYSTORE_PASSWORD }}'
+
+      - name: Publish unsigned APK
+        if: ${{ env.KEYSTORE_B64 == '' }}
+        run: |
+          echo "::warning::ANDROID_KEYSTORE_BASE64 is not set — producing an unsigned build."
+          dotnet publish "$MOBILE_PROJECT" -f net10.0-android -c Release -o ./apk
+
+      # Side-loaded for the client demo and for marking. Play Store
+      # distribution is Phase 2 and is deliberately not automated.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: npo-android-apk
+          path: ./apk/*.apk

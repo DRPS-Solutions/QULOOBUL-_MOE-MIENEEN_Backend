@@ -1,0 +1,115 @@
+name: CD Production
+
+on:
+  push:
+    branches: [main, master]
+
+env:
+  SOLUTION: "QULOOBUL _MOE'MIENEEN_Backend.slnx"
+  PROJECT: "QULOOBUL _MOE'MIENEEN_Backend/QULOOBUL _MOE'MIENEEN_Backend.csproj"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore "$SOLUTION"
+
+      - name: Build (warnings are errors)
+        run: dotnet build "$SOLUTION" -c Release --no-restore -warnaserror
+
+      - name: Test
+        run: |
+          if ! grep -rq 'Microsoft.NET.Test.Sdk' --include='*.csproj' .; then
+            echo "::warning::No test project in the repository yet - the test gate is inactive."
+            exit 0
+          fi
+          dotnet test "$SOLUTION" -c Release --no-build --collect:"XPlat Code Coverage"
+
+      - name: Publish
+        run: dotnet publish "$PROJECT" -c Release --no-build -o ./publish
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: api
+          path: ./publish
+
+  deploy-slot:
+    needs: build
+    # Skipped until Azure is provisioned and AZURE_WEBAPP_NAME_PROD is set as a repository variable.
+    if: ${{ vars.AZURE_WEBAPP_NAME_PROD != '' }}
+    runs-on: ubuntu-latest
+    # Unprotected environment - holds the production secrets, but no reviewers.
+    # Live traffic is still served by the old build at this point.
+    environment: production-slot
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: api
+          path: ./publish
+
+      - uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Deploy API to production staging slot
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ vars.AZURE_WEBAPP_NAME_PROD }}
+          slot-name: staging
+          package: ./publish
+
+      - name: Deploy Blazor client to Static Web Apps
+        if: ${{ vars.AZURE_STATIC_WEB_APP_PROD != '' }}
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_PROD }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: upload
+          app_location: src/Npo.Web
+          output_location: wwwroot
+
+      # A failure here stops the run before the swap - production is untouched.
+      - name: Apply EF Core migrations
+        env:
+          ConnectionStrings__Default: ${{ secrets.PRODUCTION_DB_CONNECTION }}
+        run: |
+          dotnet tool install --global dotnet-ef
+          dotnet ef database update --project "$PROJECT"
+
+      - name: Smoke test the slot
+        run: |
+          curl -fsS --retry 5 --retry-all-errors --retry-delay 10 \
+            "https://${{ vars.AZURE_WEBAPP_NAME_PROD }}-staging.azurewebsites.net/health"
+
+  swap:
+    needs: deploy-slot
+    runs-on: ubuntu-latest
+    # Protected environment: add the project lead as a required reviewer in
+    # Settings > Environments > production. That setting is the approval gate.
+    environment: production
+    steps:
+      - uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      # Reverse a bad release by running this same swap again.
+      - name: Swap slots
+        run: |
+          az webapp deployment slot swap \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --name "${{ vars.AZURE_WEBAPP_NAME_PROD }}" \
+            --slot staging \
+            --target-slot production

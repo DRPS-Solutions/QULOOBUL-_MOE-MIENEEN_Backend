@@ -1,0 +1,6 @@
+@QULOOBUL__MOE_MIENEEN_Backend_HostAddress = http://localhost:5012
+
+GET {{QULOOBUL__MOE_MIENEEN_Backend_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

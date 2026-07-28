@@ -1,0 +1,43 @@
+name: CI
+
+# Runs on every working branch and on every pull request into a deploy branch.
+# Builds and tests only - holds no deployment credentials.
+on:
+  push:
+    branches-ignore: [main, master, develop, dev]
+  pull_request:
+    branches: [main, master, develop, dev]
+
+env:
+  SOLUTION: "QULOOBUL _MOE'MIENEEN_Backend.slnx"
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore "$SOLUTION"
+
+      - name: Build (warnings are errors)
+        run: dotnet build "$SOLUTION" -c Release --no-restore -warnaserror
+
+      - name: Test
+        run: |
+          if ! grep -rq 'Microsoft.NET.Test.Sdk' --include='*.csproj' .; then
+            echo "::warning::No test project in the repository yet - the test gate is inactive."
+            exit 0
+          fi
+          dotnet test "$SOLUTION" -c Release --no-build --collect:"XPlat Code Coverage"
+
+      - name: Upload coverage
+        if: hashFiles('**/coverage.cobertura.xml') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: '**/coverage.cobertura.xml'
