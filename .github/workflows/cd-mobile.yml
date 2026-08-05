@@ -8,7 +8,6 @@ on:
     paths:
       - 'src/Npo.Mobile/**'
       - 'src/Npo.Shared/**'
-      - '.github/workflows/cd-mobile.yml'
 
 jobs:
   android:
