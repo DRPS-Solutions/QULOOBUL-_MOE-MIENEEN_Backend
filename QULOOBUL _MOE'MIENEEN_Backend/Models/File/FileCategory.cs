@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace QULOOBUL__MOE_MIENEEN_Backend.Models.File
@@ -10,3 +10,4 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Models.File
         [MaxLength(100)] public string CategoryName { get; set; } = String.Empty;
     }
 }
+//---------------------------DDDDDDDDDDDoooooooooooooo END OF FILE DDDDDDDDDDDoooooooooooooo---------------------------//
