@@ -1,4 +1,4 @@
-﻿using QULOOBUL__MOE_MIENEEN_Backend.Models.IdentityAndAccess;
+using QULOOBUL__MOE_MIENEEN_Backend.Models.IdentityAndAccess;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
