@@ -27,3 +27,4 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Models.File
         [ForeignKey(nameof(MeetingId))] public Meeting? Meeting { get; set; }
     }
 }
+//---------------------------DDDDDDDDDDDoooooooooooooo END OF FILE DDDDDDDDDDDoooooooooooooo---------------------------//

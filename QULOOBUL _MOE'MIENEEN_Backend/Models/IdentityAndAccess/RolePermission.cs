@@ -14,3 +14,4 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Models.IdentityAndAccess
         public Permission? Permission { get; set; }
     }
 }
+//---------------------------DDDDDDDDDDDoooooooooooooo END OF FILE DDDDDDDDDDDoooooooooooooo---------------------------//

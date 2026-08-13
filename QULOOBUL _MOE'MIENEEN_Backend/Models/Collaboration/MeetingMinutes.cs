@@ -23,3 +23,4 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Models.Collaboration
         [ForeignKey(nameof(ApprovedBy))] public User? Approver { get; set; }
     }
 }
+//---------------------------DDDDDDDDDDDoooooooooooooo END OF FILE DDDDDDDDDDDoooooooooooooo---------------------------//

@@ -16,3 +16,4 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Models.Collaboration
         public User? User { get; set; }
     }
 }
+//---------------------------DDDDDDDDDDDoooooooooooooo END OF FILE DDDDDDDDDDDoooooooooooooo---------------------------//

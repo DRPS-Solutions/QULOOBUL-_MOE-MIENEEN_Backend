@@ -20,3 +20,4 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Models.Task
         [ForeignKey(nameof(AssignedTo))] public User? Assignee { get; set; }
     }
 }
+//---------------------------DDDDDDDDDDDoooooooooooooo END OF FILE DDDDDDDDDDDoooooooooooooo---------------------------//

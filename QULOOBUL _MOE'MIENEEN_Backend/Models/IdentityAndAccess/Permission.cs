@@ -10,3 +10,4 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Models.IdentityAndAccess
         [MaxLength(100)] public string PermissionName { get; set; } = String.Empty;
     }
 }
+//---------------------------DDDDDDDDDDDoooooooooooooo END OF FILE DDDDDDDDDDDoooooooooooooo---------------------------//
