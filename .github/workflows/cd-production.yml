@@ -4,8 +4,9 @@ on:
   push:
     branches: [main, master]
 
+# Builds only the API project. The MAUI app ships via cd-mobile.yml and the
+# Blazor client is built by the Static Web Apps action from source.
 env:
-  SOLUTION: "QULOOBUL _MOE'MIENEEN_Backend.slnx"
   PROJECT: "QULOOBUL _MOE'MIENEEN_Backend/QULOOBUL _MOE'MIENEEN_Backend.csproj"
 
 jobs:
@@ -19,10 +20,10 @@ jobs:
           dotnet-version: '10.0.x'
 
       - name: Restore
-        run: dotnet restore "$SOLUTION"
+        run: dotnet restore "$PROJECT"
 
       - name: Build (warnings are errors)
-        run: dotnet build "$SOLUTION" -c Release --no-restore -warnaserror
+        run: dotnet build "$PROJECT" -c Release --no-restore -warnaserror
 
       - name: Test
         run: |
@@ -30,7 +31,7 @@ jobs:
             echo "::warning::No test project in the repository yet - the test gate is inactive."
             exit 0
           fi
-          dotnet test "$SOLUTION" -c Release --no-build --collect:"XPlat Code Coverage"
+          dotnet test "$PROJECT" -c Release --no-build --collect:"XPlat Code Coverage"
 
       - name: Publish
         run: dotnet publish "$PROJECT" -c Release --no-build -o ./publish

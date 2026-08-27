@@ -8,8 +8,12 @@ on:
   pull_request:
     branches: [main, master, develop, dev]
 
+# The MAUI app (Frontend_Mobile) is built and tested by cd-mobile.yml, which
+# installs the Android workload. This job deliberately builds only the projects
+# that run on a plain SDK so it stays fast and workload-free.
 env:
-  SOLUTION: "QULOOBUL _MOE'MIENEEN_Backend.slnx"
+  API: "QULOOBUL _MOE'MIENEEN_Backend/QULOOBUL _MOE'MIENEEN_Backend.csproj"
+  WEB: "Frontend_BlazorWeb/Frontend_BlazorWeb.csproj"
 
 jobs:
   build-test:
@@ -21,15 +25,15 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      # The .slnx includes the MAUI project (net10.0-android); restore needs its workload.
-      - name: Install MAUI Android workload
-        run: dotnet workload install maui-android
-
       - name: Restore
-        run: dotnet restore "$SOLUTION"
+        run: |
+          dotnet restore "$API"
+          dotnet restore "$WEB"
 
       - name: Build (warnings are errors)
-        run: dotnet build "$SOLUTION" -c Release --no-restore -warnaserror
+        run: |
+          dotnet build "$API" -c Release --no-restore -warnaserror
+          dotnet build "$WEB" -c Release --no-restore -warnaserror
 
       - name: Test
         run: |
@@ -37,7 +41,7 @@ jobs:
             echo "::warning::No test project in the repository yet - the test gate is inactive."
             exit 0
           fi
-          dotnet test "$SOLUTION" -c Release --no-build --collect:"XPlat Code Coverage"
+          dotnet test "$API" -c Release --collect:"XPlat Code Coverage"
 
       - name: Upload coverage
         if: hashFiles('**/coverage.cobertura.xml') != ''
