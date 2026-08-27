@@ -21,6 +21,10 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
+      # The .slnx includes the MAUI project (net10.0-android); restore needs its workload.
+      - name: Install MAUI Android workload
+        run: dotnet workload install maui-android
+
       - name: Restore
         run: dotnet restore "$SOLUTION"
 
