@@ -1,4 +1,5 @@
 <Solution>
+  <Project Path="Backend.Tests/Backend.Tests.csproj" />
   <Project Path="Frontend_BlazorWeb/Frontend_BlazorWeb.csproj" Id="d227fec9-e921-4d31-8363-af81f11c0db6" />
   <Project Path="Frontend_Mobile/Frontend_Mobile.csproj" Id="fc6d09da-5454-429d-89d4-f583348a5a61" />
   <Project Path="QULOOBUL _MOE'MIENEEN_Backend/QULOOBUL _MOE'MIENEEN_Backend.csproj" />
