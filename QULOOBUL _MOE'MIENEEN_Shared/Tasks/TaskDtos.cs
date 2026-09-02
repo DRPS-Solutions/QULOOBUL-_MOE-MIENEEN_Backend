@@ -20,7 +20,7 @@ namespace QULOOBUL__MOE_MIENEEN_Shared.Tasks
         [Required] 
         public int ProjectId { get; init; }
         [Required, MaxLength(200)] 
-        public string Title { get; init; } = "";
+        public string Title { get; init; } = string.Empty;
         [MaxLength(20)] 
         public string Priority { get; init; } = "Normal";
         [Required] 
@@ -42,7 +42,7 @@ namespace QULOOBUL__MOE_MIENEEN_Shared.Tasks
     public record MoveTaskRequest
     {
         [Required, MaxLength(30)] 
-        public string NewStatus { get; init; } = "";
+        public string NewStatus { get; init; } = string.Empty;
     }
 
     public record AssignTaskRequest
@@ -54,7 +54,7 @@ namespace QULOOBUL__MOE_MIENEEN_Shared.Tasks
     public record AddTaskCommentRequest
     {
         [Required, MaxLength(2000)] 
-        public string Comment { get; init; } = "";
+        public string Comment { get; init; } = string.Empty;
     }
 
     public record TaskCommentDto(int CommentId, int UserId, string Comment, DateTime TimeCreated);

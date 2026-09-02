@@ -12,7 +12,7 @@ namespace QULOOBUL__MOE_MIENEEN_Shared.Collaboration
     public record CreateMeetingRequest
     {
         [Required, MaxLength(200)] 
-        public string Title { get; init; } = "";
+        public string Title { get; init; } = string.Empty;
         [Required] 
         public DateTime MeetingDate { get; init; }
         public IReadOnlyList<int> AttendeeIds { get; init; } = [];
@@ -25,7 +25,7 @@ namespace QULOOBUL__MOE_MIENEEN_Shared.Collaboration
     public record RecordMinutesRequest
     {
         [Required, MinLength(1)] 
-        public string MinutesText { get; init; } = "";
+        public string MinutesText { get; init; } = string.Empty;
         public bool IsAiDraft { get; init; }
     }
 
@@ -34,10 +34,10 @@ namespace QULOOBUL__MOE_MIENEEN_Shared.Collaboration
     public record CreateEventRequest
     {
         [Required, MaxLength(200)] 
-        public string Title { get; init; } = "";
+        public string Title { get; init; } = string.Empty;
         [Required] 
         public DateTime EventDate { get; init; }
         [MaxLength(200)]
-        public string Location { get; init; } = "";
+        public string Location { get; init; } = string.Empty;
     }
 }

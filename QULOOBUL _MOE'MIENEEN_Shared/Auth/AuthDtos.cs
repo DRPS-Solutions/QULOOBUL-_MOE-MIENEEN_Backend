@@ -11,9 +11,9 @@ namespace QULOOBUL__MOE_MIENEEN_Shared.Auth
     public record LoginRequest
     {
         [Required, EmailAddress, MaxLength(256)]
-        public string Email { get; init; } = "";
+        public string Email { get; init; } = string.Empty;
         [Required, MaxLength(128)]
-        public string Password { get; init; } = "";
+        public string Password { get; init; } = string.Empty;
     }
 
     public record AuthResponse(
@@ -27,7 +27,7 @@ namespace QULOOBUL__MOE_MIENEEN_Shared.Auth
     public record PasswordResetRequest
     {
         [Required, EmailAddress] 
-        public string Email { get; init; } = "";
+        public string Email { get; init; } = string.Empty;
     }
 
 
