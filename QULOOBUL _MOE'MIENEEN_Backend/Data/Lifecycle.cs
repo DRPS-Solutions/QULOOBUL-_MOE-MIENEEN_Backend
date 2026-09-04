@@ -27,6 +27,25 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Data
         public static bool TaskCanMove(string? current, string next) =>
             CanMove(Task, current, TaskStart, next);
 
+        public const string UserStart = "Active";
+
+        private static readonly Dictionary<string, string[]> UserSm = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Active"] = ["Deactivated"],
+            ["Deactivated"] = ["Active"], // reactivation
+        };
+
+        public static bool UserCanMove(string? current, string next) =>
+            CanMove(UserSm, current, UserStart, next);
+
+        public static void EnsureUserMove(string? current, string next)
+        {
+            if (!UserCanMove(current, next))
+                throw new InvalidOperationException($"User cannot move from \"{Norm(current, UserStart)}\" to \"{next}\".");
+        }
+
+        public static string UserState(bool isActive) => isActive ? "Active" : "Deactivated";
+
         public static bool RequestCanMove(string? current, string next) =>
             CanMove(Request, current, RequestStart, next);
 
