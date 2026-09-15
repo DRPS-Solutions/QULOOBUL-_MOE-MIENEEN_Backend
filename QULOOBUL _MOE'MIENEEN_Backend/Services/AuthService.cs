@@ -43,3 +43,4 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
         public string Hash(User user, string plain) => Hasher.HashPassword(user, plain);
     }
 }
+//---------------------------DDDDDDDDDDDoooooooooooooo END OF FILE DDDDDDDDDDDoooooooooooooo---------------------------//
