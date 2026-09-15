@@ -19,8 +19,12 @@ namespace QULOOBUL__MOE_MIENEEN_Shared.Classes
         public static class Roles
         {
             public const string Admin = "Admin";
+            public const string SecondaryAdmin = "Secondary Admin";
+            public const string FacilityManager = "Facility Manager";
             public const string Staff = "Staff";
             public const string Imaamat = "Imaamat";
+
+            public const string outSider = "Outsider";
         }
 
         public static class Permissions
