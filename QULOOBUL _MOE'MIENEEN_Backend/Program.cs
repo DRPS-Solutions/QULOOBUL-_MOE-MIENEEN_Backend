@@ -16,8 +16,10 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 
-builder.Services.AddDbContext<AppDbContext>(o =>
-    o.UseSqlServer(builder.Configuration.GetConnectionString("Default")));
+// UseSeeding runs after `dotnet ef database update` (and Migrate/EnsureCreated).
+builder.Services.AddDbContext<AppDbContext>(o => o
+    .UseSqlServer(builder.Configuration.GetConnectionString("Default"))
+    .UseSeeding((db, _) => DbSeeder.Seed((AppDbContext)db, builder.Configuration)));
 
 builder.Services.AddSignalR();
 
