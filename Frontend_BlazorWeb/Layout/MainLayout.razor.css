@@ -2,76 +2,219 @@
     position: relative;
     display: flex;
     flex-direction: column;
+    min-height: 100vh;
+    background: #F5F3EC;
+    transition: background 0.2s ease;
 }
 
-main {
-    flex: 1;
-}
-
-.sidebar {
-    background-image: linear-gradient(180deg, rgb(5, 39, 103) 0%, #3a0647 70%);
-}
-
-.top-row {
-    background-color: #f7f7f7;
-    border-bottom: 1px solid #d6d5d5;
-    justify-content: flex-end;
-    height: 3.5rem;
-    display: flex;
-    align-items: center;
-}
-
-    .top-row ::deep a, .top-row ::deep .btn-link {
-        white-space: nowrap;
-        margin-left: 1.5rem;
-        text-decoration: none;
+    .page.dark-mode {
+        background: #0B1B21;
     }
 
-    .top-row ::deep a:hover, .top-row ::deep .btn-link:hover {
-        text-decoration: underline;
-    }
-
-    .top-row ::deep a:first-child {
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-
-@media (max-width: 640.98px) {
-    .top-row {
-        justify-content: space-between;
-    }
-
-    .top-row ::deep a, .top-row ::deep .btn-link {
-        margin-left: 0;
-    }
-}
-
-@media (min-width: 641px) {
-    .page {
+    /* Vertical nav mode: the top navbar becomes a fixed-width left
+   sidebar instead of a horizontal bar, and the page runs left-to-right
+   instead of top-to-bottom. */
+    .page.nav-vertical {
         flex-direction: row;
     }
 
-    .sidebar {
-        width: 250px;
-        height: 100vh;
-        position: sticky;
-        top: 0;
-    }
+        .page.nav-vertical .top-navbar {
+            position: sticky;
+            top: 0;
+            left: 0;
+            width: 260px;
+            height: 100vh;
+            flex-shrink: 0;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.2);
+        }
 
-    .top-row {
-        position: sticky;
-        top: 0;
-        z-index: 1;
-    }
+        .page.nav-vertical main {
+            flex: 1;
+            min-width: 0;
+        }
 
-    .top-row.auth ::deep a:first-child {
-        flex: 1;
-        text-align: right;
-        width: 0;
-    }
-
-    .top-row, article {
-        padding-left: 2rem !important;
-        padding-right: 1.5rem !important;
-    }
+main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
 }
+
+/* --- Login screen --- */
+.drps-login-wrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background-image: linear-gradient(135deg, #12271F 0%, #2F5C4C 100%);
+    position: relative;
+}
+
+.drps-login-theme-toggle {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 50%;
+    width: 2.5rem;
+    height: 2.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    cursor: pointer;
+}
+
+.drps-login-card {
+    width: 100%;
+    max-width: 380px;
+    background: #FFFFFF;
+    border-radius: 16px;
+    padding: 32px 28px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.25);
+    text-align: center;
+    transition: background 0.2s ease;
+}
+
+.drps-login-logo {
+    height: 48px;
+    margin-bottom: 12px;
+}
+
+.drps-login-title {
+    color: #1C3D32;
+    font-weight: 700;
+}
+
+.drps-login-subtitle {
+    color: #75806F;
+    margin-bottom: 8px;
+    display: block;
+}
+
+.drps-login-hint {
+    display: block;
+    text-align: left;
+    color: #75806F;
+    min-height: 1.2em;
+}
+
+.drps-login-footnote {
+    display: block;
+    color: #B7B2A0;
+    margin-top: 16px;
+}
+
+.page.dark-mode .drps-login-card {
+    background: #1E362B;
+}
+
+.page.dark-mode .drps-login-title {
+    color: #E9F0EA;
+}
+
+.page.dark-mode .drps-login-subtitle,
+.page.dark-mode .drps-login-hint {
+    color: #93A69A;
+}
+
+.page.dark-mode .drps-login-footnote {
+    color: #4E5F52;
+}
+
+/* --- Demo account chips --- */
+.drps-demo-accounts {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 12px;
+}
+
+.drps-demo-account-chip {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    border: 1px solid #E7E4D8;
+    background: #F5F3EC;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.drps-demo-account-chip:hover {
+    background: #EAF2ED;
+    border-color: #6FA98C;
+}
+
+.drps-demo-account-name {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #1C3D32;
+}
+
+.drps-demo-account-role {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #3C7A63;
+    background: #EAF2ED;
+    border-radius: 999px;
+    padding: 2px 10px;
+}
+
+.page.dark-mode .drps-demo-account-chip {
+    background: #0B1B21;
+    border-color: #2E4A3B;
+}
+
+.page.dark-mode .drps-demo-account-chip:hover {
+    background: rgba(60, 122, 99, 0.16);
+    border-color: #6FA98C;
+}
+
+.page.dark-mode .drps-demo-account-name {
+    color: #E9F0EA;
+}
+
+.page.dark-mode .drps-demo-account-role {
+    color: #6FA98C;
+    background: rgba(60, 122, 99, 0.16);
+}
+
+.top-navbar {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    width: 100%;
+    /* Matches the DRPS navy-to-blue gradient */
+    background-image: linear-gradient(135deg, #12271F 0%, #2F5C4C 100%);
+    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+}
+
+.content {
+    padding-top: 1.5rem;
+}
+
+#blazor-error-ui {
+    color-scheme: light only;
+    background: lightyellow;
+    bottom: 0;
+    box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.2);
+    box-sizing: border-box;
+    display: none;
+    left: 0;
+    padding: 0.6rem 1.25rem 0.7rem 1.25rem;
+    position: fixed;
+    width: 100%;
+    z-index: 1000;
+}
+
+    #blazor-error-ui .dismiss {
+        cursor: pointer;
+        position: absolute;
+        right: 0.75rem;
+        top: 0.5rem;
+    }

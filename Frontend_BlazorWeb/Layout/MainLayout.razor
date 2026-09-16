@@ -1,16 +1,240 @@
 ﻿@inherits LayoutComponentBase
-<div class="page">
-    <div class="sidebar">
-        <NavMenu />
-    </div>
+@using MudBlazor
+@inject AppDataService AppData
 
-    <main>
-        <div class="top-row px-4">
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
+<MudThemeProvider IsDarkMode="isDarkMode" Theme="_theme" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+@if (currentRole is null)
+{
+    <div class="page @(isDarkMode ? "dark-mode" : "")">
+        <div class="drps-login-wrap">
+            <button class="drps-login-theme-toggle"
+                    type="button"
+                    title="@(isDarkMode ? "Switch to light mode" : "Switch to dark mode")"
+                    @onclick="ToggleDarkMode">
+                <MudIcon Icon="@(isDarkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)" Size="Size.Small" />
+            </button>
+
+            <div class="drps-login-card">
+                <img src="images/logos/QULOOBUL MOE'MIENEEN Logo.png" alt="Company Logo" class="drps-login-logo" />
+                <MudText Typo="Typo.h5" Class="drps-login-title">QULOOBUL MOE'MIENEEN</MudText>
+                <MudText Typo="Typo.body2" Class="drps-login-subtitle">Sign in to continue</MudText>
+
+                <MudTextField @bind-Value="usernameInput"
+                              Label="Username or email"
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense"
+                              Immediate="true"
+                              @onkeydown="OnLoginKeyDown"
+                              Class="mt-4 mb-3" />
+
+                <MudTextField @bind-Value="passwordInput"
+                              Label="Password"
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense"
+                              InputType="InputType.Password"
+                              Immediate="true"
+                              @onkeydown="OnLoginKeyDown"
+                              Class="mb-2" />
+
+                @if (loginError is not null)
+                {
+                    <MudText Typo="Typo.caption" Color="Color.Error" Class="drps-login-hint">
+                        @loginError
+                    </MudText>
+                }
+
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           FullWidth="true"
+                           Class="mt-4"
+                           Disabled="@(string.IsNullOrWhiteSpace(usernameInput) || string.IsNullOrWhiteSpace(passwordInput))"
+                           OnClick="Login">
+                    Log In
+                </MudButton>
+
+                <MudText Typo="Typo.caption" Class="drps-login-footnote">
+                    Prototype sign-in - pick a demo account below to try each role.
+                </MudText>
+
+                @* Demo accounts, seeded in AppDataService - clicking one
+                   fills the fields above so graders/reviewers can try
+                   every role without hunting for credentials. *@
+                <div class="drps-demo-accounts">
+                    @foreach (var demoUser in AppData.Users)
+                    {
+                        <button type="button" class="drps-demo-account-chip" @onclick="() => FillDemoAccount(demoUser)">
+                            <span class="drps-demo-account-name">@demoUser.FullName</span>
+                            <span class="drps-demo-account-role">@demoUser.SystemRoleLabel</span>
+                        </button>
+                    }
+                </div>
+            </div>
         </div>
+    </div>
+}
+else
+{
+    <div class="page @(isDarkMode ? "dark-mode" : "") @(isVerticalNav ? "nav-vertical" : "")">
+        <header class="top-navbar">
+            <NavMenu IsDarkMode="isDarkMode"
+                     IsVerticalNav="isVerticalNav"
+                     OnToggleDarkMode="ToggleDarkMode"
+                     OnToggleNavOrientation="ToggleNavOrientation"
+                     CurrentRole="currentRole"
+                     CurrentUserName="currentUserName"
+                     CurrentUserId="currentUserId"
+                     CanSeeTasks="CanSeeTasks"
+                     CanSeeRequests="CanSeeRequests"
+                     CanSeeMeetings="CanSeeMeetings"
+                     CanSeeUserManagement="CanSeeUserManagement"
+                     CanSeeEvents="CanSeeEvents"
+                     OnLogout="Logout" />
+        </header>
 
-        <article class="content px-4">
-            @Body
-        </article>
-    </main>
+        <main>
+            <article class="content px-4">
+                @* Cascaded (by name, so it doesn't collide with any other
+                   string parameters a page might declare) so individual
+                   pages - e.g. Requests.razor gating its Approve/Deny
+                   buttons to Admins - can read who's logged in without
+                   MainLayout having to know about every page's needs. *@
+                <CascadingValue Value="currentRole" Name="CurrentRole" IsFixed="false">
+                    <CascadingValue Value="currentUserName" Name="CurrentUserName" IsFixed="false">
+                        <CascadingValue Value="currentUserId" Name="CurrentUserId" IsFixed="false">
+                            @Body
+                        </CascadingValue>
+                    </CascadingValue>
+                </CascadingValue>
+            </article>
+        </main>
+    </div>
+}
+
+<div id="blazor-error-ui" data-nosnippet>
+    An unhandled error has occurred.
+    <a href="." class="reload">Reload</a>
+    <span class="dismiss">🗙</span>
 </div>
+
+@code {
+    // Both settings live here since MainLayout wraps every page - it
+    // cascades IsDarkMode/IsVerticalNav down to NavMenu (for the toggle
+    // buttons) and applies matching classes to the outer .page element,
+    // which every page's own stylesheet keys its dark-mode overrides off.
+    private bool isDarkMode = false;
+    private bool isVerticalNav = false;
+
+    // null = not logged in, which renders the login screen instead of
+    // NavMenu + @Body below. Living here (not a routable /login page)
+    // means it persists across navigation the same way dark mode/nav
+    // orientation already do. currentRole is derived from whichever
+    // AppUser signed in (see Login below), matching one of the
+    // SystemRole enum's ToString() values so the existing
+    // CanSeeMeetings/CanSeeUserManagement/CanSeeEvents checks (and the
+    // "CurrentRole" cascade other pages read) keep working unchanged.
+    private string? currentRole = null;
+    private string currentUserName = string.Empty;
+    private Guid? currentUserId = null;
+
+    private string usernameInput = string.Empty;
+    private string passwordInput = string.Empty;
+    private string? loginError = null;
+
+    private void ToggleDarkMode() => isDarkMode = !isDarkMode;
+
+    private void ToggleNavOrientation() => isVerticalNav = !isVerticalNav;
+
+    // Validates the entered credentials against AppData.Users (seeded
+    // in AppDataService) instead of just picking a role from a
+    // dropdown - a real username/password check, even though the
+    // "database" behind it is just an in-memory list.
+    private void Login()
+    {
+        var user = AppData.Login(usernameInput, passwordInput);
+        if (user is null)
+        {
+            loginError = "That username/email or password doesn't match a known account.";
+            return;
+        }
+
+        loginError = null;
+        currentRole = user.SystemRole.ToString();
+        currentUserName = user.FullName;
+        currentUserId = user.Id;
+    }
+
+    // Demo-account chips fill the form but still require clicking
+    // "Log In" - keeps the real credential check as the only way in,
+    // while making it fast to try each role.
+    private void FillDemoAccount(AppUser user)
+    {
+        usernameInput = user.Username;
+        passwordInput = user.Password;
+        loginError = null;
+    }
+
+    private void OnLoginKeyDown(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") Login();
+    }
+
+    private void Logout()
+    {
+        currentRole = null;
+        currentUserName = string.Empty;
+        currentUserId = null;
+        usernameInput = string.Empty;
+        passwordInput = string.Empty;
+        loginError = null;
+    }
+
+    // Single source of truth for tab visibility, computed here from
+    // currentRole and passed to NavMenu as plain booleans. Home is
+    // always visible to every signed-in role, so it has no check here.
+    // (Requests is visible to General Staff's non-members only; Approve/
+    // Deny inside that page is gated separately, off the cascaded
+    // CurrentRole - see Requests.razor's own CanReview.)
+    // - General Staff: Home only
+    // - Facility Manager: General Staff's tabs, plus Daily Tasks and
+    //   Resource Requests (but can't approve/deny requests)
+    // - Secondary Admin: everything except User Management
+    // - Admin: everything
+    private bool CanSeeTasks => currentRole is "FacilityManager" or "SecondaryAdmin" or "Admin";
+    private bool CanSeeRequests => currentRole is "FacilityManager" or "SecondaryAdmin" or "Admin";
+    private bool CanSeeMeetings => currentRole is "SecondaryAdmin" or "Admin";
+    private bool CanSeeUserManagement => currentRole is "Admin";
+    private bool CanSeeEvents => currentRole is "SecondaryAdmin" or "Admin";
+
+    // Drives MudThemeProvider so built-in MudBlazor components (buttons,
+    // dialogs, tables, inputs, snackbars) switch palette automatically
+    // alongside the custom DRPS-styled cards on each page.
+    private MudTheme _theme = new MudTheme
+    {
+        PaletteLight = new PaletteLight
+        {
+            Primary = "#3C7A63",
+            Secondary = "#2F5C4C",
+            Info = "#2A5CD1",
+            AppbarBackground = "#12271F",
+            Background = "#F5F3EC",
+            Surface = "#FFFFFF"
+        },
+        PaletteDark = new PaletteDark
+        {
+            Primary = "#6FA98C",
+            Secondary = "#3C7A63",
+            Info = "#5B84D6",
+            AppbarBackground = "#12271F",
+            Background = "#0B1B21",
+            Surface = "#1E362B",
+            DrawerBackground = "#0B1B21",
+            AppbarText = "#FFFFFF",
+            TextPrimary = "#E9F0EA",
+            TextSecondary = "#93A69A"
+        }
+    };
+}
