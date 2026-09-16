@@ -1,0 +1,211 @@
+@* =====================================================================
+   TaskDetailsDialog
+   Opened by clicking on a task card/chip in Tasks.razor. Shows every
+   field of the clicked AppTask pre-filled in the same layout as
+   CreateTaskDialog, so the user can review and edit it in place, or
+   delete it entirely. Confirming "Save changes" hands the edited
+   values back as a NewTaskResult (same carrier CreateTaskDialog uses);
+   Tasks.razor applies them onto the original AppTask via
+   AppDataService.UpdateTask. "Delete task" hands back a plain string
+   sentinel ("__delete__") instead, and "Cancel"/closing without
+   saving returns nothing, leaving the task untouched.
+
+   Reuses the ".drps-modal-task-name"-style classes already defined
+   globally in Tasks.razor's <style> block, same as CreateTaskDialog.
+   ===================================================================== *@
+@using MudBlazor
+@inject AppDataService AppData
+
+<MudDialog Style="border-radius:16px;">
+    <TitleContent>
+        <MudText Typo="Typo.h6" Style="font-weight:600;">Task details</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudTextField T="string"
+                       @bind-Value="title"
+                       Label="Task title"
+                       Variant="Variant.Outlined"
+                       Class="mb-3"
+                       Immediate="true" />
+
+        <MudTextField T="string"
+                       @bind-Value="description"
+                       Label="Description (optional)"
+                       Variant="Variant.Outlined"
+                       Lines="2"
+                       Class="mb-3" />
+
+        <div class="d-flex gap-3 mb-3">
+            <MudDatePicker @bind-Date="date" Label="Date" Variant="Variant.Outlined" />
+            @if (!isAllDay)
+            {
+                <MudTimePicker @bind-Time="time" Label="Time" Variant="Variant.Outlined" />
+            }
+        </div>
+
+        <MudCheckBox T="bool" @bind-Value="isAllDay" Label="All day" Color="Color.Primary" Class="mb-3" />
+
+        <MudSelect T="string" Label="Category" Variant="Variant.Outlined" @bind-Value="category" Class="mb-3">
+            <MudSelectItem T="string" Value="@("Admin")">Admin</MudSelectItem>
+            <MudSelectItem T="string" Value="@("Meeting")">Meeting</MudSelectItem>
+            <MudSelectItem T="string" Value="@("Fieldwork")">Fieldwork</MudSelectItem>
+            <MudSelectItem T="string" Value="@("Other")">Other</MudSelectItem>
+        </MudSelect>
+
+        <MudSelect T="string" Label="Priority" Variant="Variant.Outlined" @bind-Value="priority" Class="mb-3">
+            <MudSelectItem T="string" Value="@("Low")">Low</MudSelectItem>
+            <MudSelectItem T="string" Value="@("Medium")">Medium</MudSelectItem>
+            <MudSelectItem T="string" Value="@("High")">High</MudSelectItem>
+        </MudSelect>
+
+        <MudSelect T="string" Label="Assignee" Variant="Variant.Outlined" @bind-Value="assignee" Class="mb-3">
+            @foreach (var employee in AppData.SelectableEmployeeNames)
+            {
+                <MudSelectItem T="string" Value="@employee">@employee</MudSelectItem>
+            }
+        </MudSelect>
+
+        <MudSelect T="string" Label="Task type" Variant="Variant.Outlined" @bind-Value="taskType" Class="mb-3">
+            <MudSelectItem T="string" Value="@("Daily")">Daily task</MudSelectItem>
+            <MudSelectItem T="string" Value="@("Event")">Event / project task</MudSelectItem>
+        </MudSelect>
+
+        @if (taskType == "Event")
+        {
+            @if (AppData.Events.Any())
+            {
+                <MudSelect T="Guid?" Label="Linked event" Variant="Variant.Outlined" @bind-Value="linkedEventId" Class="mb-3">
+                    @foreach (var evt in AppData.Events)
+                    {
+                        <MudSelectItem T="Guid?" Value="@evt.Id">@evt.Title</MudSelectItem>
+                    }
+                </MudSelect>
+            }
+            else
+            {
+                <MudText Typo="Typo.caption" Color="Color.Error" Class="mb-3 d-block">No events planned yet - create one on the Events page first.</MudText>
+            }
+        }
+
+        @* --- Completion status, read-only here. Checking/unchecking off
+           the task card handles the actual complete/reopen flow, so this
+           dialog just reports the current state. --- *@
+        @if (Task.IsCompleted)
+        {
+            <MudAlert Severity="Severity.Success" Dense="true" Class="mt-1">
+                Completed@(string.IsNullOrEmpty(Task.CompletedBy) ? "" : $" by {Task.CompletedBy}")@(Task.CompletedAt.HasValue ? $" on {Task.CompletedAt.Value:d MMM, h:mm tt}" : "")
+            </MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Error"
+                   Variant="Variant.Text"
+                   StartIcon="@Icons.Material.Filled.DeleteOutline"
+                   OnClick="DeleteTask"
+                   Class="mr-auto">
+            Delete task
+        </MudButton>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary"
+                   Variant="Variant.Filled"
+                   Disabled="@(!CanConfirm)"
+                   OnClick="SaveChanges">
+            Save changes
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    // Auto-injected by MudDialogProvider - lets this component close
+    // or cancel itself and hand a result back to the caller.
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    // The task being viewed/edited, passed in by Tasks.razor when it
+    // opens this dialog. Only read from directly for the completion
+    // status banner; every editable field is copied into local form
+    // state in OnInitialized so edits don't mutate the shared AppTask
+    // until "Save changes" is confirmed.
+    [Parameter]
+    public AppTask Task { get; set; } = default!;
+
+    // Sentinel string handed back via DialogResult.Ok(...) when the
+    // user clicks "Delete task", so Tasks.razor can tell delete apart
+    // from a saved edit (which comes back as a NewTaskResult).
+    public const string DeleteSentinel = "__delete__";
+
+    // --- Form state, seeded from Task in OnInitialized ---
+    private string title = string.Empty;
+    private string description = string.Empty;
+    private DateTime? date;
+    private TimeSpan? time;
+    private bool isAllDay;
+    private string category = "Admin";
+    private string priority = "Low";
+    private string assignee = string.Empty;
+    private string taskType = "Daily";
+    private Guid? linkedEventId;
+
+    protected override void OnInitialized()
+    {
+        title = Task.Title;
+        description = Task.Description;
+        date = Task.ScheduledStart.Date;
+        time = Task.ScheduledStart.TimeOfDay;
+        isAllDay = Task.IsAllDay;
+        category = Task.Category;
+        priority = Task.Priority.ToString();
+        assignee = Task.Assignee;
+        taskType = Task.Type == AppTaskType.Event ? "Event" : "Daily";
+        linkedEventId = Task.LinkedEventId;
+    }
+
+    // Same validation rule as CreateTaskDialog: a title, a date, an
+    // assignee, a time (unless all-day), and a chosen event if this is
+    // an Event-type task.
+    private bool CanConfirm =>
+        !string.IsNullOrWhiteSpace(title) &&
+        !string.IsNullOrWhiteSpace(assignee) &&
+        date.HasValue &&
+        (isAllDay || time.HasValue) &&
+        (taskType != "Event" || linkedEventId.HasValue);
+
+    // Closes the dialog successfully, returning the edited details as
+    // a NewTaskResult - Tasks.razor applies them onto the original
+    // AppTask via AppData.UpdateTask.
+    private void SaveChanges()
+    {
+        var scheduledStart = isAllDay
+            ? date!.Value.Date
+            : date!.Value.Date + time!.Value;
+
+        var linkedEvent = taskType == "Event" ? AppData.Events.FirstOrDefault(e => e.Id == linkedEventId) : null;
+
+        var result = new NewTaskResult
+        {
+            Title = title.Trim(),
+            Description = description.Trim(),
+            ScheduledStart = scheduledStart,
+            IsAllDay = isAllDay,
+            Category = category,
+            Priority = priority,
+            Assignee = assignee,
+            Type = taskType,
+            LinkedEventId = linkedEvent?.Id,
+            LinkedEventTitle = linkedEvent?.Title
+        };
+
+        MudDialog.Close(DialogResult.Ok(result));
+    }
+
+    // Closes the dialog with the delete sentinel - Tasks.razor removes
+    // the task via AppData.DeleteTask when it sees this.
+    private void DeleteTask()
+    {
+        MudDialog.Close(DialogResult.Ok(DeleteSentinel));
+    }
+
+    // Closes the dialog as cancelled - the caller treats this as "no
+    // change" and leaves the task list untouched.
+    private void Cancel() => MudDialog.Cancel();
+}
