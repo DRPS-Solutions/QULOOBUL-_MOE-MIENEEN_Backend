@@ -1,7 +1,7 @@
 @page "/notifications"
 @using MudBlazor
 @implements IDisposable
-@inject NotificationService NotificationService
+@inject AppDataService AppData
 @inject NavigationManager Navigation
 
 <PageTitle>Notifications</PageTitle>
@@ -28,12 +28,6 @@
         --drps-border-soft: #E7E4D8;
         --drps-empty: #B7B2A0;
         --drps-shadow: rgba(11, 22, 38, 0.06);
-        /* Dedicated accent blue, kept separate from --drps-blue-500/
-           --drps-tint-blue above (which are now brand green) - used
-           only for the "linked to event/task" reference chip below, so
-           the palette keeps a small, deliberate blue accent. */
-        --drps-accent-blue: #2A5CD1;
-        --drps-tint-accent-blue: #EEF2FC;
         background: var(--drps-bg);
         min-height: 100%;
         padding-bottom: 2rem;
@@ -151,13 +145,6 @@
         min-width: 0;
     }
 
-    .drps-notif-top {
-        display: flex;
-        align-items: flex-start;
-        justify-content: space-between;
-        gap: 10px;
-    }
-
     .drps-notif-title {
         font-weight: 600;
         color: var(--drps-navy-800);
@@ -179,11 +166,6 @@
         color: var(--drps-text-muted);
     }
 
-    .drps-notif-time {
-        white-space: nowrap;
-        flex-shrink: 0;
-    }
-
     .drps-unread-dot {
         width: 8px;
         height: 8px;
@@ -191,18 +173,6 @@
         background: var(--drps-blue-500);
         flex-shrink: 0;
         margin-top: 6px;
-    }
-
-    .drps-link-chip {
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
-        background: var(--drps-tint-accent-blue);
-        color: var(--drps-accent-blue);
-        border-radius: 6px;
-        padding: 2px 8px;
-        font-size: 0.72rem;
-        font-weight: 600;
     }
 
     .drps-notifications-empty {
@@ -224,7 +194,6 @@
         --drps-border-soft: #2E4A3B;
         --drps-empty: #4E5F52;
         --drps-shadow: rgba(0, 0, 0, 0.35);
-        --drps-tint-accent-blue: rgba(42, 92, 209, 0.18);
     }
 </style>
 
@@ -242,22 +211,13 @@
                     @(UnreadCount > 0 ? $"{UnreadCount} unread." : "You're all caught up.")
                 </div>
             </div>
-            <div class="d-flex" style="gap:8px;">
-                <MudButton Size="Size.Small"
-                           Variant="Variant.Outlined"
-                           Style="color:white;border-color:rgba(255,255,255,0.4);"
-                           Disabled="@(UnreadCount == 0)"
-                           OnClick="MarkAllAsRead">
-                    Mark all as read
-                </MudButton>
-                <MudButton Size="Size.Small"
-                           Variant="Variant.Text"
-                           Style="color:rgba(255,255,255,0.75);"
-                           Disabled="@(MyNotifications.Count == 0)"
-                           OnClick="ClearAll">
-                    Clear all
-                </MudButton>
-            </div>
+            <MudButton Size="Size.Small"
+                       Variant="Variant.Outlined"
+                       Style="color:white;border-color:rgba(255,255,255,0.4);"
+                       Disabled="@(UnreadCount == 0)"
+                       OnClick="MarkAllAsRead">
+                Mark all as read
+            </MudButton>
         </div>
 
         <div class="drps-card">
@@ -265,15 +225,12 @@
                 <div class="drps-filter-chip @(activeFilter is null ? "active" : "")" @onclick="@(() => activeFilter = null)">
                     All (@MyNotifications.Count)
                 </div>
-                <div class="drps-filter-chip @(activeFilter == NotificationType.ResourceRequest ? "active" : "")" @onclick="@(() => activeFilter = NotificationType.ResourceRequest)">
-                    Resource Requests (@MyNotifications.Count(n => n.Type == NotificationType.ResourceRequest))
-                </div>
-                <div class="drps-filter-chip @(activeFilter == NotificationType.EventAssignment ? "active" : "")" @onclick="@(() => activeFilter = NotificationType.EventAssignment)">
-                    Event Assignments (@MyNotifications.Count(n => n.Type == NotificationType.EventAssignment))
-                </div>
-                <div class="drps-filter-chip @(activeFilter == NotificationType.TaskAssignment ? "active" : "")" @onclick="@(() => activeFilter = NotificationType.TaskAssignment)">
-                    Task Assignments (@MyNotifications.Count(n => n.Type == NotificationType.TaskAssignment))
-                </div>
+                @foreach (var kind in new[] { Kind.ResourceRequest, Kind.EventAssignment, Kind.TaskAssignment })
+                {
+                    <div class="drps-filter-chip @(activeFilter == kind ? "active" : "")" @onclick="@(() => activeFilter = kind)">
+                        @(NotifTypeLabel(kind))s (@MyNotifications.Count(n => KindOf(n) == kind))
+                    </div>
+                }
                 <div class="drps-filter-chip @(unreadOnly ? "active" : "")" @onclick="@(() => unreadOnly = !unreadOnly)">
                     Unread only
                 </div>
@@ -289,25 +246,19 @@
             {
                 @foreach (var n in FilteredNotifications)
                 {
-                    <div class="drps-notif-item @(IsRead(n) ? "" : "unread")" @onclick="@(() => OpenNotification(n))">
-                        <div class="drps-notif-icon @(NotifIconClass(n.Type))">
-                            <MudIcon Icon="@(NotifIcon(n.Type))" Size="Size.Small" />
+                    var kind = KindOf(n);
+                    <div class="drps-notif-item @(n.IsRead ? "" : "unread")" @onclick="@(() => OpenNotification(n))">
+                        <div class="drps-notif-icon @(NotifIconClass(kind))">
+                            <MudIcon Icon="@(NotifIcon(kind))" Size="Size.Small" />
                         </div>
                         <div class="drps-notif-body">
-                            <div class="drps-notif-top">
-                                <div class="drps-notif-title">@n.Title</div>
-                                <div class="drps-notif-time">@RelativeTime(n.Timestamp)</div>
-                            </div>
+                            <div class="drps-notif-title">@Title(n)</div>
                             <div class="drps-notif-message">@n.Message</div>
                             <div class="drps-notif-meta">
-                                @if (!string.IsNullOrWhiteSpace(n.LinkedName))
-                                {
-                                    <span class="drps-link-chip">@n.LinkedName</span>
-                                }
-                                <span>@NotifTypeLabel(n.Type)</span>
+                                <span>@NotifTypeLabel(kind)</span>
                             </div>
                         </div>
-                        @if (!IsRead(n))
+                        @if (!n.IsRead)
                         {
                             <div class="drps-unread-dot" title="Unread"></div>
                         }
@@ -323,107 +274,85 @@
    CODE-BEHIND
    ===================================================================== *@
 @code {
-    // Cascaded (by name) from MainLayout - see the CascadingValue
-    // wrapping @Body there. Both are needed to ask NotificationService
-    // for only the notifications this signed-in user should see (their
-    // personal ones, plus any role-wide broadcast for their SystemRole).
-    [CascadingParameter(Name = "CurrentRole")]
-    private string? CurrentRole { get; set; }
+    // The API only ever returns the signed-in user's own notifications.
+    private IReadOnlyList<NotificationDto> MyNotifications => AppData.Notifications;
 
-    [CascadingParameter(Name = "CurrentUserId")]
-    private Guid? CurrentUserId { get; set; }
+    private int UnreadCount => AppData.UnreadCount;
 
-    private SystemRole ParsedRole =>
-        Enum.TryParse<SystemRole>(CurrentRole, out var role) ? role : SystemRole.GeneralStaff;
+    private enum Kind { ResourceRequest, EventAssignment, TaskAssignment, Other }
 
-    private List<NotificationItem> MyNotifications =>
-        CurrentUserId.HasValue ? NotificationService.NotificationsFor(CurrentUserId.Value, ParsedRole) : new();
+    // Notification types are open-ended names in the API (TaskAssigned,
+    // RequestReviewed, ProjectAssigned, Announcement...), grouped by prefix.
+    private static Kind KindOf(NotificationDto n) =>
+        n.Type.StartsWith("Request") ? Kind.ResourceRequest
+        : n.Type.StartsWith("Project") || n.Type.StartsWith("Event") ? Kind.EventAssignment
+        : n.Type.StartsWith("Task") ? Kind.TaskAssignment
+        : Kind.Other;
 
-    private int UnreadCount => MyNotifications.Count(n => !IsRead(n));
-
-    private bool IsRead(NotificationItem n) => CurrentUserId.HasValue && n.IsReadBy(CurrentUserId.Value);
-
-    private NotificationType? activeFilter = null;
+    private Kind? activeFilter = null;
     private bool unreadOnly = false;
 
-    private IEnumerable<NotificationItem> FilteredNotifications =>
+    private IEnumerable<NotificationDto> FilteredNotifications =>
         MyNotifications
-            .Where(n => activeFilter is null || n.Type == activeFilter)
-            .Where(n => !unreadOnly || !IsRead(n));
+            .Where(n => activeFilter is null || KindOf(n) == activeFilter)
+            .Where(n => !unreadOnly || !n.IsRead);
 
-    private static string NotifIconClass(NotificationType type) => type switch
+    // "TaskAssigned" -> "Task Assigned"
+    private static string Title(NotificationDto n) =>
+        string.Concat(n.Type.Select((c, i) => i > 0 && char.IsUpper(c) ? $" {c}" : c.ToString()));
+
+    private static string NotifIconClass(Kind kind) => kind switch
     {
-        NotificationType.ResourceRequest => "resource-request",
-        NotificationType.EventAssignment => "event-assignment",
-        NotificationType.TaskAssignment => "task-assignment",
-        _ => "resource-request"
+        Kind.ResourceRequest => "resource-request",
+        Kind.EventAssignment => "event-assignment",
+        _ => "task-assignment"
     };
 
-    private static string NotifIcon(NotificationType type) => type switch
+    private static string NotifIcon(Kind kind) => kind switch
     {
-        NotificationType.ResourceRequest => Icons.Material.Filled.Inventory2,
-        NotificationType.EventAssignment => Icons.Material.Filled.EventAvailable,
-        NotificationType.TaskAssignment => Icons.Material.Filled.CheckCircleOutline,
-        _ => Icons.Material.Filled.Inventory2
+        Kind.ResourceRequest => Icons.Material.Filled.Inventory2,
+        Kind.EventAssignment => Icons.Material.Filled.EventAvailable,
+        Kind.TaskAssignment => Icons.Material.Filled.CheckCircleOutline,
+        _ => Icons.Material.Filled.Campaign
     };
 
-    private static string NotifTypeLabel(NotificationType type) => type switch
+    private static string NotifTypeLabel(Kind kind) => kind switch
     {
-        NotificationType.ResourceRequest => "Resource Request",
-        NotificationType.EventAssignment => "Event Assignment",
-        NotificationType.TaskAssignment => "Task Assignment",
-        _ => type.ToString()
+        Kind.ResourceRequest => "Resource Request",
+        Kind.EventAssignment => "Event Assignment",
+        Kind.TaskAssignment => "Task Assignment",
+        _ => "Announcement"
     };
 
-    // Clicking a notification marks it read (for this user only - see
-    // NotificationService.MarkAsRead) and, since this is a prototype
-    // without per-item deep links, sends the user to the page that
-    // owns that kind of data so they can see the thing it was about.
-    private void OpenNotification(NotificationItem n)
+    // Clicking a notification marks it read and opens the page that owns
+    // that kind of item, if this user's role can see it (UC-08). Task
+    // notifications fall back to Home, which lists today's tasks.
+    private async Task OpenNotification(NotificationDto n)
     {
-        if (!CurrentUserId.HasValue) return;
-        NotificationService.MarkAsRead(n, CurrentUserId.Value);
+        if (!n.IsRead) await AppData.MarkReadAsync([n.NotificationId]);
 
-        var destination = n.Type switch
+        var destination = KindOf(n) switch
         {
-            NotificationType.ResourceRequest => "requests",
-            NotificationType.EventAssignment => "events",
-            NotificationType.TaskAssignment => "tasks",
-            _ => "requests"
+            Kind.ResourceRequest when AppData.CanSeeRequests => "requests",
+            Kind.EventAssignment when AppData.CanSeeEvents => "events",
+            Kind.TaskAssignment => AppData.CanSeeTasks ? "tasks" : "",
+            _ => null
         };
-        Navigation.NavigateTo(destination);
+        if (destination is not null) Navigation.NavigateTo(destination);
     }
 
-    private void MarkAllAsRead()
-    {
-        if (CurrentUserId.HasValue) NotificationService.MarkAllAsRead(CurrentUserId.Value, ParsedRole);
-    }
+    private Task MarkAllAsRead() =>
+        AppData.MarkReadAsync(MyNotifications.Where(n => !n.IsRead).Select(n => n.NotificationId).ToList());
 
-    private void ClearAll()
+    // Re-render when notifications refresh - including SignalR pushes.
+    protected override async Task OnInitializedAsync()
     {
-        if (CurrentUserId.HasValue) NotificationService.ClearAll(CurrentUserId.Value, ParsedRole);
-    }
-
-    private static string RelativeTime(DateTime timestamp)
-    {
-        var span = DateTime.Now - timestamp;
-        if (span.TotalMinutes < 1) return "Just now";
-        if (span.TotalMinutes < 60) return $"{(int)span.TotalMinutes}m ago";
-        if (span.TotalHours < 24) return $"{(int)span.TotalHours}h ago";
-        if (span.TotalDays < 7) return $"{(int)span.TotalDays}d ago";
-        return timestamp.ToString("dd MMM");
-    }
-
-    // Re-render if a notification is added/changed elsewhere (e.g. the
-    // user submits a resource request on another tab of this circuit)
-    // while this page is open.
-    protected override void OnInitialized()
-    {
-        NotificationService.OnChange += StateHasChanged;
+        AppData.OnChange += StateHasChanged;
+        await AppData.RefreshNotificationsAsync();
     }
 
     public void Dispose()
     {
-        NotificationService.OnChange -= StateHasChanged;
+        AppData.OnChange -= StateHasChanged;
     }
 }

@@ -19,7 +19,6 @@
         --drps-tint-amber: #F6EBD3;
         --drps-tint-red: #FCEEF0;
         --drps-border-soft: #F1EEE2;
-        --drps-track: #E7E4D8;
         --drps-hover: #F2EFE4;
         --drps-empty: #B7B2A0;
         --drps-shadow: rgba(11, 22, 38, 0.06);
@@ -116,20 +115,6 @@
     .drps-roster-role {
         font-size: 0.74rem;
         color: var(--drps-text-muted);
-    }
-
-    .drps-roster-progress {
-        margin-top: 4px;
-        height: 4px;
-        border-radius: 2px;
-        background: var(--drps-track);
-        overflow: hidden;
-    }
-
-    .drps-roster-progress-bar {
-        height: 100%;
-        background: var(--drps-blue-500);
-        border-radius: 2px;
     }
 
     /* --- Right column: selected employee detail --- */
@@ -293,7 +278,6 @@
         --drps-tint-amber: rgba(185, 134, 46, 0.18);
         --drps-tint-red: rgba(224, 67, 92, 0.16);
         --drps-border-soft: #2E4A3B;
-        --drps-track: #2E4A3B;
         --drps-hover: #1E3327;
         --drps-empty: #4E5F52;
         --drps-shadow: rgba(0, 0, 0, 0.35);
@@ -306,7 +290,7 @@
         @* --- Header: title, search, and action button --- *@
         <div class="drps-users-header">
             <MudText Typo="Typo.h6" Style="font-weight:600;">User Management</MudText>
-            
+
             <div class="d-flex align-center gap-3">
                 @if (!showCreateUserScreen)
                 {
@@ -316,6 +300,7 @@
                                   Variant="Variant.Outlined"
                                   Adornment="Adornment.Start"
                                   AdornmentIcon="@Icons.Material.Filled.Search"
+                                  Immediate="true"
                                   Class="drps-users-search"
                                   Style="max-width:280px;" />
 
@@ -334,7 +319,7 @@
 
         @if (!showCreateUserScreen)
         {
-            @* --- ORIGINAL ROSTER & DETAIL VIEW --- *@
+            @* --- ROSTER & DETAIL VIEW --- *@
             <MudGrid>
                 <MudItem xs="12" md="4">
                     <div class="drps-roster">
@@ -346,14 +331,12 @@
                         {
                             @foreach (var employee in FilteredEmployees)
                             {
-                                <div class="drps-roster-item @(employee == selectedEmployee ? "selected" : "")" @onclick="() => selectedEmployee = employee">
-                                    <div class="drps-avatar">@employee.Initials</div>
+                                <div class="drps-roster-item @(employee == selectedEmployee ? "selected" : "")" @onclick="() => SelectEmployee(employee)">
+                                    <div class="drps-avatar">@Initials(employee.FullName)</div>
                                     <div style="flex:1;">
                                         <div class="drps-roster-name">@employee.FullName</div>
-                                        <div class="drps-roster-role">@employee.JobTitle</div>
-                                        <div class="drps-roster-progress">
-                                            <div class="drps-roster-progress-bar" style="width:@(CompletionRateFor(employee))%;"></div>
-                                        </div>
+                                        <div class="drps-roster-role">@employee.Role</div>
+                                        <div class="drps-roster-role">@WorkloadFor(employee)</div>
                                     </div>
                                 </div>
                             }
@@ -364,20 +347,24 @@
                 <MudItem xs="12" md="8">
                     @if (selectedEmployee is not null)
                     {
-                        
-                            var completedTasks = CompletedTasksFor(selectedEmployee).ToList();
-                            var pendingTasks = PendingTasksFor(selectedEmployee).ToList();
-                        
+                        var completedTasks = selectedTasks.Where(t => t.IsDone()).ToList();
+                        var pendingTasks = selectedTasks.Where(t => !t.IsDone()).ToList();
+
                         <div class="drps-profile-card">
-                            <div class="drps-avatar large">@selectedEmployee.Initials</div>
+                            <div class="drps-avatar large">@Initials(selectedEmployee.FullName)</div>
                             <div>
                                 <div class="drps-profile-name">@selectedEmployee.FullName</div>
-                                <div class="drps-profile-role">@selectedEmployee.JobTitle &middot; @selectedEmployee.Department</div>
+                                <div class="drps-profile-role">@selectedEmployee.Role</div>
                                 <div class="drps-profile-meta">
                                     <span><MudIcon Icon="@Icons.Material.Filled.Email" Size="Size.Small" />@selectedEmployee.Email</span>
-                                    <span><MudIcon Icon="@Icons.Material.Filled.CalendarMonth" Size="Size.Small" />Joined @selectedEmployee.JoinDate.ToString("MMMM yyyy")</span>
-                                    <span><MudIcon Icon="@Icons.Material.Filled.FiberManualRecord" Size="Size.Small" Style="color:#2E9E5B;" />Active</span>
-                                    <span><MudIcon Icon="@Icons.Material.Filled.AdminPanelSettings" Size="Size.Small" />@selectedEmployee.SystemRoleLabel</span>
+                                    @if (selectedEmployee.IsActive)
+                                    {
+                                        <span><MudIcon Icon="@Icons.Material.Filled.FiberManualRecord" Size="Size.Small" Style="color:#2E9E5B;" />Active</span>
+                                    }
+                                    else
+                                    {
+                                        <span><MudIcon Icon="@Icons.Material.Filled.FiberManualRecord" Size="Size.Small" Style="color:#E0435C;" />Deactivated</span>
+                                    }
                                 </div>
                             </div>
                         </div>
@@ -392,7 +379,7 @@
                                 <div class="drps-stat-label">Tasks pending</div>
                             </div>
                             <div class="drps-stat-card rate">
-                                <div class="drps-stat-value">@CompletionRateFor(selectedEmployee)%</div>
+                                <div class="drps-stat-value">@(selectedTasks.Count == 0 ? 0 : (int)Math.Round(completedTasks.Count * 100.0 / selectedTasks.Count))%</div>
                                 <div class="drps-stat-label">Completion rate</div>
                             </div>
                         </div>
@@ -411,9 +398,9 @@
                                 {
                                     @foreach (var task in completedTasks)
                                     {
-                                        <div class="drps-user-task priority-@task.Priority.ToString().ToLower() done">
+                                        <div class="drps-user-task priority-@task.Priority.ToLower() done">
                                             <div class="drps-user-task-title">@task.Title</div>
-                                            <div class="drps-user-task-meta">@task.Category &middot; completed @((task.CompletedAt ?? task.ScheduledStart).ToString("d MMM"))</div>
+                                            <div class="drps-user-task-meta">@TaskMeta(task)</div>
                                         </div>
                                     }
                                 }
@@ -432,9 +419,9 @@
                                 {
                                     @foreach (var task in pendingTasks)
                                     {
-                                        <div class="drps-user-task priority-@task.Priority.ToString().ToLower()">
+                                        <div class="drps-user-task priority-@task.Priority.ToLower()">
                                             <div class="drps-user-task-title">@task.Title</div>
-                                            <div class="drps-user-task-meta">@task.Category &middot; due @task.ScheduledStart.ToString("d MMM")</div>
+                                            <div class="drps-user-task-meta">@TaskMeta(task)</div>
                                         </div>
                                     }
                                 }
@@ -446,44 +433,35 @@
         }
         else
         {
-            @* --- NEW CREATE USER FORM --- *@
+            @* --- CREATE USER FORM --- *@
             <div class="drps-create-card">
                 <MudText Typo="Typo.h6" Style="font-weight:600; color:var(--drps-navy-800);" Class="mb-4">Create New Account</MudText>
-                
+
                 <MudGrid Justify="Justify.Center">
                     <MudItem xs="12" md="6">
-                        <MudTextField T="string" @bind-Value="newUserName" Label="Full Name" Variant="Variant.Outlined" Class="mb-3" />
-                        <MudTextField T="string" @bind-Value="newUserEmail" Label="Email Address" Variant="Variant.Outlined" Class="mb-3" />
+                        <MudTextField T="string" @bind-Value="newUser.FirstName" Label="First Name" Variant="Variant.Outlined" MaxLength="100" Immediate="true" Class="mb-3" />
+                        <MudTextField T="string" @bind-Value="newUser.Surname" Label="Surname" Variant="Variant.Outlined" MaxLength="100" Immediate="true" Class="mb-3" />
+                        <MudTextField T="string" @bind-Value="newUser.Email" Label="Email Address" InputType="InputType.Email" Variant="Variant.Outlined" MaxLength="256" Immediate="true" Class="mb-3" />
+                        <MudTextField T="string" @bind-Value="newUser.CellNo" Label="Cell Number" InputType="InputType.Telephone" Variant="Variant.Outlined" MaxLength="20" Immediate="true" Class="mb-3" />
 
-                        @* Login credentials - this form creates a real login
-                           account (checked by AppDataService.Login), not
-                           just an employee profile. *@
-                        <MudTextField T="string" @bind-Value="newUserUsername" Label="Username" Placeholder="Defaults to email if left blank" Variant="Variant.Outlined" Class="mb-3" />
-                        <MudTextField T="string" @bind-Value="newUserPassword" Label="Password" InputType="InputType.Password" Variant="Variant.Outlined" Class="mb-3" />
-
-                        <MudSelect T="string" Label="Job Title" Variant="Variant.Outlined" @bind-Value="newUserRole" Class="mb-3">
-                            <MudSelectItem Value="@("Operations Coordinator")">Operations Coordinator</MudSelectItem>
-                            <MudSelectItem Value="@("Fieldwork Lead")">Fieldwork Lead</MudSelectItem>
-                            <MudSelectItem Value="@("Programs Manager")">Programs Manager</MudSelectItem>
-                            <MudSelectItem Value="@("IT & Systems Support")">IT & Systems Support</MudSelectItem>
-                            <MudSelectItem Value="@("Communications Officer")">Communications Officer</MudSelectItem>
+                        @* The role decides which pages the account can see (see
+                           AppDataService.CanSee*) and what it may do in the API. *@
+                        <MudSelect T="int?" Label="System Role" Variant="Variant.Outlined" @bind-Value="newUser.RoleId"
+                                   ToStringFunc="@(id => roles.FirstOrDefault(r => r.RoleId == id)?.RoleName)" Class="mb-3">
+                            @foreach (var role in roles)
+                            {
+                                <MudSelectItem T="int?" Value="@role.RoleId">@role.RoleName</MudSelectItem>
+                            }
                         </MudSelect>
 
-                        @* System role is separate from the job-title Role
-                           above - this is what gates which pages/tabs the
-                           new account can see (see MainLayout's
-                           CanSeeMeetings/CanSeeUserManagement/CanSeeEvents). *@
-                        <MudSelect T="SystemRole" Label="System Role" Variant="Variant.Outlined" @bind-Value="newUserSystemRole" Class="mb-3">
-                            <MudSelectItem Value="@SystemRole.GeneralStaff">General Staff</MudSelectItem>
-                            <MudSelectItem Value="@SystemRole.FacilityManager">Facility Manager</MudSelectItem>
-                            <MudSelectItem Value="@SystemRole.SecondaryAdmin">Secondary Admin</MudSelectItem>
-                            <MudSelectItem Value="@SystemRole.Admin">Admin</MudSelectItem>
-                        </MudSelect>
-
-                        <MudTextField T="string" @bind-Value="newUserDepartment" Label="Department" Variant="Variant.Outlined" Class="mb-4" />
+                        @* The account signs in with this; there's no reset flow yet, so share it securely. *@
+                        <MudTextField T="string" @bind-Value="newUser.TempPassword" Label="Temporary Password" InputType="InputType.Password"
+                                      HelperText="At least 8 characters" Variant="Variant.Outlined" MaxLength="128" Immediate="true" Class="mb-4" />
 
                         <div class="d-flex gap-2">
-                            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveUser">Save User</MudButton>
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@(!CanSaveUser)" OnClick="SaveUser">
+                                @(saving ? "Saving..." : "Save User")
+                            </MudButton>
                             <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="() => showCreateUserScreen = false">Cancel</MudButton>
                         </div>
                     </MudItem>
@@ -498,94 +476,101 @@
     private string searchTerm = string.Empty;
     private bool showCreateUserScreen = false;
 
-    // Create user form fields
-    private string newUserName = string.Empty;
-    private string newUserEmail = string.Empty;
-    private string newUserUsername = string.Empty;
-    private string newUserPassword = string.Empty;
-    private string newUserRole = "Operations Coordinator";
-    private SystemRole newUserSystemRole = SystemRole.GeneralStaff;
-    private string newUserDepartment = "Admin";
+    // UC-06 workload counts per active user, and the roles to pick from.
+    private IReadOnlyList<StaffOverviewRow> overview = [];
+    private IReadOnlyList<RoleDto> roles = [];
 
-    private IEnumerable<AppUser> FilteredEmployees =>
-        string.IsNullOrWhiteSpace(searchTerm)
-            ? AppData.Users
-            : AppData.Users.Where(e =>
-                e.FullName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
-                e.JobTitle.Contains(searchTerm, StringComparison.OrdinalIgnoreCase));
+    private UserSummaryDto? selectedEmployee;
+    private IReadOnlyList<TaskCardDto> selectedTasks = [];
 
-    private AppUser? selectedEmployee;
+    // Create user form
+    private NewUserForm newUser = new();
+    private bool saving;
 
-    // Completed/pending tasks are computed on the fly by filtering
-    // AppData's shared Tasks collection, rather than stored on the
-    // employee - this is what ties User Management into the same task
-    // pool Home/Tasks/Events all share.
-    private IEnumerable<AppTask> CompletedTasksFor(AppUser employee) =>
-        AppData.Tasks.Where(t => t.Assignee == employee.FullName && t.IsCompleted);
+    private bool CanSaveUser =>
+        !saving &&
+        !string.IsNullOrWhiteSpace(newUser.FirstName) &&
+        !string.IsNullOrWhiteSpace(newUser.Surname) &&
+        !string.IsNullOrWhiteSpace(newUser.Email) &&
+        !string.IsNullOrWhiteSpace(newUser.CellNo) &&
+        newUser.RoleId.HasValue &&
+        newUser.TempPassword.Length >= 8;
 
-    private IEnumerable<AppTask> PendingTasksFor(AppUser employee) =>
-        AppData.Tasks.Where(t => t.Assignee == employee.FullName && !t.IsCompleted);
+    private IEnumerable<UserSummaryDto> FilteredEmployees =>
+        AppData.Users
+            .Where(e => string.IsNullOrWhiteSpace(searchTerm) ||
+                        e.FullName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                        e.Role.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                        e.Email.Contains(searchTerm, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(e => e.FullName);
 
-    private int CompletionRateFor(AppUser employee)
+    private string WorkloadFor(UserSummaryDto user) =>
+        !user.IsActive ? "Deactivated"
+        : overview.FirstOrDefault(r => r.UserId == user.UserId) is { } row
+            ? $"{row.ActiveTasks} active · {row.OverdueTasks} overdue"
+            : "";
+
+    private string TaskMeta(TaskCardDto task) =>
+        $"{AppData.EventName(task) ?? "Daily task"} · due {task.Deadline:d MMM}";
+
+    private static string Initials(string fullName) =>
+        string.Concat(fullName.Split(' ', StringSplitOptions.RemoveEmptyEntries).Select(part => part[0])).ToUpper();
+
+    protected override async Task OnInitializedAsync()
     {
-        var completed = CompletedTasksFor(employee).Count();
-        var pending = PendingTasksFor(employee).Count();
-        var total = completed + pending;
-        return total == 0 ? 0 : (int)Math.Round(completed * 100.0 / total);
+        AppData.OnChange += StateHasChanged;
+        var rolesLoad = AppData.GetAsync<List<RoleDto>>("api/roles");
+        await Task.WhenAll(rolesLoad, LoadOverview(), AppData.RefreshUsersAsync());
+        roles = await rolesLoad ?? [];
+        if (FilteredEmployees.FirstOrDefault() is { } first) await SelectEmployee(first);
     }
 
-    protected override void OnInitialized()
+    private async Task LoadOverview() =>
+        overview = await AppData.GetAsync<List<StaffOverviewRow>>("api/users/overview") ?? [];
+
+    // Every task assigned to the employee, completed or not.
+    private async Task SelectEmployee(UserSummaryDto employee)
     {
-        selectedEmployee = AppData.Users.FirstOrDefault();
-        AppData.OnChange += HandleAppDataChanged;
+        selectedEmployee = employee;
+        selectedTasks = [];
+        var tasks = await AppData.GetAsync<List<TaskCardDto>>($"api/tasks?assigneeId={employee.UserId}");
+        if (selectedEmployee == employee) selectedTasks = tasks ?? []; // ignore a slower, older click
     }
 
-    // If the currently-selected employee gets removed/replaced elsewhere
-    // (not possible today - there's no delete - but kept consistent with
-    // the other migrated pages), fall back to the first user rather than
-    // holding a stale reference. Otherwise just re-render.
-    private void HandleAppDataChanged()
+    private async Task SaveUser()
     {
-        if (selectedEmployee is not null && !AppData.Users.Contains(selectedEmployee))
+        if (!CanSaveUser) return;
+        saving = true;
+        var created = await AppData.SendAsync<UserDto>(HttpMethod.Post, "api/users", new CreateUserRequest
         {
-            selectedEmployee = AppData.Users.FirstOrDefault();
-        }
-        StateHasChanged();
-    }
-
-    private void SaveUser()
-    {
-        if (string.IsNullOrWhiteSpace(newUserName)) return;
-
-        // Username defaults to the email address if left blank, same
-        // convention as the seeded accounts in AppDataService.SeedUsers.
-        var username = string.IsNullOrWhiteSpace(newUserUsername) ? newUserEmail : newUserUsername;
-
-        var created = AppData.AddUser(new AppUser
-        {
-            FullName = newUserName,
-            Email = newUserEmail,
-            Username = username,
-            Password = newUserPassword,
-            SystemRole = newUserSystemRole,
-            JobTitle = newUserRole,
-            Department = newUserDepartment,
-            JoinDate = DateTime.Today
+            FirstName = newUser.FirstName.Trim(),
+            Surname = newUser.Surname.Trim(),
+            Email = newUser.Email.Trim(),
+            CellNo = newUser.CellNo.Trim(),
+            RoleId = newUser.RoleId!.Value,
+            TempPassword = newUser.TempPassword,
         });
+        saving = false;
+        if (created is null) return;
 
-        selectedEmployee = created;
-
-        // Reset form
-        newUserName = string.Empty;
-        newUserEmail = string.Empty;
-        newUserUsername = string.Empty;
-        newUserPassword = string.Empty;
-        newUserSystemRole = SystemRole.GeneralStaff;
+        await Task.WhenAll(AppData.RefreshUsersAsync(), LoadOverview());
+        newUser = new NewUserForm();
         showCreateUserScreen = false;
+        if (AppData.Users.FirstOrDefault(u => u.UserId == created.UserId) is { } user) await SelectEmployee(user);
+    }
+
+    private class NewUserForm
+    {
+        public string FirstName { get; set; } = string.Empty;
+        public string Surname { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public string CellNo { get; set; } = string.Empty;
+        public int? RoleId { get; set; }
+        public string TempPassword { get; set; } = string.Empty;
     }
 
     public void Dispose()
     {
-        AppData.OnChange -= HandleAppDataChanged;
+        AppData.OnChange -= StateHasChanged;
     }
 }
