@@ -1,0 +1,591 @@
+@page "/users"
+@using MudBlazor
+@implements IDisposable
+@inject AppDataService AppData
+
+<PageTitle>User Management</PageTitle>
+
+<style>
+    .drps-users {
+        --drps-navy-900: #12271F;
+        --drps-navy-800: #1C3D32;
+        --drps-blue-600: #2F5C4C;
+        --drps-blue-500: #3C7A63;
+        --drps-blue-400: #6FA98C;
+        --drps-bg: #F5F3EC;
+        --drps-surface: #FFFFFF;
+        --drps-text-muted: #75806F;
+        --drps-tint-blue: #EAF2ED;
+        --drps-tint-amber: #F6EBD3;
+        --drps-tint-red: #FCEEF0;
+        --drps-border-soft: #F1EEE2;
+        --drps-track: #E7E4D8;
+        --drps-hover: #F2EFE4;
+        --drps-empty: #B7B2A0;
+        --drps-shadow: rgba(11, 22, 38, 0.06);
+        background: var(--drps-bg);
+        min-height: 100%;
+        padding-bottom: 2rem;
+    }
+
+    .drps-users-header {
+        background: linear-gradient(135deg, var(--drps-navy-900) 0%, var(--drps-blue-600) 100%);
+        border-radius: 16px;
+        padding: 20px 24px;
+        color: white;
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        flex-wrap: wrap;
+    }
+
+    .drps-users-search .mud-input-outlined-border {
+        border-color: rgba(255, 255, 255, 0.35) !important;
+    }
+
+    .drps-users-search .mud-input-slot,
+    .drps-users-search input {
+        color: white !important;
+    }
+
+    .drps-users-search .mud-input-label,
+    .drps-users-search .mud-icon-root {
+        color: rgba(255, 255, 255, 0.7) !important;
+    }
+
+    /* --- Left column: employee roster --- */
+    .drps-roster {
+        background: var(--drps-surface);
+        border-radius: 16px;
+        box-shadow: 0 2px 10px var(--drps-shadow);
+        overflow: hidden;
+    }
+
+    .drps-roster-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 16px;
+        cursor: pointer;
+        border-left: 3px solid transparent;
+        border-bottom: 1px solid var(--drps-border-soft);
+        transition: background 0.15s ease;
+    }
+
+    .drps-roster-item:last-child {
+        border-bottom: none;
+    }
+
+    .drps-roster-item:hover {
+        background: var(--drps-hover);
+    }
+
+    .drps-roster-item.selected {
+        background: var(--drps-tint-blue);
+        border-left-color: var(--drps-blue-500);
+    }
+
+    .drps-avatar {
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--drps-blue-400) 0%, var(--drps-blue-500) 100%);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        font-size: 0.85rem;
+        flex-shrink: 0;
+    }
+
+    .drps-avatar.large {
+        width: 60px;
+        height: 60px;
+        font-size: 1.2rem;
+    }
+
+    .drps-roster-name {
+        font-size: 0.88rem;
+        font-weight: 600;
+        color: var(--drps-navy-800);
+    }
+
+    .drps-roster-role {
+        font-size: 0.74rem;
+        color: var(--drps-text-muted);
+    }
+
+    .drps-roster-progress {
+        margin-top: 4px;
+        height: 4px;
+        border-radius: 2px;
+        background: var(--drps-track);
+        overflow: hidden;
+    }
+
+    .drps-roster-progress-bar {
+        height: 100%;
+        background: var(--drps-blue-500);
+        border-radius: 2px;
+    }
+
+    /* --- Right column: selected employee detail --- */
+    .drps-profile-card {
+        background: var(--drps-surface);
+        border-radius: 16px;
+        padding: 20px 24px;
+        box-shadow: 0 2px 10px var(--drps-shadow);
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 16px;
+        flex-wrap: wrap;
+    }
+
+    .drps-profile-name {
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: var(--drps-navy-800);
+    }
+
+    .drps-profile-role {
+        font-size: 0.85rem;
+        color: var(--drps-blue-500);
+        font-weight: 500;
+    }
+
+    .drps-profile-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px;
+        margin-top: 6px;
+        font-size: 0.78rem;
+        color: var(--drps-text-muted);
+    }
+
+    .drps-profile-meta span {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+
+    /* --- Stat cards row --- */
+    .drps-stats-row {
+        display: flex;
+        gap: 14px;
+        margin-bottom: 16px;
+        flex-wrap: wrap;
+    }
+
+    .drps-stat-card {
+        flex: 1;
+        min-width: 140px;
+        background: var(--drps-surface);
+        border-radius: 14px;
+        padding: 14px 18px;
+        box-shadow: 0 2px 10px var(--drps-shadow);
+        border-left: 4px solid var(--drps-blue-500);
+    }
+
+    .drps-stat-card.pending {
+        border-left-color: #B9862E;
+    }
+
+    .drps-stat-card.rate {
+        border-left-color: #2E9E5B;
+    }
+
+    .drps-stat-value {
+        font-size: 1.4rem;
+        font-weight: 700;
+        color: var(--drps-navy-800);
+    }
+
+    .drps-stat-label {
+        font-size: 0.74rem;
+        color: var(--drps-text-muted);
+    }
+
+    /* --- Task lists (completed / outstanding) --- */
+    .drps-task-columns {
+        display: flex;
+        gap: 16px;
+        flex-wrap: wrap;
+    }
+
+    .drps-task-col {
+        flex: 1;
+        min-width: 260px;
+        background: var(--drps-surface);
+        border-radius: 16px;
+        padding: 18px;
+        box-shadow: 0 2px 10px var(--drps-shadow);
+    }
+
+    .drps-task-col-title {
+        font-weight: 600;
+        color: var(--drps-navy-800);
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.9rem;
+    }
+
+    .drps-user-task {
+        border-radius: 8px;
+        padding: 8px 12px;
+        background: var(--drps-tint-blue);
+        border-left: 4px solid var(--drps-blue-500);
+        margin-bottom: 8px;
+    }
+
+    .drps-user-task.priority-high { border-left-color: #E0435C; background: var(--drps-tint-red); }
+    .drps-user-task.priority-medium { border-left-color: #B9862E; background: var(--drps-tint-amber); }
+    .drps-user-task.priority-low { border-left-color: var(--drps-blue-500); background: var(--drps-tint-blue); }
+
+    .drps-user-task.done {
+        opacity: 0.6;
+    }
+
+    .drps-user-task.done .drps-user-task-title {
+        text-decoration: line-through;
+    }
+
+    .drps-user-task-title {
+        font-size: 0.85rem;
+        font-weight: 500;
+        color: var(--drps-navy-800);
+    }
+
+    .drps-user-task-meta {
+        font-size: 0.7rem;
+        color: var(--drps-text-muted);
+        margin-top: 2px;
+    }
+
+    .drps-task-col-empty {
+        color: var(--drps-empty);
+        font-size: 0.8rem;
+        text-align: center;
+        padding: 20px 0;
+    }
+
+    /* --- Create user card styling --- */
+    .drps-create-card {
+        background: var(--drps-surface);
+        border-radius: 16px;
+        padding: 24px;
+        box-shadow: 0 2px 10px var(--drps-shadow);
+        min-height: 60vh;
+    }
+
+    /* --- Dark mode overrides --- */
+    .page.dark-mode .drps-users {
+        --drps-bg: #0B1B21;
+        --drps-surface: #1E362B;
+        --drps-text-muted: #93A69A;
+        --drps-navy-800: #E9F0EA;
+        --drps-tint-blue: rgba(60, 122, 99, 0.16);
+        --drps-tint-amber: rgba(185, 134, 46, 0.18);
+        --drps-tint-red: rgba(224, 67, 92, 0.16);
+        --drps-border-soft: #2E4A3B;
+        --drps-track: #2E4A3B;
+        --drps-hover: #1E3327;
+        --drps-empty: #4E5F52;
+        --drps-shadow: rgba(0, 0, 0, 0.35);
+    }
+</style>
+
+<div class="drps-users">
+    <MudContainer MaxWidth="MaxWidth.Large" Class="pt-6">
+
+        @* --- Header: title, search, and action button --- *@
+        <div class="drps-users-header">
+            <MudText Typo="Typo.h6" Style="font-weight:600;">User Management</MudText>
+            
+            <div class="d-flex align-center gap-3">
+                @if (!showCreateUserScreen)
+                {
+                    <MudTextField T="string"
+                                  @bind-Value="searchTerm"
+                                  Placeholder="Search employees..."
+                                  Variant="Variant.Outlined"
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Search"
+                                  Class="drps-users-search"
+                                  Style="max-width:280px;" />
+
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="() => showCreateUserScreen = true">
+                        Add New User
+                    </MudButton>
+                }
+                else
+                {
+                    <MudButton Variant="Variant.Outlined" Style="color: white; border-color: rgba(255, 255, 255, 0.5);" StartIcon="@Icons.Material.Filled.ArrowBack" OnClick="() => showCreateUserScreen = false">
+                        Back to Roster
+                    </MudButton>
+                }
+            </div>
+        </div>
+
+        @if (!showCreateUserScreen)
+        {
+            @* --- ORIGINAL ROSTER & DETAIL VIEW --- *@
+            <MudGrid>
+                <MudItem xs="12" md="4">
+                    <div class="drps-roster">
+                        @if (!FilteredEmployees.Any())
+                        {
+                            <div class="drps-task-col-empty">No employees match your search</div>
+                        }
+                        else
+                        {
+                            @foreach (var employee in FilteredEmployees)
+                            {
+                                <div class="drps-roster-item @(employee == selectedEmployee ? "selected" : "")" @onclick="() => selectedEmployee = employee">
+                                    <div class="drps-avatar">@employee.Initials</div>
+                                    <div style="flex:1;">
+                                        <div class="drps-roster-name">@employee.FullName</div>
+                                        <div class="drps-roster-role">@employee.JobTitle</div>
+                                        <div class="drps-roster-progress">
+                                            <div class="drps-roster-progress-bar" style="width:@(CompletionRateFor(employee))%;"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        }
+                    </div>
+                </MudItem>
+
+                <MudItem xs="12" md="8">
+                    @if (selectedEmployee is not null)
+                    {
+                        
+                            var completedTasks = CompletedTasksFor(selectedEmployee).ToList();
+                            var pendingTasks = PendingTasksFor(selectedEmployee).ToList();
+                        
+                        <div class="drps-profile-card">
+                            <div class="drps-avatar large">@selectedEmployee.Initials</div>
+                            <div>
+                                <div class="drps-profile-name">@selectedEmployee.FullName</div>
+                                <div class="drps-profile-role">@selectedEmployee.JobTitle &middot; @selectedEmployee.Department</div>
+                                <div class="drps-profile-meta">
+                                    <span><MudIcon Icon="@Icons.Material.Filled.Email" Size="Size.Small" />@selectedEmployee.Email</span>
+                                    <span><MudIcon Icon="@Icons.Material.Filled.CalendarMonth" Size="Size.Small" />Joined @selectedEmployee.JoinDate.ToString("MMMM yyyy")</span>
+                                    <span><MudIcon Icon="@Icons.Material.Filled.FiberManualRecord" Size="Size.Small" Style="color:#2E9E5B;" />Active</span>
+                                    <span><MudIcon Icon="@Icons.Material.Filled.AdminPanelSettings" Size="Size.Small" />@selectedEmployee.SystemRoleLabel</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="drps-stats-row">
+                            <div class="drps-stat-card">
+                                <div class="drps-stat-value">@completedTasks.Count</div>
+                                <div class="drps-stat-label">Tasks completed</div>
+                            </div>
+                            <div class="drps-stat-card pending">
+                                <div class="drps-stat-value">@pendingTasks.Count</div>
+                                <div class="drps-stat-label">Tasks pending</div>
+                            </div>
+                            <div class="drps-stat-card rate">
+                                <div class="drps-stat-value">@CompletionRateFor(selectedEmployee)%</div>
+                                <div class="drps-stat-label">Completion rate</div>
+                            </div>
+                        </div>
+
+                        <div class="drps-task-columns">
+                            <div class="drps-task-col">
+                                <div class="drps-task-col-title">
+                                    <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Small" Style="color:#2E9E5B;" />
+                                    Completed
+                                </div>
+                                @if (!completedTasks.Any())
+                                {
+                                    <div class="drps-task-col-empty">Nothing completed yet</div>
+                                }
+                                else
+                                {
+                                    @foreach (var task in completedTasks)
+                                    {
+                                        <div class="drps-user-task priority-@task.Priority.ToString().ToLower() done">
+                                            <div class="drps-user-task-title">@task.Title</div>
+                                            <div class="drps-user-task-meta">@task.Category &middot; completed @((task.CompletedAt ?? task.ScheduledStart).ToString("d MMM"))</div>
+                                        </div>
+                                    }
+                                }
+                            </div>
+
+                            <div class="drps-task-col">
+                                <div class="drps-task-col-title">
+                                    <MudIcon Icon="@Icons.Material.Filled.PendingActions" Size="Size.Small" Style="color:#B9862E;" />
+                                    Still To Do
+                                </div>
+                                @if (!pendingTasks.Any())
+                                {
+                                    <div class="drps-task-col-empty">All caught up</div>
+                                }
+                                else
+                                {
+                                    @foreach (var task in pendingTasks)
+                                    {
+                                        <div class="drps-user-task priority-@task.Priority.ToString().ToLower()">
+                                            <div class="drps-user-task-title">@task.Title</div>
+                                            <div class="drps-user-task-meta">@task.Category &middot; due @task.ScheduledStart.ToString("d MMM")</div>
+                                        </div>
+                                    }
+                                }
+                            </div>
+                        </div>
+                    }
+                </MudItem>
+            </MudGrid>
+        }
+        else
+        {
+            @* --- NEW CREATE USER FORM --- *@
+            <div class="drps-create-card">
+                <MudText Typo="Typo.h6" Style="font-weight:600; color:var(--drps-navy-800);" Class="mb-4">Create New Account</MudText>
+                
+                <MudGrid Justify="Justify.Center">
+                    <MudItem xs="12" md="6">
+                        <MudTextField T="string" @bind-Value="newUserName" Label="Full Name" Variant="Variant.Outlined" Class="mb-3" />
+                        <MudTextField T="string" @bind-Value="newUserEmail" Label="Email Address" Variant="Variant.Outlined" Class="mb-3" />
+
+                        @* Login credentials - this form creates a real login
+                           account (checked by AppDataService.Login), not
+                           just an employee profile. *@
+                        <MudTextField T="string" @bind-Value="newUserUsername" Label="Username" Placeholder="Defaults to email if left blank" Variant="Variant.Outlined" Class="mb-3" />
+                        <MudTextField T="string" @bind-Value="newUserPassword" Label="Password" InputType="InputType.Password" Variant="Variant.Outlined" Class="mb-3" />
+
+                        <MudSelect T="string" Label="Job Title" Variant="Variant.Outlined" @bind-Value="newUserRole" Class="mb-3">
+                            <MudSelectItem Value="@("Operations Coordinator")">Operations Coordinator</MudSelectItem>
+                            <MudSelectItem Value="@("Fieldwork Lead")">Fieldwork Lead</MudSelectItem>
+                            <MudSelectItem Value="@("Programs Manager")">Programs Manager</MudSelectItem>
+                            <MudSelectItem Value="@("IT & Systems Support")">IT & Systems Support</MudSelectItem>
+                            <MudSelectItem Value="@("Communications Officer")">Communications Officer</MudSelectItem>
+                        </MudSelect>
+
+                        @* System role is separate from the job-title Role
+                           above - this is what gates which pages/tabs the
+                           new account can see (see MainLayout's
+                           CanSeeMeetings/CanSeeUserManagement/CanSeeEvents). *@
+                        <MudSelect T="SystemRole" Label="System Role" Variant="Variant.Outlined" @bind-Value="newUserSystemRole" Class="mb-3">
+                            <MudSelectItem Value="@SystemRole.GeneralStaff">General Staff</MudSelectItem>
+                            <MudSelectItem Value="@SystemRole.FacilityManager">Facility Manager</MudSelectItem>
+                            <MudSelectItem Value="@SystemRole.SecondaryAdmin">Secondary Admin</MudSelectItem>
+                            <MudSelectItem Value="@SystemRole.Admin">Admin</MudSelectItem>
+                        </MudSelect>
+
+                        <MudTextField T="string" @bind-Value="newUserDepartment" Label="Department" Variant="Variant.Outlined" Class="mb-4" />
+
+                        <div class="d-flex gap-2">
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveUser">Save User</MudButton>
+                            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="() => showCreateUserScreen = false">Cancel</MudButton>
+                        </div>
+                    </MudItem>
+                </MudGrid>
+            </div>
+        }
+
+    </MudContainer>
+</div>
+
+@code {
+    private string searchTerm = string.Empty;
+    private bool showCreateUserScreen = false;
+
+    // Create user form fields
+    private string newUserName = string.Empty;
+    private string newUserEmail = string.Empty;
+    private string newUserUsername = string.Empty;
+    private string newUserPassword = string.Empty;
+    private string newUserRole = "Operations Coordinator";
+    private SystemRole newUserSystemRole = SystemRole.GeneralStaff;
+    private string newUserDepartment = "Admin";
+
+    private IEnumerable<AppUser> FilteredEmployees =>
+        string.IsNullOrWhiteSpace(searchTerm)
+            ? AppData.Users
+            : AppData.Users.Where(e =>
+                e.FullName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                e.JobTitle.Contains(searchTerm, StringComparison.OrdinalIgnoreCase));
+
+    private AppUser? selectedEmployee;
+
+    // Completed/pending tasks are computed on the fly by filtering
+    // AppData's shared Tasks collection, rather than stored on the
+    // employee - this is what ties User Management into the same task
+    // pool Home/Tasks/Events all share.
+    private IEnumerable<AppTask> CompletedTasksFor(AppUser employee) =>
+        AppData.Tasks.Where(t => t.Assignee == employee.FullName && t.IsCompleted);
+
+    private IEnumerable<AppTask> PendingTasksFor(AppUser employee) =>
+        AppData.Tasks.Where(t => t.Assignee == employee.FullName && !t.IsCompleted);
+
+    private int CompletionRateFor(AppUser employee)
+    {
+        var completed = CompletedTasksFor(employee).Count();
+        var pending = PendingTasksFor(employee).Count();
+        var total = completed + pending;
+        return total == 0 ? 0 : (int)Math.Round(completed * 100.0 / total);
+    }
+
+    protected override void OnInitialized()
+    {
+        selectedEmployee = AppData.Users.FirstOrDefault();
+        AppData.OnChange += HandleAppDataChanged;
+    }
+
+    // If the currently-selected employee gets removed/replaced elsewhere
+    // (not possible today - there's no delete - but kept consistent with
+    // the other migrated pages), fall back to the first user rather than
+    // holding a stale reference. Otherwise just re-render.
+    private void HandleAppDataChanged()
+    {
+        if (selectedEmployee is not null && !AppData.Users.Contains(selectedEmployee))
+        {
+            selectedEmployee = AppData.Users.FirstOrDefault();
+        }
+        StateHasChanged();
+    }
+
+    private void SaveUser()
+    {
+        if (string.IsNullOrWhiteSpace(newUserName)) return;
+
+        // Username defaults to the email address if left blank, same
+        // convention as the seeded accounts in AppDataService.SeedUsers.
+        var username = string.IsNullOrWhiteSpace(newUserUsername) ? newUserEmail : newUserUsername;
+
+        var created = AppData.AddUser(new AppUser
+        {
+            FullName = newUserName,
+            Email = newUserEmail,
+            Username = username,
+            Password = newUserPassword,
+            SystemRole = newUserSystemRole,
+            JobTitle = newUserRole,
+            Department = newUserDepartment,
+            JoinDate = DateTime.Today
+        });
+
+        selectedEmployee = created;
+
+        // Reset form
+        newUserName = string.Empty;
+        newUserEmail = string.Empty;
+        newUserUsername = string.Empty;
+        newUserPassword = string.Empty;
+        newUserSystemRole = SystemRole.GeneralStaff;
+        showCreateUserScreen = false;
+    }
+
+    public void Dispose()
+    {
+        AppData.OnChange -= HandleAppDataChanged;
+    }
+}
