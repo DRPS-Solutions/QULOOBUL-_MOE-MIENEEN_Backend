@@ -98,14 +98,14 @@
             <MudIconButton Icon="@Icons.Material.Filled.Notifications"
                             Color="Color.Inherit"
                             Size="Size.Small"
-                            Title="Notifications"
+                            title="Notifications"
                             OnClick="@(() => Navigation.NavigateTo("notifications"))" />
         </MudBadge>
 
         <MudMenu Icon="@Icons.Material.Filled.Settings"
                   Color="Color.Inherit"
                   Size="Size.Small"
-                  Title="Settings"
+                  title="Settings"
                   AnchorOrigin="Origin.BottomRight"
                   TransformOrigin="Origin.TopRight">
             <MudMenuItem OnClick="@(() => OnToggleDarkMode.InvokeAsync())">
@@ -131,7 +131,7 @@
         <MudMenu Icon="@Icons.Material.Filled.AccountCircle"
                   Color="Color.Inherit"
                   Size="Size.Small"
-                  Title="Account"
+                  title="Account"
                   AnchorOrigin="Origin.BottomRight"
                   TransformOrigin="Origin.TopRight">
             <MudText Typo="Typo.subtitle2" Class="px-4 pt-1 pb-2">

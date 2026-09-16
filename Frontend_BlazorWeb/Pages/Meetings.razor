@@ -262,7 +262,7 @@
 
             <div class="drps-card">
                 <MudTable T="Meeting" Items="AppData.Meetings" Hover="true" Striped="false" Elevation="0"
-                          RowClass="drps-meeting-row" OnRowClick="@((TableRowClickEventArgs<Meeting> e) => OpenExistingMeeting(e.Item))">
+                          RowClass="drps-meeting-row" OnRowClick="@((TableRowClickEventArgs<Meeting> e) => { if (e.Item is not null) OpenExistingMeeting(e.Item); })">
                     <HeaderContent>
                         <MudTh>Topic / Title</MudTh>
                         <MudTh>Date</MudTh>

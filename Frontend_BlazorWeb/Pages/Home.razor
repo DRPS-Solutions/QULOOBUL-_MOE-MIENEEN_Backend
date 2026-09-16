@@ -190,7 +190,7 @@
                         @foreach (var task in todayTasks.OrderBy(t => t.ScheduledStart))
                         {
                             <div class="task-item @(task.IsCompleted ? "completed" : "")">
-                                <MudGrid AlignItems="Center">
+                                <MudGrid Class="align-items-center">
                                     <MudItem xs="12" sm="1">
                                         <MudCheckBox T="bool"
                                                      Value="task.IsCompleted"
