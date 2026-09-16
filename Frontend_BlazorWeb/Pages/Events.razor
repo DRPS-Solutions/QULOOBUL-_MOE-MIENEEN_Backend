@@ -1,0 +1,701 @@
+﻿@page "/events"
+@using MudBlazor
+@using Microsoft.AspNetCore.Components.Web
+@implements IDisposable
+@inject NotificationService NotificationService
+@inject AppDataService AppData
+
+<PageTitle>Event Planning</PageTitle>
+
+@* =====================================================================
+   STYLE BLOCK
+   Reuses the standard DRPS navy/blue palette and card conventions,
+   scoped under .drps-events. Extended from the original two-column
+   (form + list) layout to a roster + detail layout, so existing events
+   can be selected, viewed, and edited in place - see MARKUP below.
+   ===================================================================== *@
+<style>
+    .drps-events {
+        --drps-navy-900: #12271F;
+        --drps-navy-800: #1C3D32;
+        --drps-blue-600: #2F5C4C;
+        --drps-blue-500: #3C7A63;
+        --drps-blue-400: #6FA98C;
+        --drps-bg: #F5F3EC;
+        --drps-surface: #FFFFFF;
+        --drps-text-muted: #75806F;
+        --drps-tint-blue: #EAF2ED;
+        --drps-border-soft: #E7E4D8;
+        --drps-hover: #F2EFE4;
+        --drps-empty: #B7B2A0;
+        --drps-shadow: rgba(11, 22, 38, 0.06);
+        background: var(--drps-bg);
+        min-height: 100%;
+        padding-bottom: 2rem;
+    }
+
+    .drps-events-header {
+        background: linear-gradient(135deg, var(--drps-navy-900) 0%, var(--drps-blue-600) 100%);
+        border-radius: 16px;
+        padding: 20px 24px;
+        color: white;
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .drps-card {
+        background: var(--drps-surface);
+        border-radius: 16px;
+        padding: 24px;
+        box-shadow: 0 2px 10px var(--drps-shadow);
+        height: 100%;
+    }
+
+    .drps-card-title {
+        font-weight: 600;
+        color: var(--drps-navy-800);
+        margin-bottom: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+    }
+
+    .drps-card-title .drps-card-title-text {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    /* --- Left column: event roster --- */
+    .drps-roster {
+        padding: 8px 0;
+        max-height: 620px;
+        overflow-y: auto;
+    }
+
+    .drps-roster-item {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        padding: 12px 16px;
+        cursor: pointer;
+        border-left: 3px solid transparent;
+        border-radius: 8px;
+        transition: background 0.15s ease;
+    }
+
+    .drps-roster-item:hover {
+        background: var(--drps-hover);
+    }
+
+    .drps-roster-item.selected {
+        background: var(--drps-tint-blue);
+        border-left-color: var(--drps-blue-500);
+    }
+
+    .drps-roster-title {
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: var(--drps-navy-800);
+    }
+
+    .drps-roster-meta {
+        font-size: 0.76rem;
+        color: var(--drps-text-muted);
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+
+    /* --- Right column: detail / edit / create panel --- */
+    .drps-empty-detail {
+        color: var(--drps-empty);
+        font-size: 0.9rem;
+        text-align: center;
+        padding: 60px 20px;
+    }
+
+    .drps-detail-title {
+        font-size: 1.15rem;
+        font-weight: 700;
+        color: var(--drps-navy-800);
+    }
+
+    .drps-detail-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px;
+        margin-top: 6px;
+        margin-bottom: 18px;
+        font-size: 0.82rem;
+        color: var(--drps-text-muted);
+    }
+
+    .drps-detail-meta span {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+
+    .drps-section-label {
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--drps-text-muted);
+        margin: 18px 0 8px;
+    }
+
+    .drps-section-label:first-of-type {
+        margin-top: 0;
+    }
+
+    .drps-description-text {
+        font-size: 0.88rem;
+        color: var(--drps-navy-800);
+        line-height: 1.5;
+    }
+
+    /* --- Budget/capacity mini stat cards (view mode) --- */
+    .drps-stat-row {
+        display: flex;
+        gap: 14px;
+        flex-wrap: wrap;
+    }
+
+    .drps-stat-card {
+        flex: 1;
+        min-width: 140px;
+        background: var(--drps-bg);
+        border-radius: 12px;
+        padding: 12px 16px;
+        border-left: 4px solid var(--drps-blue-500);
+    }
+
+    .drps-stat-value {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: var(--drps-navy-800);
+    }
+
+    .drps-stat-label {
+        font-size: 0.72rem;
+        color: var(--drps-text-muted);
+    }
+
+    /* --- Chips: assigned staff (view mode) and required resources
+       (both view and edit mode) --- */
+    .drps-tag-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .drps-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        background: var(--drps-tint-blue);
+        color: var(--drps-blue-500);
+        border-radius: 999px;
+        padding: 4px 6px 4px 12px;
+        font-size: 0.78rem;
+        font-weight: 600;
+    }
+
+    .drps-tag.static {
+        padding: 4px 12px;
+    }
+
+    .drps-tag-empty {
+        color: var(--drps-empty);
+        font-size: 0.82rem;
+    }
+
+    /* --- Staff checkbox grid (create/edit form) --- */
+    .drps-staff-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+        gap: 2px 8px;
+        background: var(--drps-bg);
+        border-radius: 10px;
+        padding: 8px 12px;
+    }
+
+    .drps-form-actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 8px;
+    }
+
+    .drps-event-empty {
+        color: var(--drps-empty);
+        font-size: 0.85rem;
+        text-align: center;
+        padding: 30px 0;
+    }
+
+    /* --- Dark mode overrides --- */
+    .page.dark-mode .drps-events {
+        --drps-bg: #0B1B21;
+        --drps-surface: #1E362B;
+        --drps-text-muted: #93A69A;
+        --drps-navy-800: #E9F0EA;
+        --drps-tint-blue: rgba(60, 122, 99, 0.16);
+        --drps-border-soft: #2E4A3B;
+        --drps-hover: #1E3327;
+        --drps-empty: #4E5F52;
+        --drps-shadow: rgba(0, 0, 0, 0.35);
+    }
+</style>
+
+@* =====================================================================
+   MARKUP
+   Left column: scrollable roster of all events - click one to view it,
+   or use the "+ New" button to start a blank one.
+   Right column: three mutually-exclusive states -
+     1. isCreating or isEditing -> the shared event form
+     2. selectedEvent is set (and not editing) -> read-only detail view
+     3. neither -> an empty-state prompt
+   ===================================================================== *@
+<div class="drps-events">
+    <MudContainer MaxWidth="MaxWidth.Large" Class="pt-6">
+
+        @* Header *@
+        <div class="drps-events-header">
+            <MudText Typo="Typo.h6" Style="font-weight:600;">Event & Project Planning</MudText>
+        </div>
+
+        <MudGrid>
+            @* --- Left Column: Event Roster --- *@
+            <MudItem xs="12" md="5">
+                <div class="drps-card">
+                    <div class="drps-card-title">
+                        <div class="drps-card-title-text">
+                            <MudIcon Icon="@Icons.Material.Filled.Event" Size="Size.Small" />
+                            All Events
+                        </div>
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Primary"
+                                   Size="Size.Small"
+                                   StartIcon="@Icons.Material.Filled.Add"
+                                   OnClick="StartCreate">
+                            New
+                        </MudButton>
+                    </div>
+
+                    @if (!AppData.Events.Any())
+                    {
+                        <div class="drps-event-empty">No events scheduled yet.</div>
+                    }
+                    else
+                    {
+                        <div class="drps-roster">
+                            @foreach (var evt in AppData.Events.OrderBy(e => e.Date))
+                            {
+                                var cssClass = "drps-roster-item" + (selectedEvent == evt && !isCreating ? " selected" : "");
+                                <div class="@cssClass" @onclick="() => SelectEvent(evt)">
+                                    <div class="drps-roster-title">@evt.Title</div>
+                                    <div class="drps-roster-meta">
+                                        <MudIcon Icon="@Icons.Material.Filled.CalendarToday" Size="Size.Small" />
+                                        @(evt.Date?.ToString("dd MMM yyyy")) at @(evt.Time?.ToString(@"hh\:mm"))
+                                    </div>
+                                    <div class="drps-roster-meta">
+                                        <MudIcon Icon="@Icons.Material.Filled.LocationOn" Size="Size.Small" />
+                                        @(string.IsNullOrWhiteSpace(evt.Location) ? "No location set" : evt.Location)
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            </MudItem>
+
+            @* --- Right Column: Detail / Edit / Create Panel --- *@
+            <MudItem xs="12" md="7">
+                <div class="drps-card">
+                    @if (isCreating || isEditing)
+                    {
+                        @* ---------- Shared create/edit form ---------- *@
+                        <div class="drps-card-title">
+                            <div class="drps-card-title-text">
+                                <MudIcon Icon="@(isCreating ? Icons.Material.Filled.AddBox : Icons.Material.Filled.Edit)" Size="Size.Small" />
+                                @(isCreating ? "Create New Event" : "Edit Event")
+                            </div>
+                        </div>
+
+                        <MudTextField T="string" @bind-Value="editingEvent!.Title" Label="Event Title" Variant="Variant.Outlined" Class="mb-3" />
+                        <MudTextField T="string" @bind-Value="editingEvent!.Description" Label="Description" Variant="Variant.Outlined" Lines="3" Class="mb-3" />
+                        <MudTextField T="string" @bind-Value="editingEvent!.Location" Label="Location" Variant="Variant.Outlined" Class="mb-3" />
+
+                        <div class="d-flex gap-3 mb-3">
+                            <MudDatePicker @bind-Date="editingEvent!.Date" Label="Date" Variant="Variant.Outlined" />
+                            <MudTimePicker @bind-Time="editingEvent!.Time" Label="Time" Variant="Variant.Outlined" />
+                        </div>
+
+                        <MudSelect T="string" Label="Lead Coordinator" Variant="Variant.Outlined" @bind-Value="editingEvent!.Coordinator" Class="mb-3">
+                            @foreach (var emp in AppData.SelectableEmployeeNames)
+                            {
+                                <MudSelectItem T="string" Value="@emp">@emp</MudSelectItem>
+                            }
+                        </MudSelect>
+
+                        <div class="d-flex gap-3 mb-3">
+                            <MudNumericField T="decimal?" @bind-Value="editingEvent!.EstimatedBudget" Label="Estimated Budget (R)" Variant="Variant.Outlined" Min="0" />
+                            <MudNumericField T="int?" @bind-Value="editingEvent!.EstimatedCapacity" Label="Estimated Capacity" Variant="Variant.Outlined" Min="0" />
+                        </div>
+
+                        <div class="drps-section-label">Staff Helping</div>
+                        <div class="drps-staff-grid mb-3">
+                            @foreach (var emp in AppData.SelectableEmployeeNames)
+                            {
+                                <MudCheckBox T="bool"
+                                             Value="@editingEvent!.StaffMembers.Contains(emp)"
+                                             ValueChanged="@((bool v) => ToggleStaff(emp, v))"
+                                             Label="@emp"
+                                             Color="Color.Primary"
+                                             Dense="true" />
+                            }
+                        </div>
+
+                        <div class="drps-section-label">Required Resources</div>
+                        <div class="d-flex gap-2 mb-2">
+                            <MudTextField T="string"
+                                          @bind-Value="newResourceInput"
+                                          Label="Add a resource"
+                                          Placeholder="e.g. Projector, 6 folding tables"
+                                          Variant="Variant.Outlined"
+                                          Immediate="true"
+                                          @onkeydown="OnResourceKeyDown"
+                                          Class="flex-grow-1" />
+                            <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="AddResource">Add</MudButton>
+                        </div>
+                        @if (editingEvent!.RequiredResources.Any())
+                        {
+                            <div class="drps-tag-row mb-4">
+                                @foreach (var resource in editingEvent!.RequiredResources)
+                                {
+                                    <div class="drps-tag">
+                                        @resource
+                                        <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" OnClick="@(() => RemoveResource(resource))" />
+                                    </div>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="drps-tag-empty mb-4">No resources added yet.</div>
+                        }
+
+                        <div class="drps-form-actions">
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@(!CanSave)" OnClick="SaveEvent">
+                                @(isCreating ? "Schedule Event" : "Save Changes")
+                            </MudButton>
+                            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="CancelForm">
+                                Cancel
+                            </MudButton>
+                        </div>
+                    }
+                    else if (selectedEvent is not null)
+                    {
+                        @* ---------- Read-only detail view ---------- *@
+                        var evt = selectedEvent;
+                        <div class="drps-card-title">
+                            <div class="drps-detail-title">@evt.Title</div>
+                            <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small" StartIcon="@Icons.Material.Filled.Edit" OnClick="StartEdit">
+                                Edit
+                            </MudButton>
+                        </div>
+
+                        <div class="drps-detail-meta">
+                            <span><MudIcon Icon="@Icons.Material.Filled.CalendarToday" Size="Size.Small" /> @(evt.Date?.ToString("dd MMM yyyy")) at @(evt.Time?.ToString(@"hh\:mm"))</span>
+                            <span><MudIcon Icon="@Icons.Material.Filled.LocationOn" Size="Size.Small" /> @(string.IsNullOrWhiteSpace(evt.Location) ? "No location set" : evt.Location)</span>
+                            <span><MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Small" /> Lead: @(string.IsNullOrWhiteSpace(evt.Coordinator) ? "Unassigned" : evt.Coordinator)</span>
+                        </div>
+
+                        @if (!string.IsNullOrWhiteSpace(evt.Description))
+                        {
+                            <div class="drps-section-label">Description</div>
+                            <div class="drps-description-text">@evt.Description</div>
+                        }
+
+                        <div class="drps-section-label">Budget & Capacity</div>
+                        <div class="drps-stat-row">
+                            <div class="drps-stat-card">
+                                <div class="drps-stat-value">@(evt.EstimatedBudget.HasValue ? $"R {evt.EstimatedBudget.Value:N0}" : "—")</div>
+                                <div class="drps-stat-label">Estimated Budget</div>
+                            </div>
+                            <div class="drps-stat-card">
+                                <div class="drps-stat-value">@(evt.EstimatedCapacity.HasValue ? evt.EstimatedCapacity.Value.ToString() : "—")</div>
+                                <div class="drps-stat-label">Estimated Capacity</div>
+                            </div>
+                        </div>
+
+                        <div class="drps-section-label">Staff Helping (@evt.StaffMembers.Count)</div>
+                        @if (evt.StaffMembers.Any())
+                        {
+                            <div class="drps-tag-row">
+                                @foreach (var staff in evt.StaffMembers)
+                                {
+                                    <div class="drps-tag static">@staff</div>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="drps-tag-empty">No staff assigned yet.</div>
+                        }
+
+                        <div class="drps-section-label">Required Resources</div>
+                        @if (evt.RequiredResources.Any())
+                        {
+                            <div class="drps-tag-row">
+                                @foreach (var resource in evt.RequiredResources)
+                                {
+                                    <div class="drps-tag static">@resource</div>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="drps-tag-empty">No resources listed yet.</div>
+                        }
+
+                        <div class="drps-section-label">Linked Tasks (@AppData.TasksForEvent(evt.Id).Count())</div>
+                        var linkedTasks = AppData.TasksForEvent(evt.Id).OrderBy(t => t.ScheduledStart).ToList(); 
+                        @if (linkedTasks.Any())
+                        {
+                            <div class="drps-roster">
+                                @foreach (var linkedTask in linkedTasks)
+                                {
+                                    <div class="drps-roster-item">
+                                        <div class="drps-roster-title">
+                                            @linkedTask.Title
+                                            @if (linkedTask.IsCompleted)
+                                            {
+                                                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Small" Color="Color.Success" Style="vertical-align:middle; margin-left:4px;" />
+                                            }
+                                        </div>
+                                        <div class="drps-roster-meta">
+                                            <MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Small" />
+                                            @(string.IsNullOrWhiteSpace(linkedTask.Assignee) ? "Unassigned" : linkedTask.Assignee)
+                                            &nbsp;·&nbsp;
+                                            @linkedTask.ScheduledStart.ToString("dd MMM, h:mm tt")
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="drps-tag-empty">No tasks linked to this event yet.</div>
+                        }
+                    }
+                    else
+                    {
+                        @* ---------- Nothing selected ---------- *@
+                        <div class="drps-empty-detail">
+                            <MudIcon Icon="@Icons.Material.Filled.EventNote" Size="Size.Large" Style="opacity:0.5;" />
+                            <div class="mt-2">Select an event on the left to view its details,<br />or click "New" to plan one.</div>
+                        </div>
+                    }
+                </div>
+            </MudItem>
+        </MudGrid>
+
+    </MudContainer>
+</div>
+
+@code {
+    // --- Selection / mode state ---
+    // selectedEvent: the roster item currently being viewed (read-only) -
+    // now the actual AppEvent instance held by AppDataService, so
+    // Linked Tasks (via AppData.TasksForEvent) always reflects live data.
+    // editingEvent: a *working copy* used by the shared form, whether
+    // creating a new event or editing an existing one - keeping it
+    // separate from selectedEvent means Cancel can discard changes
+    // without touching the real data.
+    private AppEvent? selectedEvent;
+    private AppEvent? editingEvent;
+    private bool isCreating = false;
+    private bool isEditing = false;
+
+    private string newResourceInput = string.Empty;
+
+    private bool CanSave =>
+        editingEvent is not null &&
+        !string.IsNullOrWhiteSpace(editingEvent.Title) &&
+        editingEvent.Date.HasValue;
+
+    // "+ New" button - opens a blank form and deselects whatever was
+    // being viewed.
+    private void StartCreate()
+    {
+        editingEvent = new AppEvent();
+        isCreating = true;
+        isEditing = false;
+        selectedEvent = null;
+        newResourceInput = string.Empty;
+    }
+
+    // Clicking a roster item shows it read-only. Any in-progress
+    // create/edit is discarded, same as navigating away from a form.
+    private void SelectEvent(AppEvent evt)
+    {
+        selectedEvent = evt;
+        isCreating = false;
+        isEditing = false;
+        editingEvent = null;
+        newResourceInput = string.Empty;
+    }
+
+    // "Edit" button on the detail view - clones the selected event into
+    // editingEvent so the form has something to bind to without
+    // mutating the roster's copy until Save.
+    private void StartEdit()
+    {
+        if (selectedEvent is null) return;
+        editingEvent = selectedEvent.Clone();
+        isEditing = true;
+        isCreating = false;
+        newResourceInput = string.Empty;
+    }
+
+    private void CancelForm()
+    {
+        isCreating = false;
+        isEditing = false;
+        editingEvent = null;
+        newResourceInput = string.Empty;
+    }
+
+    private void SaveEvent()
+    {
+        if (!CanSave || editingEvent is null) return;
+
+        if (isCreating)
+        {
+            AppData.AddEvent(editingEvent);
+            selectedEvent = editingEvent;
+            NotifyAssignedStaff(editingEvent, editingEvent.StaffMembers);
+
+            // Role-wide broadcast so Admin/Secondary Admin hear about
+            // every new event regardless of who's staffed on it -
+            // mirrors the "new resource request" broadcast in
+            // Requests.razor.
+            var dateLabel = editingEvent.Date.HasValue ? editingEvent.Date.Value.ToString("dd MMM") : "TBD";
+            NotificationService.Add(
+                NotificationType.EventAssignment,
+                "New event created",
+                $"\"{editingEvent.Title}\" was scheduled for {dateLabel}.",
+                targetRoles: EventNotificationRoles,
+                linkedName: editingEvent.Title);
+        }
+        else if (isEditing && selectedEvent is not null)
+        {
+            // Diff staff lists before CopyFrom overwrites the original,
+            // so only newly-added people (not everyone already on the
+            // event) get a notification.
+            var newlyAdded = editingEvent.StaffMembers
+                .Except(selectedEvent.StaffMembers)
+                .ToList();
+            selectedEvent.CopyFrom(editingEvent);
+            AppData.NotifyEventChanged();
+            NotifyAssignedStaff(selectedEvent, newlyAdded);
+        }
+
+        isCreating = false;
+        isEditing = false;
+        editingEvent = null;
+        newResourceInput = string.Empty;
+    }
+
+    // Adds/removes an employee from the working copy's staff list -
+    // driven by each checkbox's ValueChanged in the form above.
+    private void ToggleStaff(string employee, bool isChecked)
+    {
+        if (editingEvent is null) return;
+
+        if (isChecked)
+        {
+            if (!editingEvent.StaffMembers.Contains(employee))
+                editingEvent.StaffMembers.Add(employee);
+        }
+        else
+        {
+            editingEvent.StaffMembers.Remove(employee);
+        }
+    }
+
+    // Required-resources list: free-text entries rather than a fixed
+    // dropdown, since resource needs vary a lot per event.
+    private void AddResource()
+    {
+        if (editingEvent is null) return;
+
+        var value = newResourceInput?.Trim();
+        if (string.IsNullOrWhiteSpace(value)) return;
+        if (editingEvent.RequiredResources.Contains(value, StringComparer.OrdinalIgnoreCase)) return;
+
+        editingEvent.RequiredResources.Add(value);
+        newResourceInput = string.Empty;
+    }
+
+    private void RemoveResource(string resource) => editingEvent?.RequiredResources.Remove(resource);
+
+    // Roles that get the "new event created" role-wide broadcast -
+    // same pair Requests.razor broadcasts resource requests to.
+    private static readonly SystemRole[] EventNotificationRoles = { SystemRole.Admin, SystemRole.SecondaryAdmin };
+
+    // Roles that get a personal "you were added to this event's staff"
+    // notification. General Staff can still be picked as event staff
+    // (SelectableEmployeeNames only excludes Admin-tier), but their own
+    // notifications are daily-task-only, so they're deliberately left
+    // out here.
+    private static readonly SystemRole[] StaffAssignmentNotificationRoles = { SystemRole.SecondaryAdmin, SystemRole.FacilityManager };
+
+    // Fires one personal "you've been assigned" notification per staff
+    // member passed in, but only for staff whose role actually wants
+    // event-assignment notifications (see StaffAssignmentNotificationRoles).
+    // Used for the whole staff list on create, or just the newly added
+    // names on edit - see the callers above.
+    private void NotifyAssignedStaff(AppEvent evt, IEnumerable<string> staff)
+    {
+        var dateLabel = evt.Date.HasValue ? evt.Date.Value.ToString("dd MMM") : "TBD";
+        foreach (var name in staff)
+        {
+            var user = AppData.UserByName(name);
+            if (user is null || !StaffAssignmentNotificationRoles.Contains(user.SystemRole)) continue;
+
+            NotificationService.Add(
+                NotificationType.EventAssignment,
+                $"Assigned to {evt.Title}",
+                $"You were added to the staff list for \"{evt.Title}\" on {dateLabel}.",
+                targetUserIds: new[] { user.Id },
+                linkedName: evt.Title);
+        }
+    }
+
+    // Lets Enter submit a resource the same way clicking "Add" does,
+    // without needing a wrapping <form> element.
+    private void OnResourceKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") AddResource();
+    }
+
+    // Re-render if events/tasks change elsewhere (e.g. a new Event-linked
+    // task created from the Tasks/Home "New Task" dialog) while this
+    // page is open, so the roster and Linked Tasks list never go stale.
+    protected override void OnInitialized()
+    {
+        AppData.OnChange += StateHasChanged;
+    }
+
+    public void Dispose()
+    {
+        AppData.OnChange -= StateHasChanged;
+    }
+}
