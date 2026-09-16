@@ -1,7 +1,7 @@
 ﻿@using MudBlazor
 @implements IDisposable
 @inject NavigationManager Navigation
-@inject NotificationService NotificationService
+@inject AppDataService AppData
 
 <div class="nav-container @(IsVerticalNav ? "nav-vertical" : "")">
     <div class="navbar navbar-dark">
@@ -86,9 +86,8 @@
             Notification bell - unlike the two MudMenus below, this is a
             plain nav link (not a dropdown): clicking it takes the user
             straight to the /notifications page. The badge count comes
-            from NotificationService and updates live via OnChange, e.g.
-            the moment a new resource request or event assignment fires
-            elsewhere in the app.
+            from AppDataService and updates live via OnChange whenever
+            the API pushes a new notification over SignalR.
         -->
         <MudBadge Content="@UnreadCount"
                   Color="Color.Error"
@@ -123,10 +122,9 @@
         </MudMenu>
 
         <!--
-            Profile control - now backed by MainLayout's real login
-            state (see CurrentRole/CurrentUserName/OnLogout below).
-            NavMenu itself is only rendered once MainLayout has a
-            logged-in role, so there's no "not signed in" branch here.
+            Profile control, backed by the signed-in user in
+            AppDataService. NavMenu itself is only rendered once
+            someone is signed in, so there's no "not signed in" branch.
         -->
         <MudMenu Icon="@Icons.Material.Filled.AccountCircle"
                   Color="Color.Inherit"
@@ -135,10 +133,10 @@
                   AnchorOrigin="Origin.BottomRight"
                   TransformOrigin="Origin.TopRight">
             <MudText Typo="Typo.subtitle2" Class="px-4 pt-1 pb-2">
-                Signed in as @CurrentUserName
+                Signed in as @AppData.CurrentUser?.FullName
             </MudText>
             <MudText Typo="Typo.caption" Class="px-4 pb-2" Style="opacity:0.7;">
-                @RoleLabel
+                @AppData.Role
             </MudText>
             <MudDivider Class="my-1" />
             <MudMenuItem OnClick="@(() => OnLogout.InvokeAsync())">
@@ -160,49 +158,27 @@
     [Parameter] public EventCallback OnToggleDarkMode { get; set; }
     [Parameter] public EventCallback OnToggleNavOrientation { get; set; }
 
-    // Also cascaded from MainLayout. CurrentRole/CurrentUserName are for
-    // display in the profile menu; CurrentUserId + the parsed role below
-    // are what let this component ask NotificationService for only the
-    // notifications this signed-in user should see. Tab visibility comes
-    // straight from MainLayout as booleans below, computed there once as
-    // the single source of truth instead of re-derived here.
-    [Parameter] public string CurrentRole { get; set; } = string.Empty;
-    [Parameter] public string CurrentUserName { get; set; } = string.Empty;
-    [Parameter] public Guid? CurrentUserId { get; set; }
     [Parameter] public EventCallback OnLogout { get; set; }
 
+    // Tab visibility comes from MainLayout as plain booleans (it reads
+    // them off AppDataService, where the role matrix lives).
     [Parameter] public bool CanSeeTasks { get; set; }
     [Parameter] public bool CanSeeRequests { get; set; }
     [Parameter] public bool CanSeeMeetings { get; set; }
     [Parameter] public bool CanSeeUserManagement { get; set; }
     [Parameter] public bool CanSeeEvents { get; set; }
 
-    private string RoleLabel => CurrentRole switch
-    {
-        "GeneralStaff" => "General Staff",
-        "FacilityManager" => "Facility Manager",
-        "SecondaryAdmin" => "Secondary Admin",
-        "Admin" => "Admin",
-        _ => string.Empty
-    };
+    private int UnreadCount => AppData.UnreadCount;
 
-    // Parses the cascaded role string back into the enum so it can be
-    // passed to NotificationService's role-targeted lookups below.
-    private SystemRole ParsedRole =>
-        Enum.TryParse<SystemRole>(CurrentRole, out var role) ? role : SystemRole.GeneralStaff;
-
-    private int UnreadCount =>
-        CurrentUserId.HasValue ? NotificationService.UnreadCountFor(CurrentUserId.Value, ParsedRole) : 0;
-
-    // Re-render whenever a notification is added/read elsewhere in the
-    // app so the badge count on the bell never goes stale.
+    // Re-render whenever notifications change (e.g. a SignalR push) so
+    // the badge count on the bell never goes stale.
     protected override void OnInitialized()
     {
-        NotificationService.OnChange += StateHasChanged;
+        AppData.OnChange += StateHasChanged;
     }
 
     public void Dispose()
     {
-        NotificationService.OnChange -= StateHasChanged;
+        AppData.OnChange -= StateHasChanged;
     }
 }

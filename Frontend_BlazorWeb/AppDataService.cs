@@ -1,573 +1,334 @@
 // AppDataService.cs
 //
-// Central in-memory data store for the prototype. Every page reads
-// and writes through this one Singleton instead of keeping its own
-// private placeholder list, so the pages actually interact with each
-// other: completing a task on Home updates the Daily Tasks page,
-// creating an Event makes it selectable from the Requests page's
-// "link to an event" dropdown and from the New Task dialog's "link to
-// an event" field, and so on. There's still no database - everything
-// here lives in memory for the lifetime of the running app, exactly
-// as much "full function" as a prototype needs, and resets the moment
-// the app restarts.
+// The web client's data layer. It signs in against the API, keeps the
+// signed-in user plus the lists several pages share (staff directory,
+// projects, the tasks of the date window on screen, resource requests,
+// notifications), and listens on the API's SignalR hub so those lists
+// refresh when something changes server-side. Every HTTP call goes
+// through GetAsync/SendAsync, so failures look the same on every page
+// (a snackbar) and an expired token signs the user out.
 //
-// Singleton (not Scoped, unlike NotificationService) is intentional:
-// it lets every signed-in user see the same shared pool of tasks,
-// events, requests and meetings, the way a real multi-user system
-// would look once wired to a database.
-//
-// Register in Program.cs:
-//     builder.Services.AddSingleton<AppDataService>();
+// Scoped - in Blazor WebAssembly that means one instance per browser
+// tab. Pages subscribe to OnChange and call StateHasChanged.
 //
 // No namespace declared here on purpose - same convention as
-// NotificationService.cs/Models/AppModels.cs - so every page sees this
-// without an extra @using.
+// NewTaskResult.cs - so every page sees this without an extra @using.
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
+using System.Net;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using System.Text.Json;
+using Microsoft.AspNetCore.SignalR.Client;
+using MudBlazor;
+using QULOOBUL__MOE_MIENEEN_Shared.Auth;
+using QULOOBUL__MOE_MIENEEN_Shared.Directory;
+using QULOOBUL__MOE_MIENEEN_Shared.Notifications;
+using QULOOBUL__MOE_MIENEEN_Shared.Requests;
+using QULOOBUL__MOE_MIENEEN_Shared.Tasks;
+using static QULOOBUL__MOE_MIENEEN_Shared.Classes.Common;
 
-public class AppDataService
+public class AppDataService(HttpClient http, ISnackbar snackbar)
 {
-    // Pages (NavMenu's bell aside - that's NotificationService) that
-    // want to react live to data changing elsewhere (e.g. Home should
-    // update the moment a task's completion is toggled from the Daily
-    // Tasks page in another open tab of the same session) can subscribe
-    // to this and call StateHasChanged.
     public event Action? OnChange;
-    private void NotifyStateChanged() => OnChange?.Invoke();
+    private void Changed() => OnChange?.Invoke();
 
-    private readonly List<AppUser> _users = new();
-    private readonly List<AppTask> _tasks = new();
-    private readonly List<AppEvent> _events = new();
-    private readonly List<ResourceRequestItem> _requests = new();
-    private readonly List<Meeting> _meetings = new();
+    public AuthResponse? CurrentUser { get; private set; }
+    public IReadOnlyList<UserSummaryDto> Users { get; private set; } = [];
+    public IReadOnlyList<ProjectSummaryDto> Projects { get; private set; } = [];
+    public IReadOnlyList<TaskCardDto> Tasks { get; private set; } = [];
+    public IReadOnlyList<ResourceRequestDto> Requests { get; private set; } = [];
+    public IReadOnlyList<NotificationDto> Notifications { get; private set; } = [];
 
-    public IReadOnlyList<AppUser> Users => _users;
-    public IReadOnlyList<AppTask> Tasks => _tasks;
-    public IReadOnlyList<AppEvent> Events => _events;
-    public IReadOnlyList<ResourceRequestItem> Requests => _requests;
-    public IReadOnlyList<Meeting> Meetings => _meetings;
+    private HubConnection? hub;
 
-    public AppDataService()
-    {
-        SeedUsers();
-        SeedEvents();
-        SeedTasks();
-        SeedRequests();
-        SeedMeetings();
-    }
+    // Tasks holds one date window at a time: whichever page is showing tasks asked for it.
+    private string? taskWindowUrl;
 
     // ------------------------------------------------------------------
-    // Users / login
+    // Session
     // ------------------------------------------------------------------
 
-    // Case-insensitive match on Username, exact match on Password -
-    // plenty for a prototype with no real auth behind it.
-    public AppUser? Login(string username, string password)
+    /// <summary>Signs in (UC-01). Returns null on success, otherwise the message for the login form.</summary>
+    public async Task<string?> LoginAsync(string email, string password)
     {
-        if (string.IsNullOrWhiteSpace(username)) return null;
-        return _users.FirstOrDefault(u =>
-            string.Equals(u.Username, username.Trim(), StringComparison.OrdinalIgnoreCase) &&
-            u.Password == password);
-    }
-
-    public AppUser AddUser(AppUser user)
-    {
-        _users.Add(user);
-        NotifyStateChanged();
-        return user;
-    }
-
-    // Employee names for dropdowns/checkbox lists (assignees, event
-    // staff, meeting organizer, etc.) - every page used to keep its
-    // own hard-coded copy of this; now it's derived from the one
-    // shared user list.
-    public List<string> EmployeeNames => _users.Select(u => u.FullName).OrderBy(n => n).ToList();
-
-    // Same as EmployeeNames but excludes Admin-tier accounts - Admins
-    // (chairman/secretary/treasurer) aren't line staff, so they should
-    // never show up as a pickable assignee/coordinator/staff member on
-    // the Daily Tasks or Events pages. Every other role stays pickable.
-    public List<string> SelectableEmployeeNames =>
-        _users.Where(u => u.SystemRole != SystemRole.Admin)
-              .Select(u => u.FullName)
-              .OrderBy(n => n)
-              .ToList();
-
-    // Resolves an employee's Id/role by their display name - used when
-    // routing a notification to a specific person (e.g. a task's
-    // assignee, an event's newly-added staff, a request's original
-    // requester) since AppTask/AppEvent/ResourceRequestItem only store
-    // names, not Ids.
-    public AppUser? UserByName(string fullName) =>
-        _users.FirstOrDefault(u => u.FullName == fullName);
-
-    // ------------------------------------------------------------------
-    // Tasks
-    // ------------------------------------------------------------------
-
-    public AppTask AddTask(AppTask task)
-    {
-        _tasks.Add(task);
-        NotifyStateChanged();
-        return task;
-    }
-
-    // Marks a task complete and attributes it to whoever completed it -
-    // used by both Home and Tasks.razor's CompletedByDialog flow.
-    public void CompleteTask(AppTask task, string completedBy)
-    {
-        task.IsCompleted = true;
-        task.CompletedBy = completedBy;
-        task.CompletedAt = DateTime.Now;
-        NotifyStateChanged();
-    }
-
-    public void ReopenTask(AppTask task)
-    {
-        task.IsCompleted = false;
-        task.CompletedBy = null;
-        task.CompletedAt = null;
-        NotifyStateChanged();
-    }
-
-    // Applies edited field values (from TaskDetailsDialog) onto the
-    // existing AppTask instance - kept as one shared object (same Id)
-    // rather than replaced, so it stays the same reference other pages
-    // (Home, Events) already hold onto.
-    public void UpdateTask(AppTask task, AppTask edited)
-    {
-        task.Title = edited.Title;
-        task.Description = edited.Description;
-        task.ScheduledStart = edited.ScheduledStart;
-        task.IsAllDay = edited.IsAllDay;
-        task.Category = edited.Category;
-        task.Priority = edited.Priority;
-        task.Assignee = edited.Assignee;
-        task.Type = edited.Type;
-        task.LinkedEventId = edited.LinkedEventId;
-        task.LinkedEventTitle = edited.LinkedEventTitle;
-        NotifyStateChanged();
-    }
-
-    public void DeleteTask(AppTask task)
-    {
-        _tasks.Remove(task);
-        NotifyStateChanged();
-    }
-
-    public IEnumerable<AppTask> TasksForDate(DateTime date) =>
-        _tasks.Where(t => t.ScheduledStart.Date == date.Date);
-
-    public IEnumerable<AppTask> TodayTasks => TasksForDate(DateTime.Today);
-
-    public IEnumerable<AppTask> TasksForEvent(Guid eventId) =>
-        _tasks.Where(t => t.LinkedEventId == eventId);
-
-    // ------------------------------------------------------------------
-    // Events
-    // ------------------------------------------------------------------
-
-    public AppEvent AddEvent(AppEvent evt)
-    {
-        _events.Add(evt);
-        NotifyStateChanged();
-        return evt;
-    }
-
-    // Renaming/deleting an event would strand any tasks or requests
-    // that reference it by name, so instead of overwriting in place we
-    // just notify - callers (Events.razor) mutate the existing roster
-    // item directly (see AppEvent.CopyFrom) then call this.
-    public void NotifyEventChanged() => NotifyStateChanged();
-
-    // ------------------------------------------------------------------
-    // Resource requests
-    // ------------------------------------------------------------------
-
-    public ResourceRequestItem AddRequest(ResourceRequestItem request)
-    {
-        _requests.Add(request);
-        NotifyStateChanged();
-        return request;
-    }
-
-    public void ApproveRequest(ResourceRequestItem request, string reviewedBy)
-    {
-        request.Status = RequestStatus.Approved;
-        request.ReviewedBy = reviewedBy;
-        request.ReviewedDate = DateTime.Now;
-        NotifyStateChanged();
-    }
-
-    public void DenyRequest(ResourceRequestItem request, string reviewedBy, string? reason)
-    {
-        request.Status = RequestStatus.Denied;
-        request.ReviewedBy = reviewedBy;
-        request.ReviewedDate = DateTime.Now;
-        request.DenyReason = reason;
-        NotifyStateChanged();
-    }
-
-    // ------------------------------------------------------------------
-    // Meetings
-    // ------------------------------------------------------------------
-
-    public Meeting AddMeeting(Meeting meeting)
-    {
-        _meetings.Insert(0, meeting);
-        NotifyStateChanged();
-        return meeting;
-    }
-
-    // ------------------------------------------------------------------
-    // Seed data - placeholder-but-realistic starting content so every
-    // page/role has something to look at (and to log in as) the moment
-    // the app starts, without needing a database.
-    // ------------------------------------------------------------------
-
-    private void SeedUsers()
-    {
-        _users.AddRange(new[]
+        HttpResponseMessage res;
+        try
         {
-            new AppUser
-            {
-                FullName = "Naledi Dube",
-                Username = "naledi.dube@drpssolutions.org",
-                Email = "naledi.dube@drpssolutions.org",
-                Password = "Naledi123",
-                SystemRole = SystemRole.Admin,
-                JobTitle = "Operations Coordinator",
-                Department = "Admin",
-                JoinDate = new DateTime(2024, 3, 1)
-            },
-            new AppUser
-            {
-                FullName = "Sipho Mokoena",
-                Username = "sipho.mokoena@drpssolutions.org",
-                Email = "sipho.mokoena@drpssolutions.org",
-                Password = "Sipho123",
-                SystemRole = SystemRole.GeneralStaff,
-                JobTitle = "Fieldwork Lead",
-                Department = "Programs",
-                JoinDate = new DateTime(2023, 6, 15)
-            },
-            new AppUser
-            {
-                FullName = "Aisha Patel",
-                Username = "aisha.patel@drpssolutions.org",
-                Email = "aisha.patel@drpssolutions.org",
-                Password = "Aisha123",
-                SystemRole = SystemRole.FacilityManager,
-                JobTitle = "Programs Manager",
-                Department = "Programs",
-                JoinDate = new DateTime(2022, 1, 10)
-            },
-            new AppUser
-            {
-                FullName = "Liam Fourie",
-                Username = "liam.fourie@drpssolutions.org",
-                Email = "liam.fourie@drpssolutions.org",
-                Password = "Liam123",
-                SystemRole = SystemRole.SecondaryAdmin,
-                JobTitle = "IT & Systems Support",
-                Department = "Operations",
-                JoinDate = new DateTime(2024, 9, 2)
-            },
-            new AppUser
-            {
-                FullName = "Grace Adeyemi",
-                Username = "grace.adeyemi@drpssolutions.org",
-                Email = "grace.adeyemi@drpssolutions.org",
-                Password = "Grace123",
-                SystemRole = SystemRole.GeneralStaff,
-                JobTitle = "Communications Officer",
-                Department = "Marketing",
-                JoinDate = new DateTime(2023, 11, 20)
-            }
-        });
-    }
-
-    private void SeedEvents()
-    {
-        _events.AddRange(new[]
+            res = await http.PostAsJsonAsync("api/auth/login",
+                new LoginRequest { Email = email.Trim(), Password = password });
+        }
+        catch (HttpRequestException)
         {
-            new AppEvent
-            {
-                Title = "Annual Donor Gala",
-                Description = "Formal evening event to thank major donors and showcase this year's impact numbers.",
-                Date = DateTime.Today.AddDays(14),
-                Time = new TimeSpan(18, 0, 0),
-                Location = "Cape Town Convention Centre",
-                Coordinator = "Aisha Patel",
-                EstimatedBudget = 85000,
-                EstimatedCapacity = 220,
-                StaffMembers = new() { "Aisha Patel", "Grace Adeyemi", "Naledi Dube" },
-                RequiredResources = new() { "Stage & PA system", "Catering (220 covers)", "Photographer" }
-            },
-            new AppEvent
-            {
-                Title = "Community Workshop",
-                Description = "Half-day skills workshop for local youth, run out of the Alexandra community hall.",
-                Date = DateTime.Today.AddDays(21),
-                Time = new TimeSpan(9, 30, 0),
-                Location = "Alexandra Community Hall",
-                Coordinator = "Sipho Mokoena",
-                EstimatedBudget = 12000,
-                EstimatedCapacity = 60,
-                StaffMembers = new() { "Sipho Mokoena", "Liam Fourie" },
-                RequiredResources = new() { "Projector", "Folding chairs (60)", "Printed handouts" }
-            },
-            new AppEvent
-            {
-                Title = "Board Meeting",
-                Description = "Quarterly board strategy session covering the Q3 numbers and upcoming grant cycle.",
-                Date = DateTime.Today.AddDays(1),
-                Time = new TimeSpan(14, 0, 0),
-                Location = "Head Office Boardroom",
-                Coordinator = "Naledi Dube",
-                EstimatedBudget = 1500,
-                EstimatedCapacity = 12,
-                StaffMembers = new() { "Naledi Dube", "Aisha Patel" },
-                RequiredResources = new() { "Printed board pack" }
-            }
-        });
+            return $"Can't reach the server at {http.BaseAddress}.";
+        }
+        if (!res.IsSuccessStatusCode) return await ErrorMessage(res);
+
+        var auth = (await res.Content.ReadFromJsonAsync<AuthResponse>())!;
+        http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth.Token);
+        // Load names/projects before the shell renders, so nothing shows as "User #3" first.
+        await Task.WhenAll(RefreshUsersAsync(), RefreshProjectsAsync(), RefreshNotificationsAsync());
+        CurrentUser = auth;
+        await ConnectHubAsync();
+        Changed();
+        return null;
     }
 
-    private void SeedTasks()
+    public async Task LogoutAsync()
     {
-        var gala = _events.First(e => e.Title == "Annual Donor Gala");
-        var workshop = _events.First(e => e.Title == "Community Workshop");
-        var board = _events.First(e => e.Title == "Board Meeting");
-
-        _tasks.AddRange(new[]
+        CurrentUser = null;
+        http.DefaultRequestHeaders.Authorization = null;
+        Users = [];
+        Projects = [];
+        Tasks = [];
+        Requests = [];
+        Notifications = [];
+        taskWindowUrl = null;
+        if (hub is not null)
         {
-            new AppTask
-            {
-                Title = "Volunteer check-in call",
-                Description = "Quick call with this week's volunteer roster to confirm availability.",
-                ScheduledStart = DateTime.Today.AddHours(8),
-                Category = "Admin",
-                Priority = TaskPriority.Low,
-                Type = AppTaskType.Daily,
-                Assignee = "Naledi Dube",
-                IsCompleted = true,
-                CompletedBy = "Naledi Dube",
-                CompletedAt = DateTime.Today.AddHours(8).AddMinutes(20)
-            },
-            new AppTask
-            {
-                Title = "Prepare donor report",
-                Description = "Draft the monthly donor impact report for review.",
-                ScheduledStart = DateTime.Today.AddHours(9).AddMinutes(30),
-                Category = "Admin",
-                Priority = TaskPriority.Medium,
-                Type = AppTaskType.Daily,
-                Assignee = "Naledi Dube"
-            },
-            new AppTask
-            {
-                Title = "Site visit — Alexandra shelter",
-                Description = "On-site check of the shelter ahead of the community workshop.",
-                ScheduledStart = DateTime.Today.AddHours(11),
-                Category = "Fieldwork",
-                Priority = TaskPriority.High,
-                Type = AppTaskType.Daily,
-                Assignee = "Sipho Mokoena"
-            },
-            new AppTask
-            {
-                Title = "Team stand-up",
-                Description = "Daily sync on outstanding fieldwork and admin items.",
-                ScheduledStart = DateTime.Today.AddHours(13),
-                Category = "Meeting",
-                Priority = TaskPriority.Low,
-                Type = AppTaskType.Daily,
-                Assignee = "Aisha Patel"
-            },
-            new AppTask
-            {
-                Title = "Grant proposal review",
-                Description = "Review the sponsorship proposal ahead of the donor gala.",
-                ScheduledStart = DateTime.Today.AddHours(15).AddMinutes(30),
-                Category = "Admin",
-                Priority = TaskPriority.High,
-                Type = AppTaskType.Event,
-                LinkedEventId = gala.Id,
-                LinkedEventTitle = gala.Title,
-                Assignee = "Aisha Patel"
-            },
-            new AppTask
-            {
-                Title = "Community workshop setup",
-                Description = "Set up chairs, projector and handouts at the community hall.",
-                ScheduledStart = DateTime.Today.AddDays(1).AddHours(9),
-                Category = "Fieldwork",
-                Priority = TaskPriority.Medium,
-                Type = AppTaskType.Event,
-                LinkedEventId = workshop.Id,
-                LinkedEventTitle = workshop.Title,
-                Assignee = "Sipho Mokoena"
-            },
-            new AppTask
-            {
-                Title = "Board meeting",
-                Description = "Present Q3 numbers and the upcoming grant cycle plan.",
-                ScheduledStart = DateTime.Today.AddDays(1).AddHours(14),
-                Category = "Meeting",
-                Priority = TaskPriority.High,
-                Type = AppTaskType.Event,
-                LinkedEventId = board.Id,
-                LinkedEventTitle = board.Title,
-                Assignee = "Naledi Dube"
-            },
-            new AppTask
-            {
-                Title = "Inventory count",
-                Description = "Count and log current warehouse stock levels.",
-                ScheduledStart = DateTime.Today.AddDays(2).AddHours(10),
-                Category = "Fieldwork",
-                Priority = TaskPriority.Low,
-                Type = AppTaskType.Daily,
-                Assignee = "Sipho Mokoena"
-            },
-            new AppTask
-            {
-                Title = "Submit grant report",
-                Description = "Submit the finalised grant report before end of day.",
-                ScheduledStart = DateTime.Today,
-                Category = "Admin",
-                Priority = TaskPriority.High,
-                IsAllDay = true,
-                Type = AppTaskType.Daily,
-                Assignee = "Naledi Dube"
-            },
-            new AppTask
-            {
-                Title = "Renew office lease paperwork",
-                Description = "Sign and return the renewed office lease documents.",
-                ScheduledStart = DateTime.Today.AddDays(1),
-                Category = "Admin",
-                Priority = TaskPriority.Medium,
-                IsAllDay = true,
-                Type = AppTaskType.Daily,
-                Assignee = "Liam Fourie"
-            }
-        });
+            await hub.DisposeAsync();
+            hub = null;
+        }
+        Changed();
     }
 
-    private void SeedRequests()
+    public string? Role => CurrentUser?.Role;
+
+    public bool HasPermission(string permission) => CurrentUser?.Permissions.Contains(permission) == true;
+
+    // Page visibility, per the spec's screen/role matrix. Home and
+    // Notifications are open to everyone; roles not listed here (Staff,
+    // Imaamat) get only those two.
+    public bool CanSeeTasks => Role is Roles.FacilityManager or Roles.SecondaryAdmin or Roles.Admin;
+    public bool CanSeeRequests => CanSeeTasks;
+    public bool CanSeeMeetings => Role is Roles.SecondaryAdmin or Roles.Admin;
+    public bool CanSeeEvents => CanSeeMeetings;
+    public bool CanSeeUserManagement => Role is Roles.Admin;
+
+    // ------------------------------------------------------------------
+    // Shared lists and lookups
+    // ------------------------------------------------------------------
+
+    public Task RefreshUsersAsync() => Refresh<UserSummaryDto>("api/users", l => Users = l);
+    public Task RefreshProjectsAsync() => Refresh<ProjectSummaryDto>("api/projects", l => Projects = l);
+    public Task RefreshRequestsAsync() => Refresh<ResourceRequestDto>("api/requests", l => Requests = l);
+    public Task RefreshNotificationsAsync() => Refresh<NotificationDto>("api/notifications", l => Notifications = l);
+
+    public Task RefreshTasksAsync() =>
+        taskWindowUrl is null ? Task.CompletedTask : Refresh<TaskCardDto>(taskWindowUrl, l => Tasks = l);
+
+    /// <summary>Loads the tasks due in [from, to) into <see cref="Tasks"/>.</summary>
+    public Task LoadTasksAsync(DateTime from, DateTime to)
     {
-        var gala = _events.First(e => e.Title == "Annual Donor Gala");
-        var workshop = _events.First(e => e.Title == "Community Workshop");
-        var siteVisit = _tasks.First(t => t.Title == "Site visit — Alexandra shelter");
-
-        _requests.AddRange(new[]
-        {
-            new ResourceRequestItem
-            {
-                Title = "Projector for donor gala",
-                ResourceType = "Equipment",
-                Amount = "1 projector",
-                Notes = "Needed for the sponsor highlight reel.",
-                LinkType = RequestLinkType.Event,
-                LinkedId = gala.Id,
-                LinkedName = gala.Title,
-                RequestedBy = "Aisha Patel",
-                RequestedDate = DateTime.Now.AddDays(-2),
-                Status = RequestStatus.Pending
-            },
-            new ResourceRequestItem
-            {
-                Title = "Additional volunteers",
-                ResourceType = "Personnel",
-                Amount = "4 volunteers",
-                Notes = "Site visit needs extra hands for the day.",
-                LinkType = RequestLinkType.Task,
-                LinkedId = siteVisit.Id,
-                LinkedName = siteVisit.Title,
-                RequestedBy = "Sipho Mokoena",
-                RequestedDate = DateTime.Now.AddDays(-1),
-                Status = RequestStatus.Pending
-            },
-            new ResourceRequestItem
-            {
-                Title = "Printing budget",
-                ResourceType = "Budget",
-                Amount = "R 1,200",
-                Notes = "Workshop handouts and signage.",
-                LinkType = RequestLinkType.Event,
-                LinkedId = workshop.Id,
-                LinkedName = workshop.Title,
-                RequestedBy = "Grace Adeyemi",
-                RequestedDate = DateTime.Now.AddDays(-5),
-                Status = RequestStatus.Approved,
-                ReviewedBy = "Naledi Dube",
-                ReviewedDate = DateTime.Now.AddDays(-4)
-            },
-            new ResourceRequestItem
-            {
-                Title = "New laptop",
-                ResourceType = "Equipment",
-                Amount = "1 laptop",
-                Notes = "Current one won't hold a charge.",
-                LinkType = RequestLinkType.None,
-                RequestedBy = "Liam Fourie",
-                RequestedDate = DateTime.Now.AddDays(-7),
-                Status = RequestStatus.Denied,
-                ReviewedBy = "Naledi Dube",
-                ReviewedDate = DateTime.Now.AddDays(-6),
-                DenyReason = "Budget's earmarked for Q3 - resubmit then."
-            }
-        });
+        taskWindowUrl = $"api/tasks?from={from:s}&to={to:s}";
+        return RefreshTasksAsync();
     }
 
-    private void SeedMeetings()
+    private async Task Refresh<T>(string url, Action<List<T>> apply)
     {
-        _meetings.AddRange(new[]
+        if (await GetAsync<List<T>>(url) is { } list)
         {
-            new Meeting
-            {
-                Title = "Donor Operations Review",
-                Date = DateTime.Today.AddDays(-1),
-                Duration = "45 mins",
-                Organizer = "Aisha Patel",
-                MinutesText = "Reviewed donor pipeline health and Q3 gala prep timeline.",
-                Notes = new()
-                {
-                    new MeetingNote { Text = "Gala budget tracking on target", IsActionItem = false, Timestamp = "00:04" },
-                    new MeetingNote { Text = "Aisha to confirm caterer by Friday", IsActionItem = true, Timestamp = "00:12" }
-                },
-                // Placeholder transcript text, pre-generated for demo
-                // purposes - stands in for real speech-to-text output.
-                Transcript =
-                    "Transcript for \"Donor Operations Review\" (45:00 recorded)\n\n" +
-                    "[Speaker 1] Placeholder line of dialogue reconstructed from the recorded audio.\n" +
-                    "[Speaker 2] Placeholder response continuing the discussion.\n" +
-                    "[Speaker 1] Placeholder wrap-up remark closing out this section.\n\n" +
-                    "This is placeholder text standing in for real speech-to-text output, " +
-                    "to be replaced once a transcription service is integrated."
-            },
-            new Meeting
-            {
-                Title = "Fieldwork Logistics & Planning",
-                Date = DateTime.Today,
-                Duration = "30 mins",
-                Organizer = "Sipho Mokoena",
-                MinutesText = "Walked through the community workshop setup plan and staffing.",
-                Notes = new()
-                {
-                    new MeetingNote { Text = "Need 4 extra volunteers for site visit", IsActionItem = true, Timestamp = "00:07" }
-                }
-            },
-            new Meeting
-            {
-                Title = "Q3 Board Strategy Session",
-                Date = DateTime.Today.AddDays(2),
-                Duration = "60 mins",
-                Organizer = "Naledi Dube"
-            }
-        });
+            apply(list);
+            Changed();
+        }
     }
+
+    public string UserName(int? id) =>
+        id is null ? "" : Users.FirstOrDefault(u => u.UserId == id)?.FullName ?? $"User #{id}";
+
+    public string AssigneeNames(TaskCardDto task) => string.Join(", ", task.AssigneeIds.Select(id => UserName(id)));
+
+    // Admins aren't line staff, and the API refuses deactivated assignees.
+    public IEnumerable<UserSummaryDto> AssignableUsers =>
+        Users.Where(u => u.IsActive && u.Role != Roles.Admin).OrderBy(u => u.FullName);
+
+    public int? DailyProjectId => Projects.FirstOrDefault(p => p.ProjectName == DailyTasksProject)?.ProjectId;
+
+    // The UI's "events" are every project except the seeded daily-tasks one.
+    public IEnumerable<ProjectSummaryDto> EventProjects =>
+        Projects.Where(p => p.ProjectName != DailyTasksProject);
+
+    public string? ProjectName(int? id) => Projects.FirstOrDefault(p => p.ProjectId == id)?.ProjectName;
+
+    /// <summary>The event a task is linked to, or null for a daily task.</summary>
+    public string? EventName(TaskCardDto task) => task.ProjectId == DailyProjectId ? null : ProjectName(task.ProjectId);
+
+    public int UnreadCount => Notifications.Count(n => !n.IsRead);
+
+    public async Task MarkReadAsync(IReadOnlyList<int> ids)
+    {
+        if (ids.Count > 0 && await SendAsync(HttpMethod.Post, "api/notifications/read",
+                new MarkReadRequest { NotificationIds = ids }))
+            await RefreshNotificationsAsync();
+    }
+
+    // ------------------------------------------------------------------
+    // Tasks (Home and Daily Tasks both change them)
+    // ------------------------------------------------------------------
+
+    /// <summary>Returns true once the task exists, even if assigning it then failed (already reported).</summary>
+    public async Task<bool> CreateTaskAsync(NewTaskResult task)
+    {
+        if ((task.ProjectId ?? DailyProjectId) is not { } projectId)
+        {
+            snackbar.Add($"The server has no \"{DailyTasksProject}\" project to hold daily tasks.", Severity.Error);
+            return false;
+        }
+        var card = await SendAsync<TaskCardDto>(HttpMethod.Post, "api/tasks", new CreateTaskRequest
+        {
+            ProjectId = projectId,
+            Title = task.Title,
+            Description = task.Description,
+            Priority = task.Priority,
+            Deadline = Wall(task.ScheduledStart),
+        });
+        if (card is not null && task.AssigneeId is { } assigneeId)
+            await Assign(card.TaskId, assigneeId);
+        await RefreshTasksAsync();
+        return card is not null;
+    }
+
+    public async Task<bool> UpdateTaskAsync(TaskCardDto task, NewTaskResult edited)
+    {
+        var ok = await SendAsync(HttpMethod.Patch, $"api/tasks/{task.TaskId}", new UpdateTaskRequest
+        {
+            Title = edited.Title,
+            Description = edited.Description,
+            Priority = edited.Priority,
+            Deadline = Wall(edited.ScheduledStart),
+            ProjectId = edited.ProjectId ?? DailyProjectId,
+        });
+
+        // The UI shows one assignee, so picking another is a reassign (UC-04).
+        int? current = task.AssigneeIds.Count > 0 ? task.AssigneeIds[0] : null;
+        if (ok && edited.AssigneeId != current)
+        {
+            foreach (var old in task.AssigneeIds)
+                ok = ok && await SendAsync(HttpMethod.Delete, $"api/tasks/{task.TaskId}/assignments/{old}");
+            if (ok && edited.AssigneeId is { } assigneeId)
+                ok = await Assign(task.TaskId, assigneeId);
+        }
+        await RefreshTasksAsync();
+        return ok;
+    }
+
+    /// <summary>Ticking a task completes it as the signed-in user; unticking reopens it.
+    /// The API enforces SM-01 (e.g. an unassigned "To Do" task can't jump to Done).</summary>
+    public async Task SetTaskDoneAsync(TaskCardDto task, bool done)
+    {
+        await SendAsync(HttpMethod.Post, $"api/tasks/{task.TaskId}/move",
+            new MoveTaskRequest { NewStatus = done ? "Done" : "In Progress" });
+        await RefreshTasksAsync();
+    }
+
+    private Task<bool> Assign(int taskId, int userId) =>
+        SendAsync(HttpMethod.Post, $"api/tasks/{taskId}/assignments", new AssignTaskRequest { AssigneeId = userId });
+
+    // ------------------------------------------------------------------
+    // Live updates: the SignalR Observer from the architecture doc. The
+    // server says what changed; refetching that list keeps one data path.
+    // ------------------------------------------------------------------
+
+    private async Task ConnectHubAsync()
+    {
+        hub = new HubConnectionBuilder()
+            .WithUrl(new Uri(http.BaseAddress!, "hubs/notifications"),
+                o => o.AccessTokenProvider = () => Task.FromResult(CurrentUser?.Token))
+            .WithAutomaticReconnect()
+            .Build();
+
+        On("boardChanged", RefreshTasksAsync);
+        On("taskAssigned", RefreshNotificationsAsync);
+        On("projectAssigned", RefreshNotificationsAsync, RefreshProjectsAsync);
+        On("requestSubmitted", RefreshNotificationsAsync, RefreshRequestsAsync);
+        On("requestReviewed", RefreshNotificationsAsync, RefreshRequestsAsync);
+        On("notification", RefreshNotificationsAsync);
+
+        try
+        {
+            await hub.StartAsync();
+        }
+        catch (Exception)
+        {
+            snackbar.Add("Live updates are unavailable; other people's changes appear after a refresh.",
+                Severity.Warning);
+        }
+    }
+
+    private void On(string eventName, params Func<Task>[] refreshes) =>
+        hub!.On<JsonElement>(eventName, _ => Task.WhenAll(refreshes.Select(refresh => refresh())));
+
+    // ------------------------------------------------------------------
+    // HTTP. A failed call shows a snackbar and returns null/false.
+    // ------------------------------------------------------------------
+
+    public async Task<T?> GetAsync<T>(string url) =>
+        await Send(HttpMethod.Get, url, null) is { } res ? await res.Content.ReadFromJsonAsync<T>() : default;
+
+    public async Task<T?> SendAsync<T>(HttpMethod method, string url, object body) =>
+        await Send(method, url, body) is { } res ? await res.Content.ReadFromJsonAsync<T>() : default;
+
+    public async Task<bool> SendAsync(HttpMethod method, string url, object? body = null) =>
+        await Send(method, url, body) is not null;
+
+    private async Task<HttpResponseMessage?> Send(HttpMethod method, string url, object? body)
+    {
+        HttpResponseMessage res;
+        try
+        {
+            res = await http.SendAsync(new HttpRequestMessage(method, url)
+            {
+                Content = body is null ? null : JsonContent.Create(body),
+            });
+        }
+        catch (HttpRequestException)
+        {
+            snackbar.Add($"Can't reach the server at {http.BaseAddress}.", Severity.Error);
+            return null;
+        }
+        if (res.IsSuccessStatusCode) return res;
+
+        if (res.StatusCode != HttpStatusCode.Unauthorized)
+        {
+            snackbar.Add(await ErrorMessage(res), Severity.Error);
+        }
+        else if (CurrentUser is not null)
+        {
+            await LogoutAsync();
+            snackbar.Add("Your session has expired. Please sign in again.", Severity.Warning);
+        }
+        return null;
+    }
+
+    // The API's own errors are ErrorResponse { message }; model validation failures are ProblemDetails.
+    private static async Task<string> ErrorMessage(HttpResponseMessage res)
+    {
+        try
+        {
+            var json = await res.Content.ReadFromJsonAsync<JsonElement>();
+            if (json.TryGetProperty("message", out var message)) return message.GetString()!;
+            if (json.TryGetProperty("errors", out var errors))
+                return errors.EnumerateObject().SelectMany(e => e.Value.EnumerateArray()).First().GetString()!;
+        }
+        catch (Exception e) when (e is JsonException or NotSupportedException or InvalidOperationException)
+        {
+            // No JSON body (e.g. a bare 403); fall through to the status line.
+        }
+        return $"The server returned {(int)res.StatusCode} {res.ReasonPhrase}.";
+    }
+
+    // Deadlines and meeting dates are wall-clock times: send them without a UTC offset.
+    public static DateTime Wall(DateTime value) => DateTime.SpecifyKind(value, DateTimeKind.Unspecified);
+
+    // Times the server stamps itself (submitted, reviewed) are UTC.
+    public static DateTime Local(DateTime utc) => DateTime.SpecifyKind(utc, DateTimeKind.Utc).ToLocalTime();
+}
+
+public static class TaskCardExtensions
+{
+    public static bool IsDone(this TaskCardDto task) =>
+        string.Equals(task.Status, "Done", StringComparison.OrdinalIgnoreCase);
+
+    // ponytail: the ERD has no all-day flag, so a deadline at exactly midnight
+    // means "any time that day". Add a column if midnight deadlines become real.
+    public static bool IsAllDay(this TaskCardDto task) => task.Deadline.TimeOfDay == TimeSpan.Zero;
 }

@@ -17,6 +17,8 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Models.Project
         public int? CompletedBy { get; set; }
         public int? ScheduleId { get; set; }
         [MaxLength(200)] public string Title { get; set; } = String.Empty;
+        /// <summary>Not in the original ERD; UC-04 has users add task descriptions.</summary>
+        [MaxLength(2000)] public string? Description { get; set; }
         [MaxLength(20)] public string Priority { get; set; } = String.Empty;
         [MaxLength(30)] public string Status { get; set; } = String.Empty;
         public DateTime Deadline { get; set; }

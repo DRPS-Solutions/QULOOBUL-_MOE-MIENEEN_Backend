@@ -1,16 +1,11 @@
 @* =====================================================================
    CreateTaskDialog
    A small MudBlazor dialog, shown via IDialogService from Tasks.razor
-   when the user clicks "New Task". Collects the fields needed to build
-   an AppTask (title, description, date, time/all-day, category,
-   priority, assignee, and - only for Event-type tasks - which event it
+   when the user clicks "New Task". Collects the fields the API stores
+   for a task (title, description, date, time/all-day, priority,
+   assignee, and - only for Event-type tasks - which event/project it
    belongs to) and hands them back to the caller as a NewTaskResult.
-   Cancelling returns no result, and Tasks.razor leaves its task list
-   unchanged.
-
-   Reuses the ".drps-modal-task-name" style defined in Tasks.razor's
-   <style> block - since Blazor doesn't scope plain <style> tags, those
-   rules are already global on any page that has Tasks.razor loaded.
+   Cancelling returns no result, and Tasks.razor creates nothing.
    ===================================================================== *@
 @using MudBlazor
 @inject AppDataService AppData
@@ -24,6 +19,7 @@
                        @bind-Value="title"
                        Label="Task title"
                        Variant="Variant.Outlined"
+                       MaxLength="200"
                        Class="mb-3"
                        Immediate="true" />
 
@@ -31,6 +27,7 @@
                        @bind-Value="description"
                        Label="Description (optional)"
                        Variant="Variant.Outlined"
+                       MaxLength="2000"
                        Lines="2"
                        Class="mb-3" />
 
@@ -44,28 +41,22 @@
 
         <MudCheckBox T="bool" @bind-Value="isAllDay" Label="All day" Color="Color.Primary" Class="mb-3" />
 
-        <MudSelect T="string" Label="Category" Variant="Variant.Outlined" @bind-Value="category" Class="mb-3">
-            <MudSelectItem T="string" Value="@("Admin")">Admin</MudSelectItem>
-            <MudSelectItem T="string" Value="@("Meeting")">Meeting</MudSelectItem>
-            <MudSelectItem T="string" Value="@("Fieldwork")">Fieldwork</MudSelectItem>
-            <MudSelectItem T="string" Value="@("Other")">Other</MudSelectItem>
-        </MudSelect>
-
         <MudSelect T="string" Label="Priority" Variant="Variant.Outlined" @bind-Value="priority" Class="mb-3">
             <MudSelectItem T="string" Value="@("Low")">Low</MudSelectItem>
             <MudSelectItem T="string" Value="@("Medium")">Medium</MudSelectItem>
             <MudSelectItem T="string" Value="@("High")">High</MudSelectItem>
         </MudSelect>
 
-        <MudSelect T="string" Label="Assignee" Variant="Variant.Outlined" @bind-Value="assignee" Class="mb-3">
-            @foreach (var employee in AppData.SelectableEmployeeNames)
+        <MudSelect T="int?" Label="Assignee" Variant="Variant.Outlined" @bind-Value="assigneeId"
+                   ToStringFunc="@(id => AppData.UserName(id))" Class="mb-3">
+            @foreach (var user in AppData.AssignableUsers)
             {
-                <MudSelectItem T="string" Value="@employee">@employee</MudSelectItem>
+                <MudSelectItem T="int?" Value="@user.UserId">@user.FullName</MudSelectItem>
             }
         </MudSelect>
 
         @* Task type - Daily is a standalone task; Event ties the task
-           to one of the entries planned on the Events page, so it
+           to one of the events/projects planned on the Events page, so it
            shows up in that event's "Linked Tasks" list too. *@
         <MudSelect T="string" Label="Task type" Variant="Variant.Outlined" @bind-Value="taskType" Class="mb-3">
             <MudSelectItem T="string" Value="@("Daily")">Daily task</MudSelectItem>
@@ -74,12 +65,13 @@
 
         @if (taskType == "Event")
         {
-            @if (AppData.Events.Any())
+            @if (AppData.EventProjects.Any())
             {
-                <MudSelect T="Guid?" Label="Linked event" Variant="Variant.Outlined" @bind-Value="linkedEventId">
-                    @foreach (var evt in AppData.Events)
+                <MudSelect T="int?" Label="Linked event" Variant="Variant.Outlined" @bind-Value="projectId"
+                           ToStringFunc="@(id => AppData.ProjectName(id))">
+                    @foreach (var project in AppData.EventProjects)
                     {
-                        <MudSelectItem T="Guid?" Value="@evt.Id">@evt.Title</MudSelectItem>
+                        <MudSelectItem T="int?" Value="@project.ProjectId">@project.ProjectName</MudSelectItem>
                     }
                 </MudSelect>
             }
@@ -112,50 +104,38 @@
     private DateTime? date = DateTime.Today;
     private TimeSpan? time = new TimeSpan(9, 0, 0);
     private bool isAllDay = false;
-    private string category = "Admin";
     private string priority = "Low";
-    private string assignee = string.Empty;
+    private int? assigneeId;
     private string taskType = "Daily";
-    private Guid? linkedEventId = null;
+    private int? projectId;
 
     // Confirm is only enabled once there's a title, a date and an
     // assignee (time is only required when the task isn't all-day; an
     // Event-type task also needs a chosen event).
     private bool CanConfirm =>
         !string.IsNullOrWhiteSpace(title) &&
-        !string.IsNullOrWhiteSpace(assignee) &&
+        assigneeId.HasValue &&
         date.HasValue &&
         (isAllDay || time.HasValue) &&
-        (taskType != "Event" || linkedEventId.HasValue);
+        (taskType != "Event" || projectId.HasValue);
 
     // Closes the dialog successfully, returning the entered details as
-    // a NewTaskResult - Tasks.razor turns this into an AppTask.
+    // a NewTaskResult - Tasks.razor passes it to AppDataService.
     private void Confirm()
     {
-        var scheduledStart = isAllDay
-            ? date!.Value.Date
-            : date!.Value.Date + time!.Value;
-
-        var linkedEvent = taskType == "Event" ? AppData.Events.FirstOrDefault(e => e.Id == linkedEventId) : null;
-
-        var result = new NewTaskResult
+        MudDialog.Close(DialogResult.Ok(new NewTaskResult
         {
             Title = title.Trim(),
             Description = description.Trim(),
-            ScheduledStart = scheduledStart,
-            IsAllDay = isAllDay,
-            Category = category,
+            // An all-day task is stored as a midnight deadline.
+            ScheduledStart = isAllDay ? date!.Value.Date : date!.Value.Date + time!.Value,
             Priority = priority,
-            Assignee = assignee,
-            Type = taskType,
-            LinkedEventId = linkedEvent?.Id,
-            LinkedEventTitle = linkedEvent?.Title
-        };
-
-        MudDialog.Close(DialogResult.Ok(result));
+            AssigneeId = assigneeId,
+            ProjectId = taskType == "Event" ? projectId : null
+        }));
     }
 
     // Closes the dialog as cancelled - the caller treats this as "no
-    // change" and adds nothing to the task list.
+    // change" and creates nothing.
     private void Cancel() => MudDialog.Cancel();
 }

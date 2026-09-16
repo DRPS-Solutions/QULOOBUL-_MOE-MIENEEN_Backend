@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using QULOOBUL__MOE_MIENEEN_Backend.Data;
 using QULOOBUL__MOE_MIENEEN_Backend.Models.Request;
+using QULOOBUL__MOE_MIENEEN_Shared.Requests;
 
 namespace QULOOBUL__MOE_MIENEEN_Backend.Services
 {
@@ -14,7 +15,27 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
     {
         public const string ReviewPermission = "ReviewRequests";
 
-        public async Task<ResourceRequest> SubmitAsync(int requestedBy, int categoryId, string priority)
+        /// <summary>Reviewers see every request; everyone else sees only their own.</summary>
+        public async Task<List<ResourceRequestDto>> ListAsync(int userId)
+        {
+            var q = db.ResourceRequests.AsQueryable();
+            if (!await HasPermission(userId, ReviewPermission)) q = q.Where(r => r.RequestedBy == userId);
+
+            return await q.OrderByDescending(r => r.DateSubmitted)
+                .Select(r => new ResourceRequestDto(
+                    r.RequestId, r.RequestedBy, r.CategoryId, r.Category!.CategoryName,
+                    r.Status, r.Priority, r.DateSubmitted, r.ReviewedBy,
+                    db.RequestStatusHistory.Where(h => h.RequestId == r.RequestId).OrderBy(h => h.TimeCreated)
+                        .Select(h => new RequestStatusHistoryDto(h.NewStatus, h.ChangedBy, h.TimeCreated)).ToList(),
+                    r.Detail))
+                .ToListAsync();
+        }
+
+        public Task<List<RequestCategoryDto>> CategoriesAsync() =>
+            db.RequestCategories.OrderBy(c => c.CategoryName)
+                .Select(c => new RequestCategoryDto(c.CategoryId, c.CategoryName)).ToListAsync();
+
+        public async Task<ResourceRequest> SubmitAsync(int requestedBy, int categoryId, string priority, string? detail)
         {
             if (!await db.RequestCategories.AnyAsync(c => c.CategoryId == categoryId))
                 throw new InvalidOperationException($"Unknown request category {categoryId}.");
@@ -26,6 +47,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
                 Priority = string.IsNullOrWhiteSpace(priority) ? "Normal" : priority,
                 Status = Lifecycle.RequestStart,
                 DateSubmitted = DateTime.UtcNow,
+                Detail = string.IsNullOrWhiteSpace(detail) ? null : detail.Trim(),
             };
             db.ResourceRequests.Add(request);
             db.RequestStatusHistory.Add(new RequestStatusHistory
@@ -35,8 +57,23 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
                 ChangedBy = requestedBy,
                 TimeCreated = DateTime.UtcNow,
             });
+            await db.SaveChangesAsync(); // the notifications below point at the new request's id
+
+            // UC-05: route the request to everyone who can review it.
+            var requester = await db.Users.Where(u => u.UserId == requestedBy)
+                .Select(u => u.FirstName + " " + u.Surname).FirstAsync();
+            var summary = request.Detail?.Split('\n', 2)[0];
+            var message = $"{requester} submitted resource request #{request.RequestId}" +
+                          (summary is null ? "." : $": {summary}");
+            var reviewers = await UsersWith(ReviewPermission).Where(id => id != requestedBy).ToListAsync();
+            foreach (var reviewer in reviewers)
+                await notify.QueueAsync(reviewer, "RequestSubmitted", message,
+                    nameof(ResourceRequest), request.RequestId);
+            audit.Record(requestedBy, "request.submit", nameof(ResourceRequest), request.RequestId);
+
             await db.SaveChangesAsync();
-            await audit.RecordAndSaveAsync(requestedBy, "request.submit", nameof(ResourceRequest), request.RequestId);
+            foreach (var reviewer in reviewers)
+                await notify.PushAsync(reviewer, "requestSubmitted", new { requestId = request.RequestId });
             return request;
         }
 
@@ -101,11 +138,14 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             });
 
         private Task<bool> HasPermission(int userId, string permissionName) =>
-            (from u in db.Users
-             join rp in db.RolePermissions on u.RoleId equals rp.RoleId
-             join p in db.Permissions on rp.PermissionId equals p.PermissionId
-             where u.UserId == userId && p.PermissionName == permissionName
-             select p.PermissionId).AnyAsync();
+            UsersWith(permissionName).AnyAsync(id => id == userId);
+
+        private IQueryable<int> UsersWith(string permissionName) =>
+            from u in db.Users
+            join rp in db.RolePermissions on u.RoleId equals rp.RoleId
+            join p in db.Permissions on rp.PermissionId equals p.PermissionId
+            where u.IsActive && p.PermissionName == permissionName
+            select u.UserId;
     }
 }
 //---------------------------DDDDDDDDDDDoooooooooooooo END OF FILE DDDDDDDDDDDoooooooooooooo---------------------------//

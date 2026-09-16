@@ -10,6 +10,10 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Controllers
         public async Task<ActionResult<IReadOnlyList<TaskCardDto>>> Board(int projectId) =>
             Ok(await tasks.BoardAsync(projectId));
 
+        [HttpGet]
+        public async Task<ActionResult<IReadOnlyList<TaskCardDto>>> List(DateTime? from, DateTime? to, int? assigneeId) =>
+            Ok(await tasks.ListAsync(from, to, assigneeId));
+
         [HttpGet("{id:int}")]
         public async Task<ActionResult<TaskDetailDto>> Get(int id) => Ok(await tasks.DetailAsync(id));
 
@@ -32,6 +36,13 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Controllers
         public async Task<IActionResult> Assign(int id, AssignTaskRequest req)
         {
             await assignments.AssignAsync(id, req.AssigneeId, UserId());
+            return NoContent();
+        }
+
+        [HttpDelete("{id:int}/assignments/{userId:int}")]
+        public async Task<IActionResult> Unassign(int id, int userId)
+        {
+            await assignments.UnassignAsync(id, userId, UserId());
             return NoContent();
         }
 

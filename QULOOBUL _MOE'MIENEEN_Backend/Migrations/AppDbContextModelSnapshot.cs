@@ -560,6 +560,10 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
                     b.Property<DateTime>("Deadline")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("Description")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
                     b.Property<int>("PercentComplete")
                         .HasColumnType("int");
 
@@ -659,6 +663,10 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
 
                     b.Property<DateTime>("DateSubmitted")
                         .HasColumnType("datetime2");
+
+                    b.Property<string>("Detail")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
 
                     b.Property<string>("Priority")
                         .IsRequired()

@@ -3,7 +3,6 @@
 @implements IDisposable
 @inject IDialogService DialogService
 @inject AppDataService AppData
-@inject NotificationService NotificationService
 
 <PageTitle>Daily Tasks</PageTitle>
 
@@ -373,15 +372,7 @@
         text-decoration: line-through;
     }
 
-    /* Small category icon shown inline next to the category label on
-       both hourly task cards and all-day chips, so tasks can be
-       scanned by type at a glance. */
-    .drps-category-icon {
-        opacity: 0.7;
-    }
-
-    /* Line showing who completed a task, once attributed via the
-       completion popup. */
+    /* Line showing who completed a task (or which event it's linked to). */
     .drps-task-completed-by {
         font-size: 0.68rem;
         color: var(--drps-blue-500);
@@ -389,9 +380,8 @@
         font-style: italic;
     }
 
-    /* Completion dialog: reused by CompletedByDialog.razor (shown via
-       IDialogService/MudDialogProvider) to style the task name it
-       displays above the employee dropdown. */
+    /* Dialog subtitle: reused by DenyRequestDialog.razor (shown via
+       IDialogService/MudDialogProvider) to style the name it displays. */
     .drps-modal-task-name {
         font-size: 0.85rem;
         color: var(--drps-text-muted);
@@ -478,7 +468,7 @@
 
         @* --- Completion summary for the selected day --- *@
         <MudText Typo="Typo.body2" Class="mb-3" Style="color:#75806F;">
-            @(TasksForSelectedDay.Count() == 0 ? "No tasks scheduled" : $"{TasksForSelectedDay.Count(t => t.IsCompleted)} of {TasksForSelectedDay.Count()} completed")
+            @(TasksForSelectedDay.Count() == 0 ? "No tasks scheduled" : $"{TasksForSelectedDay.Count(t => t.IsDone())} of {TasksForSelectedDay.Count()} completed")
         </MudText>
 
         @* --- Legend explaining the priority accent colors --- *@
@@ -495,30 +485,26 @@
                 <span class="drps-allday-label">All day</span>
                 @foreach (var task in AllDayTasksForSelectedDay)
                 {
-                    <div class="drps-allday-chip priority-@task.Priority.ToString().ToLower() @(task.IsCompleted ? "done" : "")"
+                    <div class="drps-allday-chip priority-@task.Priority.ToLower() @(task.IsDone() ? "done" : "")"
                          @onclick="() => OnOpenTaskDetails(task)">
-                        <MudIcon Icon="@GetCategoryIcon(task.Category)" Size="Size.Small" Class="drps-category-icon" />
                         <div>
                             <span class="drps-allday-title">@task.Title</span>
-                            @if (task.Type == AppTaskType.Event && !string.IsNullOrWhiteSpace(task.LinkedEventTitle))
+                            @if (AppData.EventName(task) is { } eventName)
                             {
-                                <div class="drps-task-completed-by">Linked: @task.LinkedEventTitle</div>
+                                <div class="drps-task-completed-by">Linked: @eventName</div>
                             }
-                            @* Shown once attributed via the completion popup, same as
-                               hourly task cards. *@
-                            @if (task.IsCompleted && !string.IsNullOrEmpty(task.CompletedBy))
+                            @if (task.IsDone() && task.CompletedBy is not null)
                             {
-                                <div class="drps-task-completed-by">Completed by @task.CompletedBy</div>
+                                <div class="drps-task-completed-by">Completed by @AppData.UserName(task.CompletedBy)</div>
                             }
                         </div>
-                        @* Same completion popup flow as the hourly cards - checking
-                           opens CompletedByDialog, unchecking clears it directly.
-                           stopPropagation keeps a checkbox click from also opening
-                           the details dialog underneath it. *@
+                        @* Same completion flow as the hourly cards. stopPropagation
+                           keeps a checkbox click from also opening the details
+                           dialog underneath it. *@
                         <div @onclick:stopPropagation="true">
                             <MudCheckBox T="bool"
-                                         Value="task.IsCompleted"
-                                         ValueChanged="@(v => OnToggleTask(task, v))"
+                                         Value="task.IsDone()"
+                                         ValueChanged="@((bool done) => AppData.SetTaskDoneAsync(task, done))"
                                          Color="Color.Primary"
                                          Size="Size.Small" />
                         </div>
@@ -542,7 +528,7 @@
             @foreach (var hour in DisplayHours)
             {
                 // Tasks for the selected day that start within this hour.
-                var hourTasks = TimedTasksForSelectedDay.Where(t => t.ScheduledStart.Hour == hour).ToList();
+                var hourTasks = TimedTasksForSelectedDay.Where(t => t.Deadline.Hour == hour).ToList();
                 <div class="drps-hour-row @(hourTasks.Count == 0 ? "drps-empty-row" : "")">
 
                     @* Time label for this row, e.g. "9 AM" *@
@@ -560,36 +546,32 @@
                             @* One card per task scheduled in this hour. *@
                             @foreach (var task in hourTasks)
                             {
-                                <div class="drps-task-card priority-@task.Priority.ToString().ToLower() @(task.IsCompleted ? "done" : "")"
+                                var assignees = AppData.AssigneeNames(task);
+                                <div class="drps-task-card priority-@task.Priority.ToLower() @(task.IsDone() ? "done" : "")"
                                      @onclick="() => OnOpenTaskDetails(task)">
                                     <div>
                                         <div class="drps-task-title">@task.Title</div>
                                         <div class="drps-task-time">
-                                            <MudIcon Icon="@GetCategoryIcon(task.Category)" Size="Size.Small" Class="drps-category-icon" Style="vertical-align:text-bottom;" />
-                                            @task.ScheduledStart.ToString("h:mm tt") &middot; @task.Category
-                                            @(string.IsNullOrWhiteSpace(task.Assignee) ? "" : $" \u00b7 {task.Assignee}")
+                                            @task.Deadline.ToString("h:mm tt")
+                                            @(assignees.Length == 0 ? "" : $" \u00b7 {assignees}")
                                         </div>
-                                        @if (task.Type == AppTaskType.Event && !string.IsNullOrWhiteSpace(task.LinkedEventTitle))
+                                        @if (AppData.EventName(task) is { } eventName)
                                         {
-                                            <div class="drps-task-completed-by">Linked: @task.LinkedEventTitle</div>
+                                            <div class="drps-task-completed-by">Linked: @eventName</div>
                                         }
-                                        @* Shown once the task has been marked complete and
-                                           attributed to an employee via the popup. *@
-                                        @if (task.IsCompleted && !string.IsNullOrEmpty(task.CompletedBy))
+                                        @if (task.IsDone() && task.CompletedBy is not null)
                                         {
-                                            <div class="drps-task-completed-by">Completed by @task.CompletedBy</div>
+                                            <div class="drps-task-completed-by">Completed by @AppData.UserName(task.CompletedBy)</div>
                                         }
                                     </div>
-                                    @* Checking the box does not mark the task done directly -
-                                       it opens the completion popup (OnToggleTask) so the
-                                       user can attribute who completed it. Unchecking clears
-                                       completion immediately with no prompt needed.
-                                       stopPropagation keeps a checkbox click from also
-                                       opening the details dialog underneath it. *@
+                                    @* Ticking completes the task as the signed-in user;
+                                       unticking reopens it. stopPropagation keeps a
+                                       checkbox click from also opening the details
+                                       dialog underneath it. *@
                                     <div @onclick:stopPropagation="true">
                                         <MudCheckBox T="bool"
-                                                     Value="task.IsCompleted"
-                                                     ValueChanged="@(v => OnToggleTask(task, v))"
+                                                     Value="task.IsDone()"
+                                                     ValueChanged="@((bool done) => AppData.SetTaskDoneAsync(task, done))"
                                                      Color="Color.Primary"
                                                      Size="Size.Small" />
                                     </div>
@@ -606,8 +588,8 @@
 
 @* =====================================================================
    CODE-BEHIND
-   State, placeholder data, and the small pieces of logic that drive
-   the markup above (which day/week is showing, which hours to
+   State and the small pieces of logic that drive the markup above
+   (which day/week is showing and loaded from the API, which hours to
    display, where the "now" line sits, and the day/week navigation
    handlers).
    ===================================================================== *@
@@ -630,209 +612,66 @@
     // from weekStart.
     private IEnumerable<DateTime> WeekDays => Enumerable.Range(0, 7).Select(i => weekStart.AddDays(i));
 
-    // Tasks now live in AppDataService (Singleton) instead of a private
-    // placeholder list, so this page and Home.razor read/write the
-    // exact same AppTask objects - that's what "links" the two pages.
-    private List<AppTask> tasks => AppData.Tasks.ToList();
+    // AppData.Tasks holds the displayed week, loaded from the API (see
+    // LoadWeek); Home.razor reads the same list for today.
+    private IReadOnlyList<TaskCardDto> tasks => AppData.Tasks;
 
     // True if the given date has at least one scheduled task - drives
     // the small dot indicator in the day strip above.
-    private bool DayHasTasks(DateTime day) => tasks.Any(t => t.ScheduledStart.Date == day.Date);
+    private bool DayHasTasks(DateTime day) => tasks.Any(t => t.Deadline.Date == day.Date);
 
-    // Employee list for the "who completed this?" dropdown and the New
-    // Task dialog's assignee field, now sourced from AppDataService's
-    // shared user list instead of a private hard-coded copy.
-    private List<string> employees => AppData.EmployeeNames;
-
-    // --- Completion popup, via IDialogService/MudDialogProvider ---
-    // Fired by a task's checkbox. Checking a task doesn't mark it done
-    // immediately - it opens CompletedByDialog so the user can say who
-    // completed it. Unchecking clears completion right away, no dialog
-    // needed since there's nothing to attribute.
-    private async Task OnToggleTask(AppTask task, bool isChecked)
-    {
-        if (isChecked)
-        {
-            var parameters = new DialogParameters<CompletedByDialog>
-            {
-                { x => x.TaskTitle, task.Title },
-                { x => x.Employees, employees }
-            };
-            var options = new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true, CloseOnEscapeKey = true };
-
-            var dialog = await DialogService.ShowAsync<CompletedByDialog>("Mark task complete", parameters, options);
-            var result = await dialog.Result;
-
-            // Only mark the task done if the user actually picked an
-            // employee and confirmed - cancelling leaves task.IsCompleted
-            // untouched, so the checkbox just reverts to unchecked.
-            if (result is not null && !result.Canceled && result.Data is string employee && !string.IsNullOrEmpty(employee))
-            {
-                AppData.CompleteTask(task, employee);
-            }
-        }
-        else
-        {
-            AppData.ReopenTask(task);
-        }
-    }
+    private static readonly DialogOptions DialogOptions =
+        new() { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true, CloseOnEscapeKey = true };
 
     // --- Task creation, via IDialogService/MudDialogProvider ---
-    // Fired by the "New Task" button next to the date heading. Opens
-    // CreateTaskDialog to collect the new task's details; if the user
-    // confirms, maps the dialog's NewTaskResult onto an AppTask and adds
-    // it via AppDataService (so Home picks it up immediately if it's
-    // scheduled for today). Cancelling adds nothing.
+    // Fired by the "New Task" button next to the date heading. The API
+    // creates the task, assigns it, and notifies the assignee.
     private async Task OnCreateTask()
     {
-        var options = new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true, CloseOnEscapeKey = true };
-
-        var dialog = await DialogService.ShowAsync<CreateTaskDialog>("New task", options);
+        var dialog = await DialogService.ShowAsync<CreateTaskDialog>("New task", DialogOptions);
         var result = await dialog.Result;
 
-        if (result is not null && !result.Canceled && result.Data is NewTaskResult newTask)
+        if (result is { Canceled: false, Data: NewTaskResult newTask } && await AppData.CreateTaskAsync(newTask))
         {
-            var createdTask = AppData.AddTask(new AppTask
-            {
-                Title = newTask.Title,
-                Description = newTask.Description,
-                ScheduledStart = newTask.ScheduledStart,
-                IsAllDay = newTask.IsAllDay,
-                Category = newTask.Category,
-                Priority = Enum.TryParse<TaskPriority>(newTask.Priority, out var parsedPriority) ? parsedPriority : TaskPriority.Low,
-                Assignee = newTask.Assignee,
-                Type = newTask.Type == "Event" ? AppTaskType.Event : AppTaskType.Daily,
-                LinkedEventId = newTask.LinkedEventId,
-                LinkedEventTitle = newTask.LinkedEventTitle
-            });
-
-            NotifyAssignee(createdTask);
-
-            // Jump the view to the day the new task was scheduled on,
-            // so the user immediately sees it land in the timeline.
-            selectedDate = newTask.ScheduledStart.Date;
-            weekStart = StartOfWeek(newTask.ScheduledStart.Date);
+            // Jump to the day the task landed on.
+            await ShowDay(newTask.ScheduledStart);
         }
     }
 
     // --- Task details/edit popup, via IDialogService/MudDialogProvider ---
     // Fired by clicking anywhere on a task card/chip (but not its
-    // checkbox - see stopPropagation on that wrapper). Opens
-    // TaskDetailsDialog pre-filled with the clicked task; the result is
-    // either a saved edit (NewTaskResult, applied via AppData.UpdateTask),
-    // the delete sentinel (removes the task via AppData.DeleteTask), or
-    // nothing at all if the user just closes/cancels.
-    private async Task OnOpenTaskDetails(AppTask task)
+    // checkbox - see stopPropagation on that wrapper). There's no
+    // delete: task history is append-only in the API.
+    private async Task OnOpenTaskDetails(TaskCardDto task)
     {
         var parameters = new DialogParameters<TaskDetailsDialog>
         {
             { x => x.Task, task }
         };
-        var options = new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true, CloseOnEscapeKey = true };
-
-        var dialog = await DialogService.ShowAsync<TaskDetailsDialog>("Task details", parameters, options);
+        var dialog = await DialogService.ShowAsync<TaskDetailsDialog>("Task details", parameters, DialogOptions);
         var result = await dialog.Result;
 
-        if (result is null || result.Canceled)
+        if (result is { Canceled: false, Data: NewTaskResult edited } && await AppData.UpdateTaskAsync(task, edited))
         {
-            return;
+            await ShowDay(edited.ScheduledStart);
         }
-
-        if (result.Data is string sentinel && sentinel == TaskDetailsDialog.DeleteSentinel)
-        {
-            AppData.DeleteTask(task);
-        }
-        else if (result.Data is NewTaskResult edited)
-        {
-            var previousAssignee = task.Assignee;
-
-            AppData.UpdateTask(task, new AppTask
-            {
-                Title = edited.Title,
-                Description = edited.Description,
-                ScheduledStart = edited.ScheduledStart,
-                IsAllDay = edited.IsAllDay,
-                Category = edited.Category,
-                Priority = Enum.TryParse<TaskPriority>(edited.Priority, out var parsedPriority) ? parsedPriority : TaskPriority.Low,
-                Assignee = edited.Assignee,
-                Type = edited.Type == "Event" ? AppTaskType.Event : AppTaskType.Daily,
-                LinkedEventId = edited.LinkedEventId,
-                LinkedEventTitle = edited.LinkedEventTitle
-            });
-
-            // Only notify when the assignee actually changed - editing
-            // any other field shouldn't re-notify the same person.
-            if (!string.Equals(previousAssignee, task.Assignee, StringComparison.Ordinal))
-            {
-                NotifyAssignee(task);
-            }
-
-            // Jump the view to the (possibly changed) date so the edit
-            // is immediately visible, same as OnCreateTask does.
-            selectedDate = edited.ScheduledStart.Date;
-            weekStart = StartOfWeek(edited.ScheduledStart.Date);
-        }
-    }
-
-    // Sends a personal "you were assigned this task" notification to a
-    // task's assignee, but only if their role actually wants to hear
-    // about this kind of task:
-    //   - GeneralStaff    -> only for AppTaskType.Daily tasks
-    //   - FacilityManager / SecondaryAdmin -> any task type
-    //   - Admin -> n/a (not assignable, excluded from SelectableEmployeeNames)
-    // Called on creation, and on edit only when the assignee changed
-    // (see OnOpenTaskDetails above).
-    private void NotifyAssignee(AppTask task)
-    {
-        var user = AppData.UserByName(task.Assignee);
-        if (user is null) return;
-
-        var wantsNotification = user.SystemRole switch
-        {
-            SystemRole.GeneralStaff => task.Type == AppTaskType.Daily,
-            SystemRole.FacilityManager or SystemRole.SecondaryAdmin => true,
-            _ => false
-        };
-        if (!wantsNotification) return;
-
-        var dateLabel = task.IsAllDay
-            ? task.ScheduledStart.ToString("dd MMM")
-            : task.ScheduledStart.ToString("dd MMM, h:mm tt");
-
-        NotificationService.Add(
-            NotificationType.TaskAssignment,
-            "New task assigned",
-            $"You were assigned \"{task.Title}\" on {dateLabel}.",
-            targetUserIds: new[] { user.Id },
-            linkedName: task.Title);
     }
 
     // All tasks belonging to the selected date (both all-day and
-    // timed), sorted by start time. Used for the completion summary.
-    private IEnumerable<AppTask> TasksForSelectedDay =>
-        tasks.Where(t => t.ScheduledStart.Date == selectedDate.Date)
-             .OrderBy(t => t.ScheduledStart);
+    // timed), sorted by time. Used for the completion summary.
+    private IEnumerable<TaskCardDto> TasksForSelectedDay =>
+        tasks.Where(t => t.Deadline.Date == selectedDate.Date)
+             .OrderBy(t => t.Deadline);
 
     // Selected day's tasks that aren't tied to a specific hour -
     // rendered in the "All day" bar above the timeline.
-    private IEnumerable<AppTask> AllDayTasksForSelectedDay =>
-        TasksForSelectedDay.Where(t => t.IsAllDay);
+    private IEnumerable<TaskCardDto> AllDayTasksForSelectedDay =>
+        TasksForSelectedDay.Where(t => t.IsAllDay());
 
     // Selected day's tasks that do have a specific hour - these are
     // the ones placed into the hourly timeline rows.
-    private IEnumerable<AppTask> TimedTasksForSelectedDay =>
-        TasksForSelectedDay.Where(t => !t.IsAllDay);
-
-    // Maps a task's category to a MudBlazor icon so it can be scanned
-    // visually. Falls back to a generic task icon for anything
-    // unrecognized.
-    private string GetCategoryIcon(string category) => category switch
-    {
-        "Meeting" => Icons.Material.Filled.Groups,
-        "Admin" => Icons.Material.Filled.Description,
-        "Fieldwork" => Icons.Material.Filled.LocationOn,
-        _ => Icons.Material.Filled.Task
-    };
+    private IEnumerable<TaskCardDto> TimedTasksForSelectedDay =>
+        TasksForSelectedDay.Where(t => !t.IsAllDay());
 
     // Computes the inline "top" CSS position (in pixels) for the red
     // "now" line, based on the real current time and the 64px height
@@ -868,24 +707,30 @@
     // date's tasks the timeline displays.
     private void SelectDay(DateTime day) => selectedDate = day;
 
-    // Shifts the visible week back by 7 days (left arrow).
-    private void PrevWeek()
+    // Week arrows move the selected day with the week, since only the
+    // displayed week's tasks are loaded.
+    private Task PrevWeek() => ShowDay(selectedDate.AddDays(-7));
+
+    private Task NextWeek() => ShowDay(selectedDate.AddDays(7));
+
+    // Selects a day, loading its week if that's not the one on screen.
+    private async Task ShowDay(DateTime day)
     {
-        weekStart = weekStart.AddDays(-7);
+        selectedDate = day.Date;
+        var start = StartOfWeek(day);
+        if (start == weekStart) return;
+        weekStart = start;
+        await LoadWeek();
     }
 
-    // Shifts the visible week forward by 7 days (right arrow).
-    private void NextWeek()
-    {
-        weekStart = weekStart.AddDays(7);
-    }
+    private Task LoadWeek() => AppData.LoadTasksAsync(weekStart, weekStart.AddDays(7));
 
-    // Re-render if a task is added/completed elsewhere (e.g. from Home,
-    // or an Event-linked task created via the Events page) while this
-    // page is open, so the timeline never shows stale state.
-    protected override void OnInitialized()
+    // Re-render when the task list refreshes - our own changes, or a
+    // SignalR push after someone else's - so the timeline never goes stale.
+    protected override async Task OnInitializedAsync()
     {
         AppData.OnChange += StateHasChanged;
+        await LoadWeek();
     }
 
     public void Dispose()

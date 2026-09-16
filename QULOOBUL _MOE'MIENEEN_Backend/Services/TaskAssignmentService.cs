@@ -53,8 +53,28 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             await db.SaveChangesAsync(); // UoW commit: assignment + status + history + notification + audit
             await notify.PushAsync(assigneeId, "taskAssigned",
                 new { taskId, title = task.Title, assignment.AssignmentId });
+            await notify.BroadcastAsync("boardChanged", new { projectId = task.ProjectId });
 
             return assignment;
+        }
+
+        /// <summary>UC-04 reassign: take <paramref name="userId"/> off a task. Same hierarchy rule as
+        /// assigning: nobody removes someone more senior than themselves.</summary>
+        public async Task UnassignAsync(int taskId, int userId, int actorId)
+        {
+            var assignment = await db.TaskAssignments.Include(a => a.User).Include(a => a.Task)
+                .FirstOrDefaultAsync(a => a.TaskId == taskId && a.UserId == userId)
+                ?? throw new KeyNotFoundException("That user is not assigned to this task.");
+            var actor = await db.Users.FindAsync(actorId)
+                ?? throw new KeyNotFoundException($"User {actorId} not found.");
+
+            if (await LevelOf(actor.RoleId) > await LevelOf(assignment.User!.RoleId))
+                throw new InvalidOperationException("You may not unassign someone higher in the hierarchy.");
+
+            db.TaskAssignments.Remove(assignment);
+            audit.Record(actorId, "task.unassign", nameof(TaskAssignment), taskId);
+            await db.SaveChangesAsync();
+            await notify.BroadcastAsync("boardChanged", new { projectId = assignment.Task!.ProjectId });
         }
 
         /// <summary>SM-01 guarded status change, callable directly by a task-board move.</summary>

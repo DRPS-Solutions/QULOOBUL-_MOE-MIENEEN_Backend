@@ -8,6 +8,17 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
     /// <summary>UC-03: create meetings, record/approve minutes. Author + date are set server-side.</summary>
     public class MeetingMinutesService(AppDbContext db, AuditService audit)
     {
+        /// <summary>Every meeting, newest first, with its latest minutes (edits append a new record).</summary>
+        public Task<List<MeetingDto>> ListAsync() =>
+            db.Meetings.OrderByDescending(m => m.MeetingDate).Select(m => new MeetingDto(
+                m.MeetingId, m.OrganiserId, m.Title, m.MeetingDate,
+                db.MeetingAttendees.Where(a => a.MeetingId == m.MeetingId).Select(a => a.UserId).ToList(),
+                db.MeetingMinutes.Where(x => x.MeetingId == m.MeetingId).OrderByDescending(x => x.MinutesId)
+                    .Select(x => new MeetingMinutesDto(
+                        x.MinutesId, x.MeetingId, x.RecordedBy, x.TimeRecorded, x.MinutesText, x.IsAiDraft, x.ApprovedBy))
+                    .FirstOrDefault()))
+                .ToListAsync();
+
         public async Task<int> CreateMeetingAsync(CreateMeetingRequest req, int organiserId)
         {
             var meeting = new Meeting { OrganiserId = organiserId, Title = req.Title, MeetingDate = req.MeetingDate };

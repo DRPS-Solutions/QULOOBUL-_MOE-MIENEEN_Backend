@@ -16,6 +16,9 @@ namespace QULOOBUL__MOE_MIENEEN_Shared.Classes
         /// <summary>The only error shape clients ever parse (see global exception handler).</summary>
         public record ErrorResponse(string Message, string? Detail = null);
 
+        /// <summary>Every task belongs to a project; standalone daily tasks live in this seeded one.</summary>
+        public const string DailyTasksProject = "Daily Tasks";
+
         public static class Roles
         {
             public const string Admin = "Admin";

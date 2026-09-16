@@ -17,7 +17,10 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
         public async Task<Notification> QueueAsync(
             int userId, string typeName, string message, string entityType, int entityId)
         {
-            var type = await db.NotificationTypes.FirstOrDefaultAsync(t => t.TypeName == typeName);
+            // Check unsaved types first: queueing several notifications of a brand-new type in one
+            // Unit of Work must not insert that type more than once.
+            var type = db.NotificationTypes.Local.FirstOrDefault(t => t.TypeName == typeName)
+                       ?? await db.NotificationTypes.FirstOrDefaultAsync(t => t.TypeName == typeName);
             if (type is null)
             {
                 type = new NotificationType { TypeName = typeName };
@@ -39,6 +42,11 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
         /// <summary>Push a live event to every device the user has connected. Call after SaveChanges.</summary>
         public Task PushAsync(int userId, string eventName, object payload) =>
             hub.Clients.Group(NotificationHub.GroupFor(userId)).SendAsync(eventName, payload);
+
+        /// <summary>Push to every connected client, for changes everyone's view shows (UC-02 board).
+        /// ponytail: goes to all users; narrow to project members once project-scoped visibility exists.</summary>
+        public Task BroadcastAsync(string eventName, object payload) =>
+            hub.Clients.All.SendAsync(eventName, payload);
     }
 }
 //---------------------------DDDDDDDDDDDoooooooooooooo END OF FILE DDDDDDDDDDDoooooooooooooo---------------------------//

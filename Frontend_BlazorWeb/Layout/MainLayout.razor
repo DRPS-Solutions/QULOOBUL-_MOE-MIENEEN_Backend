@@ -1,5 +1,6 @@
 ﻿@inherits LayoutComponentBase
 @using MudBlazor
+@implements IDisposable
 @inject AppDataService AppData
 
 <MudThemeProvider IsDarkMode="isDarkMode" Theme="_theme" />
@@ -7,7 +8,7 @@
 <MudDialogProvider />
 <MudSnackbarProvider />
 
-@if (currentRole is null)
+@if (AppData.CurrentUser is null)
 {
     <div class="page @(isDarkMode ? "dark-mode" : "")">
         <div class="drps-login-wrap">
@@ -23,10 +24,11 @@
                 <MudText Typo="Typo.h5" Class="drps-login-title">QULOOBUL MOE'MIENEEN</MudText>
                 <MudText Typo="Typo.body2" Class="drps-login-subtitle">Sign in to continue</MudText>
 
-                <MudTextField @bind-Value="usernameInput"
-                              Label="Username or email"
+                <MudTextField @bind-Value="emailInput"
+                              Label="Email"
                               Variant="Variant.Outlined"
                               Margin="Margin.Dense"
+                              InputType="InputType.Email"
                               Immediate="true"
                               @onkeydown="OnLoginKeyDown"
                               Class="mt-4 mb-3" />
@@ -51,27 +53,10 @@
                            Color="Color.Primary"
                            FullWidth="true"
                            Class="mt-4"
-                           Disabled="@(string.IsNullOrWhiteSpace(usernameInput) || string.IsNullOrWhiteSpace(passwordInput))"
+                           Disabled="@(!CanLogin)"
                            OnClick="Login">
-                    Log In
+                    @(loggingIn ? "Signing in..." : "Log In")
                 </MudButton>
-
-                <MudText Typo="Typo.caption" Class="drps-login-footnote">
-                    Prototype sign-in - pick a demo account below to try each role.
-                </MudText>
-
-                @* Demo accounts, seeded in AppDataService - clicking one
-                   fills the fields above so graders/reviewers can try
-                   every role without hunting for credentials. *@
-                <div class="drps-demo-accounts">
-                    @foreach (var demoUser in AppData.Users)
-                    {
-                        <button type="button" class="drps-demo-account-chip" @onclick="() => FillDemoAccount(demoUser)">
-                            <span class="drps-demo-account-name">@demoUser.FullName</span>
-                            <span class="drps-demo-account-role">@demoUser.SystemRoleLabel</span>
-                        </button>
-                    }
-                </div>
             </div>
         </div>
     </div>
@@ -84,31 +69,18 @@ else
                      IsVerticalNav="isVerticalNav"
                      OnToggleDarkMode="ToggleDarkMode"
                      OnToggleNavOrientation="ToggleNavOrientation"
-                     CurrentRole="currentRole"
-                     CurrentUserName="currentUserName"
-                     CurrentUserId="currentUserId"
-                     CanSeeTasks="CanSeeTasks"
-                     CanSeeRequests="CanSeeRequests"
-                     CanSeeMeetings="CanSeeMeetings"
-                     CanSeeUserManagement="CanSeeUserManagement"
-                     CanSeeEvents="CanSeeEvents"
+                     CanSeeTasks="AppData.CanSeeTasks"
+                     CanSeeRequests="AppData.CanSeeRequests"
+                     CanSeeMeetings="AppData.CanSeeMeetings"
+                     CanSeeUserManagement="AppData.CanSeeUserManagement"
+                     CanSeeEvents="AppData.CanSeeEvents"
                      OnLogout="Logout" />
         </header>
 
         <main>
             <article class="content px-4">
-                @* Cascaded (by name, so it doesn't collide with any other
-                   string parameters a page might declare) so individual
-                   pages - e.g. Requests.razor gating its Approve/Deny
-                   buttons to Admins - can read who's logged in without
-                   MainLayout having to know about every page's needs. *@
-                <CascadingValue Value="currentRole" Name="CurrentRole" IsFixed="false">
-                    <CascadingValue Value="currentUserName" Name="CurrentUserName" IsFixed="false">
-                        <CascadingValue Value="currentUserId" Name="CurrentUserId" IsFixed="false">
-                            @Body
-                        </CascadingValue>
-                    </CascadingValue>
-                </CascadingValue>
+                @* Pages read the signed-in user from AppDataService. *@
+                @Body
             </article>
         </main>
     </div>
@@ -128,86 +100,47 @@ else
     private bool isDarkMode = false;
     private bool isVerticalNav = false;
 
-    // null = not logged in, which renders the login screen instead of
-    // NavMenu + @Body below. Living here (not a routable /login page)
-    // means it persists across navigation the same way dark mode/nav
-    // orientation already do. currentRole is derived from whichever
-    // AppUser signed in (see Login below), matching one of the
-    // SystemRole enum's ToString() values so the existing
-    // CanSeeMeetings/CanSeeUserManagement/CanSeeEvents checks (and the
-    // "CurrentRole" cascade other pages read) keep working unchanged.
-    private string? currentRole = null;
-    private string currentUserName = string.Empty;
-    private Guid? currentUserId = null;
-
-    private string usernameInput = string.Empty;
+    // Signed-in state lives in AppDataService (AppData.CurrentUser null =
+    // show the login screen instead of NavMenu + @Body). Tab visibility
+    // comes from AppData.CanSee*, the one place the role matrix lives.
+    private string emailInput = string.Empty;
     private string passwordInput = string.Empty;
     private string? loginError = null;
+    private bool loggingIn = false;
+
+    private bool CanLogin =>
+        !loggingIn && !string.IsNullOrWhiteSpace(emailInput) && !string.IsNullOrWhiteSpace(passwordInput);
 
     private void ToggleDarkMode() => isDarkMode = !isDarkMode;
 
     private void ToggleNavOrientation() => isVerticalNav = !isVerticalNav;
 
-    // Validates the entered credentials against AppData.Users (seeded
-    // in AppDataService) instead of just picking a role from a
-    // dropdown - a real username/password check, even though the
-    // "database" behind it is just an in-memory list.
-    private void Login()
+    // UC-01: the API checks the credentials and returns a JWT.
+    private async Task Login()
     {
-        var user = AppData.Login(usernameInput, passwordInput);
-        if (user is null)
-        {
-            loginError = "That username/email or password doesn't match a known account.";
-            return;
-        }
-
-        loginError = null;
-        currentRole = user.SystemRole.ToString();
-        currentUserName = user.FullName;
-        currentUserId = user.Id;
+        if (!CanLogin) return;
+        loggingIn = true;
+        loginError = await AppData.LoginAsync(emailInput, passwordInput);
+        loggingIn = false;
+        if (loginError is null) passwordInput = string.Empty;
     }
 
-    // Demo-account chips fill the form but still require clicking
-    // "Log In" - keeps the real credential check as the only way in,
-    // while making it fast to try each role.
-    private void FillDemoAccount(AppUser user)
+    private async Task OnLoginKeyDown(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e)
     {
-        usernameInput = user.Username;
-        passwordInput = user.Password;
-        loginError = null;
+        if (e.Key == "Enter") await Login();
     }
 
-    private void OnLoginKeyDown(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e)
+    private async Task Logout()
     {
-        if (e.Key == "Enter") Login();
-    }
-
-    private void Logout()
-    {
-        currentRole = null;
-        currentUserName = string.Empty;
-        currentUserId = null;
-        usernameInput = string.Empty;
+        await AppData.LogoutAsync();
         passwordInput = string.Empty;
         loginError = null;
     }
 
-    // Single source of truth for tab visibility, computed here from
-    // currentRole and passed to NavMenu as plain booleans. Home is
-    // always visible to every signed-in role, so it has no check here.
-    // (Requests is visible to General Staff's non-members only; Approve/
-    // Deny inside that page is gated separately, off the cascaded
-    // CurrentRole - see Requests.razor's own CanReview.)
-    // - General Staff: Home only
-    // - Facility Manager: General Staff's tabs, plus Daily Tasks and
-    //   Resource Requests (but can't approve/deny requests)
-    // - Secondary Admin: everything except User Management
-    // - Admin: everything
-    private bool CanSeeTasks => currentRole is "FacilityManager" or "SecondaryAdmin" or "Admin";
-    private bool CanSeeRequests => currentRole is "FacilityManager" or "SecondaryAdmin" or "Admin";
-    private bool CanSeeMeetings => currentRole is "SecondaryAdmin" or "Admin";
-    private bool CanSeeUserManagement => currentRole is "Admin";
-    private bool CanSeeEvents => currentRole is "SecondaryAdmin" or "Admin";
+    // Re-render when the session ends elsewhere (e.g. an expired token).
+    protected override void OnInitialized() => AppData.OnChange += StateHasChanged;
+
+    public void Dispose() => AppData.OnChange -= StateHasChanged;
 
     // Drives MudThemeProvider so built-in MudBlazor components (buttons,
     // dialogs, tables, inputs, snackbars) switch palette automatically

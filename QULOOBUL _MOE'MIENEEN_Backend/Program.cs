@@ -82,6 +82,7 @@ builder.Services.AddScoped<ProjectService>();
 builder.Services.AddScoped<StaffOverviewService>();
 builder.Services.AddScoped<NotificationQueryService>();
 builder.Services.AddScoped<ReportingService>();
+builder.Services.AddScoped<UserService>();
 
 var app = builder.Build();
 

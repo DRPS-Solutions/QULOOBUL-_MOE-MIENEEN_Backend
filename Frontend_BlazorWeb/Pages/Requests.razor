@@ -2,7 +2,6 @@
 @using MudBlazor
 @implements IDisposable
 @inject IDialogService DialogService
-@inject NotificationService NotificationService
 @inject AppDataService AppData
 
 <PageTitle>Resource Requests</PageTitle>
@@ -30,12 +29,6 @@
         --drps-border-soft: #E7E4D8;
         --drps-empty: #B7B2A0;
         --drps-shadow: rgba(11, 22, 38, 0.06);
-        /* Dedicated accent blue, kept separate from --drps-blue-500/
-           --drps-tint-blue above (which are now brand green) - used
-           only for the "linked to event/task" reference chip below, so
-           the palette keeps a small, deliberate blue accent. */
-        --drps-accent-blue: #2A5CD1;
-        --drps-tint-accent-blue: #EEF2FC;
         background: var(--drps-bg);
         min-height: 100%;
         padding-bottom: 2rem;
@@ -141,11 +134,13 @@
         gap: 4px;
     }
 
+    /* The request's detail text after its first line (quantity, link, notes). */
     .drps-request-notes {
         margin-top: 8px;
         font-size: 0.82rem;
         color: var(--drps-navy-800);
         opacity: 0.85;
+        white-space: pre-line;
     }
 
     .drps-request-review {
@@ -171,26 +166,15 @@
         color: #B9862E;
     }
 
-    .drps-status-chip.approved {
+    .drps-status-chip.approved,
+    .drps-status-chip.completed {
         background: var(--drps-tint-green);
         color: #2E9E5B;
     }
 
-    .drps-status-chip.denied {
+    .drps-status-chip.declined {
         background: var(--drps-tint-red);
         color: #E0435C;
-    }
-
-    .drps-link-chip {
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
-        background: var(--drps-tint-accent-blue);
-        color: var(--drps-accent-blue);
-        border-radius: 6px;
-        padding: 2px 8px;
-        font-size: 0.72rem;
-        font-weight: 600;
     }
 
     .drps-request-actions {
@@ -219,23 +203,22 @@
         --drps-border-soft: #2E4A3B;
         --drps-empty: #4E5F52;
         --drps-shadow: rgba(0, 0, 0, 0.35);
-        --drps-tint-accent-blue: rgba(42, 92, 209, 0.18);
     }
 </style>
 
 @* =====================================================================
    MARKUP
-   Left column: submission form, open to every role.
-   Right column: full request list with a status filter, plus
-   Approve/Deny controls that only render when IsAdmin is true (derived
-   from CurrentRole, cascaded down from MainLayout).
+   Left column: submission form, open to every role that can see the page.
+   Right column: request list with a status filter. Reviewers (the
+   ReviewRequests permission) see everyone's requests plus Approve/Deny;
+   everyone else sees only their own - the API applies both rules.
    ===================================================================== *@
 <div class="drps-requests">
     <MudContainer MaxWidth="MaxWidth.Large" Class="pt-6">
 
         <div class="drps-requests-header">
             <MudText Typo="Typo.h6" Style="font-weight:600;">Resource Requests</MudText>
-            <div class="drps-subtitle">Request equipment, budget, or people - optionally tie it to an event or task.</div>
+            <div class="drps-subtitle">Request equipment, supplies, or maintenance - optionally tie it to an event or task.</div>
         </div>
 
         <MudGrid>
@@ -249,12 +232,12 @@
 
                     <MudTextField T="string" @bind-Value="newRequest.Title" Label="What do you need?" Variant="Variant.Outlined" Class="mb-3" />
 
-                    <MudSelect T="string" Label="Resource Type" Variant="Variant.Outlined" @bind-Value="newRequest.ResourceType" Class="mb-3">
-                        <MudSelectItem T="string" Value="@("Equipment")">Equipment</MudSelectItem>
-                        <MudSelectItem T="string" Value="@("Budget")">Budget</MudSelectItem>
-                        <MudSelectItem T="string" Value="@("Personnel")">Personnel</MudSelectItem>
-                        <MudSelectItem T="string" Value="@("Venue")">Venue</MudSelectItem>
-                        <MudSelectItem T="string" Value="@("Other")">Other</MudSelectItem>
+                    <MudSelect T="int?" Label="Category" Variant="Variant.Outlined" @bind-Value="newRequest.CategoryId"
+                               ToStringFunc="@(id => categories.FirstOrDefault(c => c.CategoryId == id)?.CategoryName)" Class="mb-3">
+                        @foreach (var category in categories)
+                        {
+                            <MudSelectItem T="int?" Value="@category.CategoryId">@category.CategoryName</MudSelectItem>
+                        }
                     </MudSelect>
 
                     <MudTextField T="string" @bind-Value="newRequest.Amount" Label="Quantity / Amount (optional)" Placeholder="e.g. 2 laptops, R 5,000" Variant="Variant.Outlined" Class="mb-3" />
@@ -269,19 +252,21 @@
 
                     @if (newRequest.LinkType == "Event")
                     {
-                        <MudSelect T="Guid?" Label="Which event?" Variant="Variant.Outlined" @bind-Value="newRequest.LinkedId" Class="mb-3">
-                            @foreach (var evt in AppData.Events)
+                        <MudSelect T="int?" Label="Which event?" Variant="Variant.Outlined" @bind-Value="newRequest.LinkedId"
+                                   ToStringFunc="@(id => AppData.ProjectName(id))" Class="mb-3">
+                            @foreach (var project in AppData.EventProjects)
                             {
-                                <MudSelectItem T="Guid?" Value="@((Guid?)evt.Id)">@evt.Title</MudSelectItem>
+                                <MudSelectItem T="int?" Value="@project.ProjectId">@project.ProjectName</MudSelectItem>
                             }
                         </MudSelect>
                     }
                     else if (newRequest.LinkType == "Task")
                     {
-                        <MudSelect T="Guid?" Label="Which task?" Variant="Variant.Outlined" @bind-Value="newRequest.LinkedId" Class="mb-3">
+                        <MudSelect T="int?" Label="Which task? (next two weeks)" Variant="Variant.Outlined" @bind-Value="newRequest.LinkedId"
+                                   ToStringFunc="@(id => AppData.Tasks.FirstOrDefault(t => t.TaskId == id)?.Title)" Class="mb-3">
                             @foreach (var task in AppData.Tasks)
                             {
-                                <MudSelectItem T="Guid?" Value="@((Guid?)task.Id)">@task.Title</MudSelectItem>
+                                <MudSelectItem T="int?" Value="@task.TaskId">@task.Title</MudSelectItem>
                             }
                         </MudSelect>
                     }
@@ -289,7 +274,7 @@
                     <MudTextField T="string" @bind-Value="newRequest.Notes" Label="Justification / notes" Variant="Variant.Outlined" Lines="3" Class="mb-4" />
 
                     <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" Disabled="@(!CanSubmit)" OnClick="SubmitRequest">
-                        Submit Request
+                        @(submitting ? "Submitting..." : "Submit Request")
                     </MudButton>
                 </div>
             </MudItem>
@@ -299,15 +284,15 @@
                 <div class="drps-card">
                     <div class="drps-card-title">
                         <MudIcon Icon="@Icons.Material.Filled.Inbox" Size="Size.Small" />
-                        All Requests
+                        @(CanReview ? "All Requests" : "My Requests")
                     </div>
 
-                    @* Status filter - "All" plus one chip per RequestStatus value. *@
+                    @* Status filter - "All" plus one chip per SM-02 status. *@
                     <div class="drps-filter-row">
                         <div class="drps-filter-chip @(activeFilter is null ? "active" : "")" @onclick="() => activeFilter = null">
                             All (@AppData.Requests.Count)
                         </div>
-                        @foreach (var status in Enum.GetValues<RequestStatus>())
+                        @foreach (var status in Statuses)
                         {
                             <div class="drps-filter-chip @(activeFilter == status ? "active" : "")" @onclick="() => activeFilter = status">
                                 @status (@AppData.Requests.Count(r => r.Status == status))
@@ -321,55 +306,45 @@
                     }
                     else
                     {
-                        @foreach (var req in FilteredRequests.OrderByDescending(r => r.RequestedDate))
+                        @foreach (var req in FilteredRequests)
                         {
+                            var (title, notes) = SplitDetail(req);
                             <div class="drps-request-item">
                                 <div class="drps-request-top">
                                     <div>
-                                        <div class="drps-request-title">@req.Title</div>
+                                        <div class="drps-request-title">@title</div>
                                         <div class="drps-request-meta">
-                                            <span><MudIcon Icon="@GetResourceTypeIcon(req.ResourceType)" Size="Size.Small" /> @req.ResourceType@(string.IsNullOrWhiteSpace(req.Amount) ? "" : $" \u00b7 {req.Amount}")</span>
-                                            <span><MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Small" /> @req.RequestedBy</span>
-                                            <span><MudIcon Icon="@Icons.Material.Filled.Schedule" Size="Size.Small" /> @req.RequestedDate.ToString("d MMM, h:mm tt")</span>
+                                            <span><MudIcon Icon="@GetCategoryIcon(req.CategoryName)" Size="Size.Small" /> @req.CategoryName</span>
+                                            <span><MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Small" /> @AppData.UserName(req.RequestedBy)</span>
+                                            <span><MudIcon Icon="@Icons.Material.Filled.Schedule" Size="Size.Small" /> @AppDataService.Local(req.DateSubmitted).ToString("d MMM, h:mm tt")</span>
                                         </div>
                                     </div>
-                                    <div class="drps-status-chip @req.Status.ToString().ToLower()">@req.Status</div>
+                                    <div class="drps-status-chip @req.Status.ToLower()">@req.Status</div>
                                 </div>
 
-                                @if (req.LinkType != RequestLinkType.None && !string.IsNullOrWhiteSpace(req.LinkedName))
+                                @if (!string.IsNullOrWhiteSpace(notes))
                                 {
-                                    <div class="mt-2">
-                                        <span class="drps-link-chip">
-                                            <MudIcon Icon="@(req.LinkType == RequestLinkType.Event ? Icons.Material.Filled.CalendarToday : Icons.Material.Filled.Task)" Size="Size.Small" />
-                                            @req.LinkType: @req.LinkedName
-                                        </span>
-                                    </div>
+                                    <div class="drps-request-notes">@notes</div>
                                 }
 
-                                @if (!string.IsNullOrWhiteSpace(req.Notes))
-                                {
-                                    <div class="drps-request-notes">@req.Notes</div>
-                                }
-
-                                @* Once reviewed, show who by and (if denied) why -
-                                   visible to everyone, not just Admins. *@
-                                @if (req.Status != RequestStatus.Pending && !string.IsNullOrWhiteSpace(req.ReviewedBy))
+                                @* Once reviewed, show who by and when - visible to everyone. *@
+                                @if (req.Status != "Pending" && req.ReviewedBy is not null)
                                 {
                                     <div class="drps-request-review">
-                                        @req.Status by @req.ReviewedBy on @req.ReviewedDate?.ToString("d MMM")
-                                        @(req.Status == RequestStatus.Denied && !string.IsNullOrWhiteSpace(req.DenyReason) ? $" - \u201c{req.DenyReason}\u201d" : "")
+                                        @req.Status by @AppData.UserName(req.ReviewedBy)@ReviewedOn(req)
                                     </div>
                                 }
 
-                                @* Approve/Deny only render for Admin/Secondary
-                                   Admin, and only while still Pending. *@
-                                @if (CanReview && req.Status == RequestStatus.Pending)
+                                @* Approve/Deny only render for reviewers, only while still
+                                   Pending, and never on their own request (the API refuses
+                                   self-review). *@
+                                @if (CanReview && req.Status == "Pending" && req.RequestedBy != AppData.CurrentUser?.UserId)
                                 {
                                     <div class="drps-request-actions">
-                                        <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Success" OnClick="@(() => ApproveRequest(req))">
+                                        <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Success" OnClick="@(() => Review(req, true, null))">
                                             Approve
                                         </MudButton>
-                                        <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Error" OnClick="@(() => DenyRequest(req))">
+                                        <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Error" OnClick="@(() => DenyRequest(req, title))">
                                             Deny
                                         </MudButton>
                                     </div>
@@ -388,188 +363,134 @@
    CODE-BEHIND
    ===================================================================== *@
 @code {
-    // Cascaded (by name) from MainLayout - see the CascadingValue wrapping
-    // @Body there. CurrentRole drives CanReview below; CurrentUserName is
-    // used to attribute new requests and reviews.
-    [CascadingParameter(Name = "CurrentRole")]
-    private string? CurrentRole { get; set; }
+    // The API decides who may review (and re-checks on every review);
+    // this only decides whether to show the buttons.
+    private bool CanReview => AppData.HasPermission(Permissions.ReviewRequests);
 
-    [CascadingParameter(Name = "CurrentUserName")]
-    private string? CurrentUserName { get; set; }
+    // SM-02 statuses, in lifecycle order.
+    private static readonly string[] Statuses = ["Pending", "Approved", "Declined", "Completed"];
 
-    // Only Admin and Secondary Admin get Approve/Deny controls -
-    // Facility Manager can see this page (to submit/track requests) but
-    // can't review them. Every role that can reach this page can still
-    // see full request history and who reviewed each one.
-    private bool CanReview => CurrentRole is "Admin" or "SecondaryAdmin";
-
-    // Roles that want to hear about resource requests at all - Facility
-    // Manager explicitly gets none (not the "new request" broadcast,
-    // and not even the outcome of their own submitted request).
-    private static readonly SystemRole[] RequestNotificationRoles = { SystemRole.Admin, SystemRole.SecondaryAdmin };
+    private IReadOnlyList<RequestCategoryDto> categories = [];
 
     // --- Submission form state ---
     private RequestFormModel newRequest = new();
+    private bool submitting;
 
     private bool CanSubmit =>
+        !submitting &&
         !string.IsNullOrWhiteSpace(newRequest.Title) &&
+        newRequest.CategoryId.HasValue &&
         (newRequest.LinkType == "None" || newRequest.LinkedId.HasValue);
 
-    private void SubmitRequest()
+    private async Task SubmitRequest()
     {
         if (!CanSubmit) return;
 
-        var requestedBy = string.IsNullOrWhiteSpace(CurrentUserName) ? "You" : CurrentUserName!;
-        var title = newRequest.Title.Trim();
-
-        // Resolve the real link (Id + display name) from AppData's shared
-        // Events/Tasks collections, rather than trusting a free-typed name -
-        // this is what makes the request a real reference, not just a
-        // string match.
-        var linkType = newRequest.LinkType switch
+        var linkedName = newRequest.LinkType switch
         {
-            "Event" => RequestLinkType.Event,
-            "Task" => RequestLinkType.Task,
-            _ => RequestLinkType.None
+            "Event" => AppData.ProjectName(newRequest.LinkedId),
+            "Task" => AppData.Tasks.FirstOrDefault(t => t.TaskId == newRequest.LinkedId)?.Title,
+            _ => null
         };
 
-        string? linkedName = null;
-        if (linkType == RequestLinkType.Event && newRequest.LinkedId.HasValue)
+        // A request stores one Detail text; its first line is the title.
+        var detail = string.Join("\n", new[]
         {
-            linkedName = AppData.Events.FirstOrDefault(e => e.Id == newRequest.LinkedId.Value)?.Title;
-        }
-        else if (linkType == RequestLinkType.Task && newRequest.LinkedId.HasValue)
-        {
-            linkedName = AppData.Tasks.FirstOrDefault(t => t.Id == newRequest.LinkedId.Value)?.Title;
-        }
+            newRequest.Title.Trim(),
+            string.IsNullOrWhiteSpace(newRequest.Amount) ? null : $"Quantity: {newRequest.Amount.Trim()}",
+            linkedName is null ? null : $"For {newRequest.LinkType.ToLower()}: {linkedName}",
+            newRequest.Notes?.Trim(),
+        }.Where(line => !string.IsNullOrWhiteSpace(line)));
 
-        AppData.AddRequest(new ResourceRequestItem
-        {
-            Title = title,
-            ResourceType = newRequest.ResourceType,
-            Amount = newRequest.Amount,
-            Notes = newRequest.Notes,
-            LinkType = linkType,
-            LinkedId = linkType == RequestLinkType.None ? null : newRequest.LinkedId,
-            LinkedName = linkType == RequestLinkType.None ? null : linkedName,
-            RequestedBy = requestedBy,
-            RequestedDate = DateTime.Now,
-            Status = RequestStatus.Pending
-        });
+        submitting = true;
+        var id = await AppData.SendAsync<int?>(HttpMethod.Post, "api/requests",
+            new CreateResourceRequest { CategoryId = newRequest.CategoryId!.Value, Detail = detail });
+        submitting = false;
+        if (id is null) return;
 
-        // Broadcast to every Admin/Secondary Admin - they're the ones
-        // who review requests, so they hear about every one submitted
-        // regardless of who submitted it. Facility Manager and General
-        // Staff never get this (Facility Manager is excluded from
-        // resource-request notifications entirely; General Staff can't
-        // reach this page in the first place).
-        NotificationService.Add(
-            NotificationType.ResourceRequest,
-            "New resource request",
-            $"{requestedBy} requested \"{title}\"" + (linkType != RequestLinkType.None && !string.IsNullOrWhiteSpace(linkedName) ? $" for {linkedName}." : "."),
-            targetRoles: RequestNotificationRoles,
-            linkedName: linkType == RequestLinkType.None ? null : linkedName);
-
-        // Reset the form, but keep the last-used resource type since
-        // people often submit a few similar requests in a row.
-        var lastType = newRequest.ResourceType;
-        newRequest = new RequestFormModel { ResourceType = lastType };
+        await AppData.RefreshRequestsAsync();
+        // Keep the category, since people often submit a few similar requests in a row.
+        newRequest = new RequestFormModel { CategoryId = newRequest.CategoryId };
     }
 
     // --- Status filter above the list. Null means "All". ---
-    private RequestStatus? activeFilter = null;
+    private string? activeFilter = null;
 
-    private IEnumerable<ResourceRequestItem> FilteredRequests =>
+    private IEnumerable<ResourceRequestDto> FilteredRequests =>
         activeFilter is null ? AppData.Requests : AppData.Requests.Where(r => r.Status == activeFilter);
 
-    // Only notify the original requester about the outcome of their own
-    // request if their role is one that hears about resource requests at
-    // all (Facility Manager is excluded entirely, per RequestNotificationRoles).
-    private IEnumerable<Guid> RequesterTarget(ResourceRequestItem req)
+    private static (string Title, string? Notes) SplitDetail(ResourceRequestDto req)
     {
-        var requester = AppData.UserByName(req.RequestedBy);
-        if (requester is not null && RequestNotificationRoles.Contains(requester.SystemRole))
-        {
-            yield return requester.Id;
-        }
+        var parts = (req.Detail ?? req.CategoryName).Split('\n', 2);
+        return (parts[0], parts.Length > 1 ? parts[1] : null);
     }
 
-    // --- Review actions (Admin/Secondary Admin only, per CanReview) ---
-    // Approve needs no extra input, so it applies immediately.
-    private void ApproveRequest(ResourceRequestItem req)
-    {
-        var reviewedBy = string.IsNullOrWhiteSpace(CurrentUserName) ? "Admin" : CurrentUserName!;
-        AppData.ApproveRequest(req, reviewedBy);
+    // The latest history row is the review (or completion) itself.
+    private static string ReviewedOn(ResourceRequestDto req) =>
+        req.History.LastOrDefault(x => x.NewStatus == req.Status) is { } review
+            ? $" on {AppDataService.Local(review.TimeCreated):d MMM}"
+            : "";
 
-        NotificationService.Add(
-            NotificationType.ResourceRequest,
-            "Request approved",
-            $"{reviewedBy} approved your \"{req.Title}\" request.",
-            targetUserIds: RequesterTarget(req),
-            linkedName: req.LinkedName);
+    // --- Review actions (UC-05). The API notifies the requester. ---
+    private async Task Review(ResourceRequestDto req, bool approve, string? note)
+    {
+        if (await AppData.SendAsync(HttpMethod.Post, $"api/requests/{req.RequestId}/review",
+                new ReviewRequestRequest { Approve = approve, Note = note }))
+            await AppData.RefreshRequestsAsync();
     }
 
     // Deny opens DenyRequestDialog so the reviewer can optionally leave
-    // a reason. Cancelling the dialog leaves the request Pending.
-    private async Task DenyRequest(ResourceRequestItem req)
+    // a reason; it goes into the requester's notification. Cancelling
+    // the dialog leaves the request Pending.
+    private async Task DenyRequest(ResourceRequestDto req, string title)
     {
         var parameters = new DialogParameters<DenyRequestDialog>
         {
-            { x => x.RequestTitle, req.Title }
+            { x => x.RequestTitle, title }
         };
         var options = new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true, CloseOnEscapeKey = true };
 
         var dialog = await DialogService.ShowAsync<DenyRequestDialog>("Deny request", parameters, options);
         var result = await dialog.Result;
 
-        if (result is not null && !result.Canceled)
+        if (result is { Canceled: false })
         {
-            var reviewedBy = string.IsNullOrWhiteSpace(CurrentUserName) ? "Admin" : CurrentUserName!;
             var reason = result.Data as string;
-            AppData.DenyRequest(req, reviewedBy, reason);
-
-            var reasonSuffix = string.IsNullOrWhiteSpace(reason) ? "" : $" Reason: {reason}";
-            NotificationService.Add(
-                NotificationType.ResourceRequest,
-                "Request denied",
-                $"{reviewedBy} denied your \"{req.Title}\" request.{reasonSuffix}",
-                targetUserIds: RequesterTarget(req),
-                linkedName: req.LinkedName);
+            await Review(req, false, string.IsNullOrWhiteSpace(reason) ? null : reason.Trim());
         }
     }
 
-    // Maps a request's resource type to a MudBlazor icon.
-    private string GetResourceTypeIcon(string resourceType) => resourceType switch
+    // Maps a request category to a MudBlazor icon.
+    private static string GetCategoryIcon(string category) => category switch
     {
+        "Maintenance" => Icons.Material.Filled.Handyman,
         "Equipment" => Icons.Material.Filled.Build,
-        "Budget" => Icons.Material.Filled.AttachMoney,
-        "Personnel" => Icons.Material.Filled.Groups,
-        "Venue" => Icons.Material.Filled.LocationOn,
         _ => Icons.Material.Filled.Inventory2
     };
 
-    // Lightweight model bound to the submission form on the left -
-    // kept separate from ResourceRequestItem so a half-filled form never
-    // pollutes AppData.Requests until Submit is clicked. LinkType stays a
-    // string ("None"/"Event"/"Task") to drive which dropdown renders;
-    // LinkedId is the real Guid reference resolved from AppData's shared
-    // Events/Tasks collections.
+    // Lightweight model bound to the submission form on the left, kept
+    // separate so a half-filled form never touches the request list.
+    // LinkType stays a string ("None"/"Event"/"Task") to drive which
+    // dropdown renders; LinkedId is the chosen project's or task's id.
     private class RequestFormModel
     {
         public string Title { get; set; } = string.Empty;
-        public string ResourceType { get; set; } = "Equipment";
+        public int? CategoryId { get; set; }
         public string? Amount { get; set; }
         public string? Notes { get; set; }
         public string LinkType { get; set; } = "None";
-        public Guid? LinkedId { get; set; }
+        public int? LinkedId { get; set; }
     }
 
-    // Re-render if requests/events/tasks change elsewhere while this page
-    // is open (e.g. a new Event added from Events.razor, so it shows up
-    // in the "Which event?" dropdown immediately).
-    protected override void OnInitialized()
+    // Re-render when requests refresh - including SignalR pushes when a
+    // request is submitted or reviewed elsewhere.
+    protected override async Task OnInitializedAsync()
     {
         AppData.OnChange += StateHasChanged;
+        var categoriesLoad = AppData.GetAsync<List<RequestCategoryDto>>("api/requests/categories");
+        await Task.WhenAll(categoriesLoad, AppData.RefreshRequestsAsync(),
+            AppData.LoadTasksAsync(DateTime.Today, DateTime.Today.AddDays(14)));
+        categories = await categoriesLoad ?? [];
     }
 
     public void Dispose()
