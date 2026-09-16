@@ -1,0 +1,579 @@
+@page "/requests"
+@using MudBlazor
+@implements IDisposable
+@inject IDialogService DialogService
+@inject NotificationService NotificationService
+@inject AppDataService AppData
+
+<PageTitle>Resource Requests</PageTitle>
+
+@* =====================================================================
+   STYLE BLOCK
+   Same DRPS palette-as-CSS-variables approach as the other pages
+   (Tasks.razor, Events.razor, UserManagement.razor), scoped under
+   .drps-requests so it doesn't leak into MudBlazor's global theme.
+   ===================================================================== *@
+<style>
+    .drps-requests {
+        --drps-navy-900: #12271F;
+        --drps-navy-800: #1C3D32;
+        --drps-blue-600: #2F5C4C;
+        --drps-blue-500: #3C7A63;
+        --drps-blue-400: #6FA98C;
+        --drps-bg: #F5F3EC;
+        --drps-surface: #FFFFFF;
+        --drps-text-muted: #75806F;
+        --drps-tint-blue: #EAF2ED;
+        --drps-tint-amber: #F6EBD3;
+        --drps-tint-red: #FCEEF0;
+        --drps-tint-green: #E7F3EB;
+        --drps-border-soft: #E7E4D8;
+        --drps-empty: #B7B2A0;
+        --drps-shadow: rgba(11, 22, 38, 0.06);
+        /* Dedicated accent blue, kept separate from --drps-blue-500/
+           --drps-tint-blue above (which are now brand green) - used
+           only for the "linked to event/task" reference chip below, so
+           the palette keeps a small, deliberate blue accent. */
+        --drps-accent-blue: #2A5CD1;
+        --drps-tint-accent-blue: #EEF2FC;
+        background: var(--drps-bg);
+        min-height: 100%;
+        padding-bottom: 2rem;
+    }
+
+    .drps-requests-header {
+        background: linear-gradient(135deg, var(--drps-navy-900) 0%, var(--drps-blue-600) 100%);
+        border-radius: 16px;
+        padding: 20px 24px;
+        color: white;
+        margin-bottom: 20px;
+    }
+
+    .drps-requests-header .drps-subtitle {
+        color: rgba(255, 255, 255, 0.75);
+        font-size: 0.85rem;
+        margin-top: 4px;
+    }
+
+    .drps-card {
+        background: var(--drps-surface);
+        border-radius: 16px;
+        padding: 20px 24px;
+        box-shadow: 0 2px 10px var(--drps-shadow);
+    }
+
+    .drps-card-title {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-weight: 600;
+        color: var(--drps-navy-800);
+        margin-bottom: 16px;
+    }
+
+    /* --- Status filter chips above the request list --- */
+    .drps-filter-row {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-bottom: 16px;
+    }
+
+    .drps-filter-chip {
+        padding: 6px 14px;
+        border-radius: 999px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        cursor: pointer;
+        color: var(--drps-text-muted);
+        background: var(--drps-bg);
+        border: 1px solid var(--drps-border-soft);
+        transition: background 0.15s ease, color 0.15s ease;
+    }
+
+    .drps-filter-chip:hover {
+        background: var(--drps-tint-blue);
+    }
+
+    .drps-filter-chip.active {
+        background: var(--drps-blue-500);
+        border-color: var(--drps-blue-500);
+        color: white;
+    }
+
+    /* --- Individual request card --- */
+    .drps-request-item {
+        border: 1px solid var(--drps-border-soft);
+        border-radius: 12px;
+        padding: 14px 16px;
+        margin-bottom: 12px;
+    }
+
+    .drps-request-item:last-child {
+        margin-bottom: 0;
+    }
+
+    .drps-request-top {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+    }
+
+    .drps-request-title {
+        font-weight: 600;
+        color: var(--drps-navy-800);
+        font-size: 0.95rem;
+    }
+
+    .drps-request-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-top: 4px;
+        font-size: 0.76rem;
+        color: var(--drps-text-muted);
+    }
+
+    .drps-request-meta span {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .drps-request-notes {
+        margin-top: 8px;
+        font-size: 0.82rem;
+        color: var(--drps-navy-800);
+        opacity: 0.85;
+    }
+
+    .drps-request-review {
+        margin-top: 8px;
+        font-size: 0.76rem;
+        color: var(--drps-text-muted);
+        font-style: italic;
+    }
+
+    .drps-status-chip {
+        flex-shrink: 0;
+        padding: 4px 10px;
+        border-radius: 999px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        white-space: nowrap;
+    }
+
+    .drps-status-chip.pending {
+        background: var(--drps-tint-amber);
+        color: #B9862E;
+    }
+
+    .drps-status-chip.approved {
+        background: var(--drps-tint-green);
+        color: #2E9E5B;
+    }
+
+    .drps-status-chip.denied {
+        background: var(--drps-tint-red);
+        color: #E0435C;
+    }
+
+    .drps-link-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        background: var(--drps-tint-accent-blue);
+        color: var(--drps-accent-blue);
+        border-radius: 6px;
+        padding: 2px 8px;
+        font-size: 0.72rem;
+        font-weight: 600;
+    }
+
+    .drps-request-actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 10px;
+    }
+
+    .drps-requests-empty {
+        color: var(--drps-empty);
+        font-size: 0.85rem;
+        text-align: center;
+        padding: 30px 0;
+    }
+
+    /* --- Dark mode overrides --- */
+    .page.dark-mode .drps-requests {
+        --drps-bg: #0B1B21;
+        --drps-surface: #1E362B;
+        --drps-text-muted: #93A69A;
+        --drps-navy-800: #E9F0EA;
+        --drps-tint-blue: rgba(60, 122, 99, 0.16);
+        --drps-tint-amber: rgba(185, 134, 46, 0.18);
+        --drps-tint-red: rgba(224, 67, 92, 0.16);
+        --drps-tint-green: rgba(46, 158, 91, 0.16);
+        --drps-border-soft: #2E4A3B;
+        --drps-empty: #4E5F52;
+        --drps-shadow: rgba(0, 0, 0, 0.35);
+        --drps-tint-accent-blue: rgba(42, 92, 209, 0.18);
+    }
+</style>
+
+@* =====================================================================
+   MARKUP
+   Left column: submission form, open to every role.
+   Right column: full request list with a status filter, plus
+   Approve/Deny controls that only render when IsAdmin is true (derived
+   from CurrentRole, cascaded down from MainLayout).
+   ===================================================================== *@
+<div class="drps-requests">
+    <MudContainer MaxWidth="MaxWidth.Large" Class="pt-6">
+
+        <div class="drps-requests-header">
+            <MudText Typo="Typo.h6" Style="font-weight:600;">Resource Requests</MudText>
+            <div class="drps-subtitle">Request equipment, budget, or people - optionally tie it to an event or task.</div>
+        </div>
+
+        <MudGrid>
+            @* --- Left column: submission form --- *@
+            <MudItem xs="12" md="5">
+                <div class="drps-card">
+                    <div class="drps-card-title">
+                        <MudIcon Icon="@Icons.Material.Filled.AddBox" Size="Size.Small" />
+                        New Request
+                    </div>
+
+                    <MudTextField T="string" @bind-Value="newRequest.Title" Label="What do you need?" Variant="Variant.Outlined" Class="mb-3" />
+
+                    <MudSelect T="string" Label="Resource Type" Variant="Variant.Outlined" @bind-Value="newRequest.ResourceType" Class="mb-3">
+                        <MudSelectItem T="string" Value="@("Equipment")">Equipment</MudSelectItem>
+                        <MudSelectItem T="string" Value="@("Budget")">Budget</MudSelectItem>
+                        <MudSelectItem T="string" Value="@("Personnel")">Personnel</MudSelectItem>
+                        <MudSelectItem T="string" Value="@("Venue")">Venue</MudSelectItem>
+                        <MudSelectItem T="string" Value="@("Other")">Other</MudSelectItem>
+                    </MudSelect>
+
+                    <MudTextField T="string" @bind-Value="newRequest.Amount" Label="Quantity / Amount (optional)" Placeholder="e.g. 2 laptops, R 5,000" Variant="Variant.Outlined" Class="mb-3" />
+
+                    @* Linking to an Event or Task is optional - "None" is
+                       the default and skips the second dropdown entirely. *@
+                    <MudSelect T="string" Label="Link to (optional)" Variant="Variant.Outlined" @bind-Value="newRequest.LinkType" Class="mb-3">
+                        <MudSelectItem T="string" Value="@("None")">Not linked</MudSelectItem>
+                        <MudSelectItem T="string" Value="@("Event")">An event</MudSelectItem>
+                        <MudSelectItem T="string" Value="@("Task")">A task</MudSelectItem>
+                    </MudSelect>
+
+                    @if (newRequest.LinkType == "Event")
+                    {
+                        <MudSelect T="Guid?" Label="Which event?" Variant="Variant.Outlined" @bind-Value="newRequest.LinkedId" Class="mb-3">
+                            @foreach (var evt in AppData.Events)
+                            {
+                                <MudSelectItem T="Guid?" Value="@((Guid?)evt.Id)">@evt.Title</MudSelectItem>
+                            }
+                        </MudSelect>
+                    }
+                    else if (newRequest.LinkType == "Task")
+                    {
+                        <MudSelect T="Guid?" Label="Which task?" Variant="Variant.Outlined" @bind-Value="newRequest.LinkedId" Class="mb-3">
+                            @foreach (var task in AppData.Tasks)
+                            {
+                                <MudSelectItem T="Guid?" Value="@((Guid?)task.Id)">@task.Title</MudSelectItem>
+                            }
+                        </MudSelect>
+                    }
+
+                    <MudTextField T="string" @bind-Value="newRequest.Notes" Label="Justification / notes" Variant="Variant.Outlined" Lines="3" Class="mb-4" />
+
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" Disabled="@(!CanSubmit)" OnClick="SubmitRequest">
+                        Submit Request
+                    </MudButton>
+                </div>
+            </MudItem>
+
+            @* --- Right column: request list --- *@
+            <MudItem xs="12" md="7">
+                <div class="drps-card">
+                    <div class="drps-card-title">
+                        <MudIcon Icon="@Icons.Material.Filled.Inbox" Size="Size.Small" />
+                        All Requests
+                    </div>
+
+                    @* Status filter - "All" plus one chip per RequestStatus value. *@
+                    <div class="drps-filter-row">
+                        <div class="drps-filter-chip @(activeFilter is null ? "active" : "")" @onclick="() => activeFilter = null">
+                            All (@AppData.Requests.Count)
+                        </div>
+                        @foreach (var status in Enum.GetValues<RequestStatus>())
+                        {
+                            <div class="drps-filter-chip @(activeFilter == status ? "active" : "")" @onclick="() => activeFilter = status">
+                                @status (@AppData.Requests.Count(r => r.Status == status))
+                            </div>
+                        }
+                    </div>
+
+                    @if (!FilteredRequests.Any())
+                    {
+                        <div class="drps-requests-empty">No requests here yet.</div>
+                    }
+                    else
+                    {
+                        @foreach (var req in FilteredRequests.OrderByDescending(r => r.RequestedDate))
+                        {
+                            <div class="drps-request-item">
+                                <div class="drps-request-top">
+                                    <div>
+                                        <div class="drps-request-title">@req.Title</div>
+                                        <div class="drps-request-meta">
+                                            <span><MudIcon Icon="@GetResourceTypeIcon(req.ResourceType)" Size="Size.Small" /> @req.ResourceType@(string.IsNullOrWhiteSpace(req.Amount) ? "" : $" \u00b7 {req.Amount}")</span>
+                                            <span><MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Small" /> @req.RequestedBy</span>
+                                            <span><MudIcon Icon="@Icons.Material.Filled.Schedule" Size="Size.Small" /> @req.RequestedDate.ToString("d MMM, h:mm tt")</span>
+                                        </div>
+                                    </div>
+                                    <div class="drps-status-chip @req.Status.ToString().ToLower()">@req.Status</div>
+                                </div>
+
+                                @if (req.LinkType != RequestLinkType.None && !string.IsNullOrWhiteSpace(req.LinkedName))
+                                {
+                                    <div class="mt-2">
+                                        <span class="drps-link-chip">
+                                            <MudIcon Icon="@(req.LinkType == RequestLinkType.Event ? Icons.Material.Filled.CalendarToday : Icons.Material.Filled.Task)" Size="Size.Small" />
+                                            @req.LinkType: @req.LinkedName
+                                        </span>
+                                    </div>
+                                }
+
+                                @if (!string.IsNullOrWhiteSpace(req.Notes))
+                                {
+                                    <div class="drps-request-notes">@req.Notes</div>
+                                }
+
+                                @* Once reviewed, show who by and (if denied) why -
+                                   visible to everyone, not just Admins. *@
+                                @if (req.Status != RequestStatus.Pending && !string.IsNullOrWhiteSpace(req.ReviewedBy))
+                                {
+                                    <div class="drps-request-review">
+                                        @req.Status by @req.ReviewedBy on @req.ReviewedDate?.ToString("d MMM")
+                                        @(req.Status == RequestStatus.Denied && !string.IsNullOrWhiteSpace(req.DenyReason) ? $" - \u201c{req.DenyReason}\u201d" : "")
+                                    </div>
+                                }
+
+                                @* Approve/Deny only render for Admin/Secondary
+                                   Admin, and only while still Pending. *@
+                                @if (CanReview && req.Status == RequestStatus.Pending)
+                                {
+                                    <div class="drps-request-actions">
+                                        <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Success" OnClick="@(() => ApproveRequest(req))">
+                                            Approve
+                                        </MudButton>
+                                        <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Error" OnClick="@(() => DenyRequest(req))">
+                                            Deny
+                                        </MudButton>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    }
+                </div>
+            </MudItem>
+        </MudGrid>
+
+    </MudContainer>
+</div>
+
+@* =====================================================================
+   CODE-BEHIND
+   ===================================================================== *@
+@code {
+    // Cascaded (by name) from MainLayout - see the CascadingValue wrapping
+    // @Body there. CurrentRole drives CanReview below; CurrentUserName is
+    // used to attribute new requests and reviews.
+    [CascadingParameter(Name = "CurrentRole")]
+    private string? CurrentRole { get; set; }
+
+    [CascadingParameter(Name = "CurrentUserName")]
+    private string? CurrentUserName { get; set; }
+
+    // Only Admin and Secondary Admin get Approve/Deny controls -
+    // Facility Manager can see this page (to submit/track requests) but
+    // can't review them. Every role that can reach this page can still
+    // see full request history and who reviewed each one.
+    private bool CanReview => CurrentRole is "Admin" or "SecondaryAdmin";
+
+    // Roles that want to hear about resource requests at all - Facility
+    // Manager explicitly gets none (not the "new request" broadcast,
+    // and not even the outcome of their own submitted request).
+    private static readonly SystemRole[] RequestNotificationRoles = { SystemRole.Admin, SystemRole.SecondaryAdmin };
+
+    // --- Submission form state ---
+    private RequestFormModel newRequest = new();
+
+    private bool CanSubmit =>
+        !string.IsNullOrWhiteSpace(newRequest.Title) &&
+        (newRequest.LinkType == "None" || newRequest.LinkedId.HasValue);
+
+    private void SubmitRequest()
+    {
+        if (!CanSubmit) return;
+
+        var requestedBy = string.IsNullOrWhiteSpace(CurrentUserName) ? "You" : CurrentUserName!;
+        var title = newRequest.Title.Trim();
+
+        // Resolve the real link (Id + display name) from AppData's shared
+        // Events/Tasks collections, rather than trusting a free-typed name -
+        // this is what makes the request a real reference, not just a
+        // string match.
+        var linkType = newRequest.LinkType switch
+        {
+            "Event" => RequestLinkType.Event,
+            "Task" => RequestLinkType.Task,
+            _ => RequestLinkType.None
+        };
+
+        string? linkedName = null;
+        if (linkType == RequestLinkType.Event && newRequest.LinkedId.HasValue)
+        {
+            linkedName = AppData.Events.FirstOrDefault(e => e.Id == newRequest.LinkedId.Value)?.Title;
+        }
+        else if (linkType == RequestLinkType.Task && newRequest.LinkedId.HasValue)
+        {
+            linkedName = AppData.Tasks.FirstOrDefault(t => t.Id == newRequest.LinkedId.Value)?.Title;
+        }
+
+        AppData.AddRequest(new ResourceRequestItem
+        {
+            Title = title,
+            ResourceType = newRequest.ResourceType,
+            Amount = newRequest.Amount,
+            Notes = newRequest.Notes,
+            LinkType = linkType,
+            LinkedId = linkType == RequestLinkType.None ? null : newRequest.LinkedId,
+            LinkedName = linkType == RequestLinkType.None ? null : linkedName,
+            RequestedBy = requestedBy,
+            RequestedDate = DateTime.Now,
+            Status = RequestStatus.Pending
+        });
+
+        // Broadcast to every Admin/Secondary Admin - they're the ones
+        // who review requests, so they hear about every one submitted
+        // regardless of who submitted it. Facility Manager and General
+        // Staff never get this (Facility Manager is excluded from
+        // resource-request notifications entirely; General Staff can't
+        // reach this page in the first place).
+        NotificationService.Add(
+            NotificationType.ResourceRequest,
+            "New resource request",
+            $"{requestedBy} requested \"{title}\"" + (linkType != RequestLinkType.None && !string.IsNullOrWhiteSpace(linkedName) ? $" for {linkedName}." : "."),
+            targetRoles: RequestNotificationRoles,
+            linkedName: linkType == RequestLinkType.None ? null : linkedName);
+
+        // Reset the form, but keep the last-used resource type since
+        // people often submit a few similar requests in a row.
+        var lastType = newRequest.ResourceType;
+        newRequest = new RequestFormModel { ResourceType = lastType };
+    }
+
+    // --- Status filter above the list. Null means "All". ---
+    private RequestStatus? activeFilter = null;
+
+    private IEnumerable<ResourceRequestItem> FilteredRequests =>
+        activeFilter is null ? AppData.Requests : AppData.Requests.Where(r => r.Status == activeFilter);
+
+    // Only notify the original requester about the outcome of their own
+    // request if their role is one that hears about resource requests at
+    // all (Facility Manager is excluded entirely, per RequestNotificationRoles).
+    private IEnumerable<Guid> RequesterTarget(ResourceRequestItem req)
+    {
+        var requester = AppData.UserByName(req.RequestedBy);
+        if (requester is not null && RequestNotificationRoles.Contains(requester.SystemRole))
+        {
+            yield return requester.Id;
+        }
+    }
+
+    // --- Review actions (Admin/Secondary Admin only, per CanReview) ---
+    // Approve needs no extra input, so it applies immediately.
+    private void ApproveRequest(ResourceRequestItem req)
+    {
+        var reviewedBy = string.IsNullOrWhiteSpace(CurrentUserName) ? "Admin" : CurrentUserName!;
+        AppData.ApproveRequest(req, reviewedBy);
+
+        NotificationService.Add(
+            NotificationType.ResourceRequest,
+            "Request approved",
+            $"{reviewedBy} approved your \"{req.Title}\" request.",
+            targetUserIds: RequesterTarget(req),
+            linkedName: req.LinkedName);
+    }
+
+    // Deny opens DenyRequestDialog so the reviewer can optionally leave
+    // a reason. Cancelling the dialog leaves the request Pending.
+    private async Task DenyRequest(ResourceRequestItem req)
+    {
+        var parameters = new DialogParameters<DenyRequestDialog>
+        {
+            { x => x.RequestTitle, req.Title }
+        };
+        var options = new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true, CloseOnEscapeKey = true };
+
+        var dialog = await DialogService.ShowAsync<DenyRequestDialog>("Deny request", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is not null && !result.Canceled)
+        {
+            var reviewedBy = string.IsNullOrWhiteSpace(CurrentUserName) ? "Admin" : CurrentUserName!;
+            var reason = result.Data as string;
+            AppData.DenyRequest(req, reviewedBy, reason);
+
+            var reasonSuffix = string.IsNullOrWhiteSpace(reason) ? "" : $" Reason: {reason}";
+            NotificationService.Add(
+                NotificationType.ResourceRequest,
+                "Request denied",
+                $"{reviewedBy} denied your \"{req.Title}\" request.{reasonSuffix}",
+                targetUserIds: RequesterTarget(req),
+                linkedName: req.LinkedName);
+        }
+    }
+
+    // Maps a request's resource type to a MudBlazor icon.
+    private string GetResourceTypeIcon(string resourceType) => resourceType switch
+    {
+        "Equipment" => Icons.Material.Filled.Build,
+        "Budget" => Icons.Material.Filled.AttachMoney,
+        "Personnel" => Icons.Material.Filled.Groups,
+        "Venue" => Icons.Material.Filled.LocationOn,
+        _ => Icons.Material.Filled.Inventory2
+    };
+
+    // Lightweight model bound to the submission form on the left -
+    // kept separate from ResourceRequestItem so a half-filled form never
+    // pollutes AppData.Requests until Submit is clicked. LinkType stays a
+    // string ("None"/"Event"/"Task") to drive which dropdown renders;
+    // LinkedId is the real Guid reference resolved from AppData's shared
+    // Events/Tasks collections.
+    private class RequestFormModel
+    {
+        public string Title { get; set; } = string.Empty;
+        public string ResourceType { get; set; } = "Equipment";
+        public string? Amount { get; set; }
+        public string? Notes { get; set; }
+        public string LinkType { get; set; } = "None";
+        public Guid? LinkedId { get; set; }
+    }
+
+    // Re-render if requests/events/tasks change elsewhere while this page
+    // is open (e.g. a new Event added from Events.razor, so it shows up
+    // in the "Which event?" dropdown immediately).
+    protected override void OnInitialized()
+    {
+        AppData.OnChange += StateHasChanged;
+    }
+
+    public void Dispose()
+    {
+        AppData.OnChange -= StateHasChanged;
+    }
+}

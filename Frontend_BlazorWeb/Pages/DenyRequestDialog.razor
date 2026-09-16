@@ -1,0 +1,60 @@
+@* =====================================================================
+   DenyRequestDialog
+   A small MudBlazor dialog, shown via IDialogService from Requests.razor
+   when an Admin clicks "Deny" on a pending request. Optionally collects
+   a short reason and returns it as the dialog result. Cancelling
+   returns no result, and Requests.razor leaves the request's status
+   untouched (still Pending).
+
+   Reuses the ".drps-modal-task-name" style defined in Tasks.razor's
+   <style> block - since Blazor doesn't scope plain <style> tags, those
+   rules are already global on any page that has Tasks.razor loaded.
+   ===================================================================== *@
+@using MudBlazor
+
+<MudDialog Style="border-radius:16px;">
+    <TitleContent>
+        <MudText Typo="Typo.h6" Style="font-weight:600;">Deny request</MudText>
+    </TitleContent>
+    <DialogContent>
+        <div class="drps-modal-task-name">@RequestTitle</div>
+        <MudTextField T="string"
+                       @bind-Value="reason"
+                       Label="Reason (optional)"
+                       Variant="Variant.Outlined"
+                       Lines="3"
+                       Placeholder="Let the requester know why, if useful." />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Error"
+                   Variant="Variant.Filled"
+                   OnClick="Confirm">
+            Deny request
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    // Auto-injected by MudDialogProvider - lets this component close
+    // or cancel itself and hand a result back to the caller.
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    // The request's title, passed in from Requests.razor for display
+    // only.
+    [Parameter]
+    public string RequestTitle { get; set; } = string.Empty;
+
+    // Optional reason typed by the admin - may be left blank, unlike
+    // CompletedByDialog's employee picker which is required.
+    private string reason = string.Empty;
+
+    // Closes the dialog successfully, returning the (possibly empty)
+    // reason as the result data.
+    private void Confirm() => MudDialog.Close(DialogResult.Ok(reason));
+
+    // Closes the dialog as cancelled - the caller treats this as "no
+    // change", leaving the request's status untouched.
+    private void Cancel() => MudDialog.Cancel();
+}
