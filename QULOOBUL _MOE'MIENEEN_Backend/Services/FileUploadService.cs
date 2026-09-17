@@ -12,15 +12,15 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
     public class FileUploadService(AppDbContext db, BlobStorageService blob, AuditService audit)
     {
         public const string Container = "attachments";
-
+//----------------------------------------------------------------------------------------------------------------------//
         /// <summary>At most one attachment context may be set (architecture doc / CK_FileUpload_OneContext).</summary>
         public record AttachmentContext(int? TaskId = null, int? MeetingId = null, DateTime? PeriodMonth = null)
         {
             public int Count => (TaskId is null ? 0 : 1) + (MeetingId is null ? 0 : 1) + (PeriodMonth is null ? 0 : 1);
         }
-
+//----------------------------------------------------------------------------------------------------------------------//
         public record UploadTicket(FileUpload File, Uri UploadUri);
-
+//----------------------------------------------------------------------------------------------------------------------//
         /// <summary>
         /// Records the file metadata and returns a SAS the caller uploads to. FilePath is the
         /// blob path (container/blobName), not a public URL.
@@ -59,7 +59,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             var uploadUri = await blob.CreateUploadSasAsync(Container, blobName);
             return new UploadTicket(file, uploadUri);
         }
-
+//----------------------------------------------------------------------------------------------------------------------//
         /// <summary>A short-lived read SAS for downloading an existing file.</summary>
         public async Task<Uri> GetDownloadUriAsync(int fileId)
         {

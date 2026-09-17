@@ -14,7 +14,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
     public class RequestReviewService(AppDbContext db, AuditService audit, NotificationService notify)
     {
         public const string ReviewPermission = "ReviewRequests";
-
+//----------------------------------------------------------------------------------------------------------------------//
         /// <summary>Reviewers see every request; everyone else sees only their own.</summary>
         public async Task<List<ResourceRequestDto>> ListAsync(int userId)
         {
@@ -30,11 +30,11 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
                     r.Detail))
                 .ToListAsync();
         }
-
+//----------------------------------------------------------------------------------------------------------------------//
         public Task<List<RequestCategoryDto>> CategoriesAsync() =>
             db.RequestCategories.OrderBy(c => c.CategoryName)
                 .Select(c => new RequestCategoryDto(c.CategoryId, c.CategoryName)).ToListAsync();
-
+//----------------------------------------------------------------------------------------------------------------------//
         public async Task<ResourceRequest> SubmitAsync(int requestedBy, int categoryId, string priority, string? detail)
         {
             if (!await db.RequestCategories.AnyAsync(c => c.CategoryId == categoryId))
@@ -76,7 +76,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
                 await notify.PushAsync(reviewer, "requestSubmitted", new { requestId = request.RequestId });
             return request;
         }
-
+//----------------------------------------------------------------------------------------------------------------------//
         /// <summary>Approve or decline a pending request. Reviewer needs the ReviewRequests permission
         /// and may not review their own request.</summary>
         public async Task<ResourceRequest> ReviewAsync(int requestId, int reviewerId, bool approve, string? note = null)
@@ -107,7 +107,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             await notify.PushAsync(request.RequestedBy, "requestReviewed", new { requestId, status = target });
             return request;
         }
-
+//----------------------------------------------------------------------------------------------------------------------//
         /// <summary>Mark an approved request fulfilled.</summary>
         public async Task<ResourceRequest> CompleteAsync(int requestId, int actorId)
         {
@@ -127,7 +127,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             await notify.PushAsync(request.RequestedBy, "requestReviewed", new { requestId, status = "Completed" });
             return request;
         }
-
+//----------------------------------------------------------------------------------------------------------------------//
         private void AddHistory(int requestId, string newStatus, int changedBy) =>
             db.RequestStatusHistory.Add(new RequestStatusHistory
             {
@@ -136,10 +136,10 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
                 ChangedBy = changedBy,
                 TimeCreated = DateTime.UtcNow,
             });
-
+//----------------------------------------------------------------------------------------------------------------------//
         private Task<bool> HasPermission(int userId, string permissionName) =>
             UsersWith(permissionName).AnyAsync(id => id == userId);
-
+//----------------------------------------------------------------------------------------------------------------------//
         private IQueryable<int> UsersWith(string permissionName) =>
             from u in db.Users
             join rp in db.RolePermissions on u.RoleId equals rp.RoleId

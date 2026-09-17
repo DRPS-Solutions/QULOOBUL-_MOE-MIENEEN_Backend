@@ -11,7 +11,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
     public class AuthService(AppDbContext db, JwtTokenFactory tokens, AuditService audit)
     {
         private static readonly PasswordHasher<User> Hasher = new();
-
+//----------------------------------------------------------------------------------------------------------------------//
         public async Task<AuthResponse> LoginAsync(LoginRequest req)
         {
             var user = await db.Users.Include(u => u.Role)
@@ -38,7 +38,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             return new AuthResponse(token, expires, user.UserId,
                 $"{user.FirstName} {user.Surname}", roleName, permissions);
         }
-
+//----------------------------------------------------------------------------------------------------------------------//
         /// <summary>Used by CreateUserRequest / password reset — hash for storage.</summary>
         public string Hash(User user, string plain) => Hasher.HashPassword(user, plain);
     }

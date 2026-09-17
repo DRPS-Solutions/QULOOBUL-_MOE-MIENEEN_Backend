@@ -18,7 +18,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
                         x.MinutesId, x.MeetingId, x.RecordedBy, x.TimeRecorded, x.MinutesText, x.IsAiDraft, x.ApprovedBy))
                     .FirstOrDefault()))
                 .ToListAsync();
-
+//----------------------------------------------------------------------------------------------------------------------//
         public async Task<int> CreateMeetingAsync(CreateMeetingRequest req, int organiserId)
         {
             var meeting = new Meeting { OrganiserId = organiserId, Title = req.Title, MeetingDate = req.MeetingDate };
@@ -32,7 +32,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             await db.SaveChangesAsync();
             return meeting.MeetingId;
         }
-
+//----------------------------------------------------------------------------------------------------------------------//
         public async Task<MeetingMinutesDto> RecordAsync(int meetingId, RecordMinutesRequest req, int recordedBy)
         {
             if (!await db.Meetings.AnyAsync(m => m.MeetingId == meetingId))
@@ -51,7 +51,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             await db.SaveChangesAsync();
             return Map(minutes);
         }
-
+//----------------------------------------------------------------------------------------------------------------------//
         public async Task<MeetingMinutesDto> ApproveAsync(int minutesId, int approverId)
         {
             var minutes = await db.MeetingMinutes.FindAsync(minutesId)
@@ -62,15 +62,16 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             await db.SaveChangesAsync();
             return Map(minutes);
         }
-
+//----------------------------------------------------------------------------------------------------------------------//
         public Task<List<MeetingMinutesDto>> SearchAsync(string? keyword, DateTime? from, DateTime? to) =>
             db.MeetingMinutes
                 .Where(m => (keyword == null || m.MinutesText.Contains(keyword))
                          && (from == null || m.TimeRecorded >= from)
                          && (to == null || m.TimeRecorded <= to))
                 .Select(m => Map(m)).ToListAsync();
-
+//----------------------------------------------------------------------------------------------------------------------//
         private static MeetingMinutesDto Map(MeetingMinutes m) => new(
             m.MinutesId, m.MeetingId, m.RecordedBy, m.TimeRecorded, m.MinutesText, m.IsAiDraft, m.ApprovedBy);
     }
 }
+//---------------------------DDDDDDDDDDDoooooooooooooo END OF FILE DDDDDDDDDDDoooooooooooooo---------------------------//

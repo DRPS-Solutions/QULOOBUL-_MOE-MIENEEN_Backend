@@ -12,7 +12,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
                 .Select(n => new NotificationDto(
                     n.NotificationId, n.Type!.TypeName, n.Message, n.IsRead, n.EntityType, n.EntityId))
                 .ToListAsync();
-
+//----------------------------------------------------------------------------------------------------------------------//
         public async Task MarkReadAsync(int userId, IReadOnlyList<int> ids)
         {
             var rows = await db.Notifications
@@ -20,7 +20,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             foreach (var n in rows) n.IsRead = true;
             await db.SaveChangesAsync();
         }
-
+//----------------------------------------------------------------------------------------------------------------------//
         /// <summary>UC-08 alternate flow — admin broadcast.</summary>
         public async Task SendAsync(SendNotificationRequest req, int senderId)
         {
@@ -33,3 +33,4 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
         }
     }
 }
+//---------------------------DDDDDDDDDDDoooooooooooooo END OF FILE DDDDDDDDDDDoooooooooooooo---------------------------//
