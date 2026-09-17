@@ -10,14 +10,14 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Controllers
     {
         [HttpGet]
         public async Task<ActionResult<List<ResourceRequestDto>>> List() => Ok(await requests.ListAsync(UserId()));
-
+//----------------------------------------------------------------------------------------------------------------------//
         [HttpGet("categories")]
         public async Task<ActionResult<List<RequestCategoryDto>>> Categories() => Ok(await requests.CategoriesAsync());
-
+//----------------------------------------------------------------------------------------------------------------------//
         [HttpPost]
         public async Task<ActionResult<int>> Submit(CreateResourceRequest req) =>
             Ok((await requests.SubmitAsync(UserId(), req.CategoryId, req.Priority, req.Detail)).RequestId);
-
+//----------------------------------------------------------------------------------------------------------------------//
         [HttpPost("{id:int}/review"), Authorize(Policy = Permissions.ReviewRequests)]
         public async Task<IActionResult> Review(int id, ReviewRequestRequest req)
         {
@@ -26,3 +26,4 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Controllers
         }
     }
 }
+//---------------------------DDDDDDDDDDDoooooooooooooo END OF FILE DDDDDDDDDDDoooooooooooooo---------------------------//

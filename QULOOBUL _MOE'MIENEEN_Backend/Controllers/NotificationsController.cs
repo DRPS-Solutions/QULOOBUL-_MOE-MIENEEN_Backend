@@ -6,10 +6,19 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Controllers
 {
     public class NotificationsController(NotificationQueryService notifications) : ApiControllerBase
     {
+        /// <summary>
+        /// Returns a list of notifications for the current user.
+        /// </summary>
+        /// <returns></returns>
         [HttpGet]
         public async Task<ActionResult<List<NotificationDto>>> List() =>
             Ok(await notifications.ForUserAsync(UserId(), unreadOnly: false));
-
+        //----------------------------------------------------------------------------------------------------------------------//
+        /// <summary>
+        /// Marks the specified notifications as read for the current user.
+        /// </summary>
+        /// <param name="req"></param>
+        /// <returns></returns>
         [HttpPost("read")]
         public async Task<IActionResult> MarkRead(MarkReadRequest req)
         {
@@ -18,3 +27,4 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Controllers
         }
     }
 }
+//---------------------------DDDDDDDDDDDoooooooooooooo END OF FILE DDDDDDDDDDDoooooooooooooo---------------------------//
