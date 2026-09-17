@@ -13,34 +13,55 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
     public class BlobStorageService(BlobServiceClient client)
     {
         private static readonly TimeSpan DefaultTtl = TimeSpan.FromMinutes(15);
-
+//----------------------------------------------------------------------------------------------------------------------//
         /// <summary>A single-blob SAS the client uses to PUT the bytes straight to Blob Storage.</summary>
         public async Task<Uri> CreateUploadSasAsync(string container, string blobName, TimeSpan? ttl = null)
         {
             var blob = await GetBlobClientAsync(container, blobName);
             return Sas(blob, BlobSasPermissions.Create | BlobSasPermissions.Write, ttl);
         }
-
+//----------------------------------------------------------------------------------------------------------------------//
         /// <summary>A single-blob read SAS handed to a client that needs to download the file.</summary>
         public async Task<Uri> CreateReadSasAsync(string container, string blobName, TimeSpan? ttl = null)
         {
             var blob = await GetBlobClientAsync(container, blobName);
             return Sas(blob, BlobSasPermissions.Read, ttl);
         }
-
+//----------------------------------------------------------------------------------------------------------------------//
+        /// <summary>
+        /// Deletes a blob if it exists. This is the only way to remove a file from storage; there is no "delete SAS".
+        /// </summary>
+        /// <param name="container"></param>
+        /// <param name="blobName"></param>
+        /// <returns></returns>
         public async Task DeleteAsync(string container, string blobName)
         {
             var blob = await GetBlobClientAsync(container, blobName);
             await blob.DeleteIfExistsAsync();
         }
-
+//----------------------------------------------------------------------------------------------------------------------//
+        /// <summary>
+        /// Gets a BlobClient for the given container/blob name, creating the container if it doesn't exist.
+        /// </summary>
+        /// <param name="container"></param>
+        /// <param name="blobName"></param>
+        /// <returns></returns>
         private async Task<BlobClient> GetBlobClientAsync(string container, string blobName)
         {
             var c = client.GetBlobContainerClient(container);
             await c.CreateIfNotExistsAsync(PublicAccessType.None);
             return c.GetBlobClient(blobName);
         }
-
+//----------------------------------------------------------------------------------------------------------------------//
+        /// <summary>
+        /// Generates a SAS for a single blob. Throws if the BlobServiceClient was not created with a shared key.
+        /// SAS is the only way to give a client direct access to a blob without passing the bytes through the API.
+        /// </summary>
+        /// <param name="blob"></param>
+        /// <param name="permissions"></param>
+        /// <param name="ttl"></param>
+        /// <returns></returns>
+        /// <exception cref="InvalidOperationException"></exception>
         private static Uri Sas(BlobClient blob, BlobSasPermissions permissions, TimeSpan? ttl)
         {
             if (!blob.CanGenerateSasUri)
