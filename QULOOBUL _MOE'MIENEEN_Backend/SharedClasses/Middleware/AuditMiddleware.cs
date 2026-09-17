@@ -7,7 +7,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.SharedClasses.Middleware
     public class AuditMiddleware(RequestDelegate next)
     {
         private static readonly string[] Mutating = ["POST", "PUT", "PATCH", "DELETE"];
-
+//----------------------------------------------------------------------------------------------------------------------//
         public async Task Invoke(HttpContext ctx, AppDbContext db)
         {
             await next(ctx);
@@ -28,3 +28,4 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.SharedClasses.Middleware
         }
     }
 }
+//---------------------------DDDDDDDDDDDoooooooooooooo END OF FILE DDDDDDDDDDDoooooooooooooo---------------------------//
