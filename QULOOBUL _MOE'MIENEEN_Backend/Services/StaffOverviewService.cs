@@ -5,7 +5,7 @@ using QULOOBUL__MOE_MIENEEN_Shared.Directory;
 
 namespace QULOOBUL__MOE_MIENEEN_Backend.Services
 {
-    /// <summary>UC-06 admin dashboard — read-only aggregate over staff, tasks, requests.</summary>
+    /// <summary>UC-06 admin dashboard - read-only aggregate over staff, tasks, requests.</summary>
     public class StaffOverviewService(AppDbContext db)
     {
         public Task<List<StaffOverviewRow>> RowsAsync() =>

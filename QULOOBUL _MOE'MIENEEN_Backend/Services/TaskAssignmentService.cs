@@ -57,7 +57,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
 
             return assignment;
         }
-
+//----------------------------------------------------------------------------------------------------------------------//
         /// <summary>UC-04 reassign: take <paramref name="userId"/> off a task. Same hierarchy rule as
         /// assigning: nobody removes someone more senior than themselves.</summary>
         public async Task UnassignAsync(int taskId, int userId, int actorId)
@@ -76,7 +76,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             await db.SaveChangesAsync();
             await notify.BroadcastAsync("boardChanged", new { projectId = assignment.Task!.ProjectId });
         }
-
+//----------------------------------------------------------------------------------------------------------------------//
         /// <summary>SM-01 guarded status change, callable directly by a task-board move.</summary>
         public async Task ChangeStatusAsync(int taskId, string newStatus, int changedById)
         {
@@ -86,7 +86,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             audit.Record(changedById, "task.status", nameof(ProjectTask), taskId);
             await db.SaveChangesAsync();
         }
-
+//----------------------------------------------------------------------------------------------------------------------//
         private void MoveStatus(ProjectTask task, string newStatus, int changedById)
         {
             if (string.Equals(task.Status, newStatus, StringComparison.OrdinalIgnoreCase))
@@ -110,7 +110,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
                 TimeCreated = DateTime.UtcNow,
             });
         }
-
+//----------------------------------------------------------------------------------------------------------------------//
         private async Task<int> LevelOf(int roleId)
         {
             var role = await db.Roles.FindAsync(roleId)
