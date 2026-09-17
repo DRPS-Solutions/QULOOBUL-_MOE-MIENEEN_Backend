@@ -22,7 +22,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Data
         public DbSet<Role> Roles => Set<Role>();
         public DbSet<Permission> Permissions => Set<Permission>();
         public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
-
+//----------------------------------------------------------------------------------------------------------------------//
         // Projects and tasks
         public DbSet<Project> Projects => Set<Project>();
         public DbSet<ProjectMember> ProjectMembers => Set<ProjectMember>();
@@ -31,29 +31,35 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Data
         public DbSet<TaskComment> TaskComments => Set<TaskComment>();
         public DbSet<TaskSchedule> TaskSchedules => Set<TaskSchedule>();
         public DbSet<TaskStatusHistory> TaskStatusHistory => Set<TaskStatusHistory>();
-
+//----------------------------------------------------------------------------------------------------------------------//
         // Meetings and events
         public DbSet<Meeting> Meetings => Set<Meeting>();
         public DbSet<MeetingAttendee> MeetingAttendees => Set<MeetingAttendee>();
         public DbSet<MeetingMinutes> MeetingMinutes => Set<MeetingMinutes>();
         public DbSet<Event> Events => Set<Event>();
         public DbSet<EventAttendee> EventAttendees => Set<EventAttendee>();
-
+//----------------------------------------------------------------------------------------------------------------------//
         // Files and reporting
         public DbSet<FileCategory> FileCategories => Set<FileCategory>();
         public DbSet<FileUpload> FileUploads => Set<FileUpload>();
         public DbSet<Report> Reports => Set<Report>();
-
+//----------------------------------------------------------------------------------------------------------------------//
         // Resource requests
         public DbSet<RequestCategory> RequestCategories => Set<RequestCategory>();
         public DbSet<ResourceRequest> ResourceRequests => Set<ResourceRequest>();
         public DbSet<RequestStatusHistory> RequestStatusHistory => Set<RequestStatusHistory>();
-
+//----------------------------------------------------------------------------------------------------------------------//
         // Notifications and audit
         public DbSet<Notification> Notifications => Set<Notification>();
         public DbSet<NotificationType> NotificationTypes => Set<NotificationType>();
         public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+//----------------------------------------------------------------------------------------------------------------------//
 
+        /// <summary>
+        /// Performs additional configuration of the model that was discovered by convention from the entity types
+        /// Protected override method called by EF Core during model creation. Sets delete behaviors, unique constraints, and check constraints according to the architecture requirements.
+        /// </summary>
+        /// <param name="b"></param>
         protected override void OnModelCreating(ModelBuilder b)
         {
             // Every FK is ON DELETE NO ACTION: the audit trail and history tables must never
