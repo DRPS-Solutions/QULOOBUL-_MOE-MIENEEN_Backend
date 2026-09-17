@@ -9,7 +9,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Data
     {
         public const string TaskStart = "To Do";
         public const string RequestStart = "Pending";
-
+//----------------------------------------------------------------------------------------------------------------------//
         private static readonly Dictionary<string, string[]> Task = new(StringComparer.OrdinalIgnoreCase)
         {
             ["To Do"] = ["In Progress", "Blocked"],
@@ -17,51 +17,51 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Data
             ["Blocked"] = ["In Progress", "To Do"],
             ["Done"] = ["In Progress"], // reopen
         };
-
+//----------------------------------------------------------------------------------------------------------------------//
         private static readonly Dictionary<string, string[]> Request = new(StringComparer.OrdinalIgnoreCase)
         {
             ["Pending"] = ["Approved", "Declined"],
             ["Approved"] = ["Completed"],
         };
-
+//----------------------------------------------------------------------------------------------------------------------//
         public static bool TaskCanMove(string? current, string next) =>
             CanMove(Task, current, TaskStart, next);
-
+//----------------------------------------------------------------------------------------------------------------------//
         public const string UserStart = "Active";
-
+//----------------------------------------------------------------------------------------------------------------------//
         private static readonly Dictionary<string, string[]> UserSm = new(StringComparer.OrdinalIgnoreCase)
         {
             ["Active"] = ["Deactivated"],
             ["Deactivated"] = ["Active"], // reactivation
         };
-
+//----------------------------------------------------------------------------------------------------------------------//
         public static bool UserCanMove(string? current, string next) =>
             CanMove(UserSm, current, UserStart, next);
-
+//----------------------------------------------------------------------------------------------------------------------//
         public static void EnsureUserMove(string? current, string next)
         {
             if (!UserCanMove(current, next))
                 throw new InvalidOperationException($"User cannot move from \"{Norm(current, UserStart)}\" to \"{next}\".");
         }
-
+//----------------------------------------------------------------------------------------------------------------------//
         public static string UserState(bool isActive) => isActive ? "Active" : "Deactivated";
-
+//----------------------------------------------------------------------------------------------------------------------//
         public static bool RequestCanMove(string? current, string next) =>
             CanMove(Request, current, RequestStart, next);
-
+//----------------------------------------------------------------------------------------------------------------------//
         /// <summary>Throws <see cref="InvalidOperationException"/> if the move is not allowed.</summary>
         public static void EnsureTaskMove(string? current, string next)
         {
             if (!TaskCanMove(current, next))
                 throw new InvalidOperationException($"Task cannot move from \"{Norm(current, TaskStart)}\" to \"{next}\".");
         }
-
+//----------------------------------------------------------------------------------------------------------------------//
         public static void EnsureRequestMove(string? current, string next)
         {
             if (!RequestCanMove(current, next))
                 throw new InvalidOperationException($"Request cannot move from \"{Norm(current, RequestStart)}\" to \"{next}\".");
         }
-
+//----------------------------------------------------------------------------------------------------------------------//
         private static bool CanMove(Dictionary<string, string[]> table, string? current, string start, string next)
         {
             var from = Norm(current, start);
@@ -69,8 +69,9 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Data
             return table.TryGetValue(from, out var allowed)
                    && allowed.Contains(next, StringComparer.OrdinalIgnoreCase);
         }
-
+//----------------------------------------------------------------------------------------------------------------------//
         private static string Norm(string? current, string start) =>
             string.IsNullOrEmpty(current) ? start : current;
     }
 }
+//---------------------------DDDDDDDDDDDoooooooooooooo END OF FILE DDDDDDDDDDDoooooooooooooo---------------------------//
