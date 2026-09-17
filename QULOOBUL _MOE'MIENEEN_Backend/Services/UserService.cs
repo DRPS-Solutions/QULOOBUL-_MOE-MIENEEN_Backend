@@ -31,9 +31,10 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
 
             return new UserDto(user.UserId, user.FirstName, user.Surname, user.Email, user.CellNo, role.RoleName, user.IsActive);
         }
-
+//----------------------------------------------------------------------------------------------------------------------//
         public Task<List<RoleDto>> RolesAsync() =>
             db.Roles.OrderBy(r => r.HierarchyLevel).ThenBy(r => r.RoleName)
                 .Select(r => new RoleDto(r.RoleId, r.RoleName, r.HierarchyLevel)).ToListAsync();
     }
 }
+//---------------------------DDDDDDDDDDDoooooooooooooo END OF FILE DDDDDDDDDDDoooooooooooooo---------------------------//
