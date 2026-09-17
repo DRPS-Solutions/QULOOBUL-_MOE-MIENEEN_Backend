@@ -13,7 +13,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
     {
         public async Task<IReadOnlyList<TaskCardDto>> BoardAsync(int projectId) =>
             await Cards(db.Tasks.Where(t => t.ProjectId == projectId)).ToListAsync();
-
+//----------------------------------------------------------------------------------------------------------------------//
         /// <summary>Calendar/overview list: tasks due in [from, to), optionally only one assignee's.
         /// ponytail: with only an assignee the list is that user's whole history; page it once
         /// one user has thousands of tasks.</summary>
@@ -25,7 +25,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             if (assigneeId is { } a) q = q.Where(t => db.TaskAssignments.Any(x => x.TaskId == t.TaskId && x.UserId == a));
             return await Cards(q).ToListAsync();
         }
-
+//----------------------------------------------------------------------------------------------------------------------//
         public async Task<TaskCardDto> CreateAsync(CreateTaskRequest req, int creatorId)
         {
             if (!await db.Projects.AnyAsync(p => p.ProjectId == req.ProjectId))
@@ -49,7 +49,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             await notify.BroadcastAsync("boardChanged", new { projectId = req.ProjectId });
             return card;
         }
-
+//----------------------------------------------------------------------------------------------------------------------//
         public async Task<TaskCardDto> UpdateAsync(int taskId, UpdateTaskRequest req, int actorId)
         {
             var task = await db.Tasks.FindAsync(taskId)
@@ -72,15 +72,15 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             await notify.BroadcastAsync("boardChanged", new { projectId = task.ProjectId });
             return await Card(taskId);
         }
-
-        /// <summary>Kanban column move — SM-01 enforced by TaskAssignmentService.</summary>
+//----------------------------------------------------------------------------------------------------------------------//
+        /// <summary>Kanban column move - SM-01 enforced by TaskAssignmentService.</summary>
         public async Task MoveAsync(int taskId, string newStatus, int actorId)
         {
             await assignments.ChangeStatusAsync(taskId, newStatus, actorId);
             var projectId = await db.Tasks.Where(t => t.TaskId == taskId).Select(t => t.ProjectId).FirstAsync();
             await notify.BroadcastAsync("boardChanged", new { projectId });
         }
-
+//----------------------------------------------------------------------------------------------------------------------//
         public async Task<TaskCommentDto> AddCommentAsync(int taskId, string text, int userId)
         {
             if (!await db.Tasks.AnyAsync(t => t.TaskId == taskId))
@@ -91,7 +91,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             await db.SaveChangesAsync();
             return new TaskCommentDto(c.CommentId, c.UserId, c.Comment, c.TimeCreated);
         }
-
+//----------------------------------------------------------------------------------------------------------------------//
         public async Task<TaskDetailDto> DetailAsync(int taskId)
         {
             var task = await db.Tasks.FindAsync(taskId)
@@ -106,7 +106,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
                 task.PercentComplete, task.Deadline, task.CreatedBy, task.CompletedBy, comments, history,
                 task.Description);
         }
-
+//----------------------------------------------------------------------------------------------------------------------//
         private Task<TaskCardDto> Card(int taskId) => Cards(db.Tasks.Where(t => t.TaskId == taskId)).FirstAsync();
 
         // Assignees in assignment order, so "the" assignee a single-assignee client shows is the first one.
@@ -116,7 +116,8 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
                 db.TaskAssignments.Where(a => a.TaskId == t.TaskId).OrderBy(a => a.AssignmentId)
                     .Select(a => a.UserId).ToList(),
                 t.Description, t.CompletedBy));
-
+//----------------------------------------------------------------------------------------------------------------------//
         private static string? Blank(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
     }
 }
+//---------------------------DDDDDDDDDDDoooooooooooooo END OF FILE DDDDDDDDDDDoooooooooooooo---------------------------//
