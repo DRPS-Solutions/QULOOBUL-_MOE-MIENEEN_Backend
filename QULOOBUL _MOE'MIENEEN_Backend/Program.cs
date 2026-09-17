@@ -26,7 +26,7 @@ builder.Services.AddSignalR();
 builder.Services.AddSingleton(_ => new BlobServiceClient(
     builder.Configuration.GetConnectionString("BlobStorage") ?? "UseDevelopmentStorage=true"));
 
-// --- Auth ---
+// ------------------------------------------------------- Auth ---------------------------------------------------------------
 var jwt = builder.Configuration.GetSection("Jwt");
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(o =>
@@ -66,7 +66,7 @@ builder.Services.AddCors(o => o.AddDefaultPolicy(p => p
     .WithOrigins(builder.Configuration.GetSection("Cors:Origins").Get<string[]>() ?? [])
     .AllowAnyHeader().AllowAnyMethod().AllowCredentials()));
 
-// --- Use-case services ---
+// ------------------------------------------------------ Use-case services -------------------------------------------------
 builder.Services.AddScoped<JwtTokenFactory>();
 builder.Services.AddScoped<AuditService>();
 builder.Services.AddScoped<NotificationService>();
