@@ -69,14 +69,13 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             await EnsureUserFreeAsync(userId, ev.EventDate, eventId);
 
             db.EventAttendees.Add(new EventAttendee { EventId = eventId, UserId = userId, Status = Invited });
-            var notification = await notify.QueueAsync(userId, "EventInvite",
+            await notify.QueueAsync(userId, "EventInvite",
                 $"You have been invited to \"{ev.Title}\" on {ev.EventDate:yyyy-MM-dd HH:mm} UTC.",
                 nameof(Event), eventId);
             audit.Record(actorId, "event.attendee.add", nameof(EventAttendee), eventId);
 
             await db.SaveChangesAsync();
             await notify.PushAsync(userId, "eventInvite", new { eventId, title = ev.Title });
-            _ = notification;
         }
 //----------------------------------------------------------------------------------------------------------------------//
         /// <summary>RSVP. Only the attendee changes their own answer.</summary>
