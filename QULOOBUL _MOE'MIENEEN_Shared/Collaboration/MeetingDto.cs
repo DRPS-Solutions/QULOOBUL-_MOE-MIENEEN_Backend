@@ -33,11 +33,22 @@ namespace QULOOBUL__MOE_MIENEEN_Shared.Collaboration
 
     public record CreateEventRequest
     {
-        [Required, MaxLength(200)] 
+        [Required, MaxLength(200)]
         public string Title { get; init; } = string.Empty;
-        [Required] 
+        [Required]
         public DateTime EventDate { get; init; }
         [MaxLength(200)]
         public string Location { get; init; } = string.Empty;
+    }
+
+    public record EventAttendeeDto(int UserId, string FullName, string Status);
+
+    public record AddEventAttendeeRequest { [Required] public int UserId { get; init; } }
+
+    /// <summary>RSVP against an event the caller is already on.</summary>
+    public record RespondToEventRequest
+    {
+        [Required, RegularExpression("Invited|Accepted|Declined")]
+        public string Status { get; init; } = "Accepted";
     }
 }

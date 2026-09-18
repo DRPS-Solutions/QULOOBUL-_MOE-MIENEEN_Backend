@@ -2,6 +2,7 @@
 using QULOOBUL__MOE_MIENEEN_Backend.Data;
 using QULOOBUL__MOE_MIENEEN_Backend.Models.Project;
 using QULOOBUL__MOE_MIENEEN_Shared.Directory;
+using static QULOOBUL__MOE_MIENEEN_Shared.Classes.Common;
 
 namespace QULOOBUL__MOE_MIENEEN_Backend.Services
 {
@@ -18,8 +19,9 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
                 db.ResourceRequests.Count(r => r.RequestedBy == u.UserId && r.Status == "Pending")))
                 .ToListAsync();
 //----------------------------------------------------------------------------------------------------------------------//
+        /// <summary>The seeded automation account is an implementation detail, not a colleague.</summary>
         public Task<List<UserSummaryDto>> StaffAsync() =>
-            db.Users.Select(u => new UserSummaryDto(
+            db.Users.Where(u => u.Email != SystemAccountEmail).Select(u => new UserSummaryDto(
                 u.UserId, u.FirstName + " " + u.Surname, u.Email, u.Role!.RoleName, u.IsActive)).ToListAsync();
     }
 }

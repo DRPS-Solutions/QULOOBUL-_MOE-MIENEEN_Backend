@@ -69,6 +69,22 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Data
                 db.SaveChanges();
             }
 
+            // The actor for clock-driven transitions in MaintenanceJobs. Every history and audit row
+            // needs a resolvable user FK, and an escalation has no human behind it. Inactive and with
+            // no usable password hash, so it can neither log in nor be assigned work.
+            if (!db.Users.Any(u => u.Email == SystemAccountEmail))
+            {
+                db.Users.Add(new User
+                {
+                    RoleId = db.Roles.Single(r => r.RoleName == Roles.Staff).RoleId,
+                    FirstName = "System",
+                    Surname = "Automation",
+                    Email = SystemAccountEmail,
+                    IsActive = false,
+                });
+                db.SaveChanges();
+            }
+
             // Every task needs a project; standalone daily tasks go in this one, owned by an admin.
             var adminId = db.Users.Where(u => u.Role!.RoleName == Roles.Admin)
                 .OrderBy(u => u.UserId).Select(u => (int?)u.UserId).FirstOrDefault();
