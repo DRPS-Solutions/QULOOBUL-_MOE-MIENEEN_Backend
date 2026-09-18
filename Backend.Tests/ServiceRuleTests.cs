@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using QULOOBUL__MOE_MIENEEN_Backend.Data;
 using QULOOBUL__MOE_MIENEEN_Backend.Models.IdentityAndAccess;
 using QULOOBUL__MOE_MIENEEN_Backend.Models.Request;
@@ -56,6 +57,31 @@ public class ServiceRuleTests
         Assert.Equal(2, await db.Notifications.CountAsync());
     }
 
+    // SD-04 validates before the SAS is handed out; once the client holds one the API is out of
+    // the loop, so an oversized or executable upload has to be refused here or not at all.
+    [Theory]
+    [InlineData("report.pdf", 1024, true)]
+    [InlineData("photo.JPG", 1024, true)]                       // extension match is case-insensitive
+    [InlineData("huge.pdf", 30L * 1024 * 1024, false)]          // over 25 MB
+    [InlineData("payload.exe", 1024, false)]                    // not a permitted type
+    [InlineData("noextension", 1024, false)]
+    [InlineData("empty.pdf", 0, false)]
+    public async Task Uploads_are_validated_before_a_SAS_is_issued(string fileName, long size, bool permitted)
+    {
+        using var db = NewDb();
+        var uploads = new FileUploadService(db, null!, new AuditService(db), new ConfigurationBuilder().Build());
+        var context = new FileUploadService.AttachmentContext();
+
+        var attempt = () => uploads.CreateUploadAsync(1, 1, fileName, "application/octet-stream", size, context);
+
+        if (permitted)
+            // A permitted file gets past validation and fails later, on the unknown category —
+            // which is the proof that validation let it through.
+            await Assert.ThrowsAsync<InvalidOperationException>(attempt);
+        else
+            await Assert.ThrowsAsync<ArgumentException>(attempt);
+    }
+//----------------------------------------------------------------------------------------------------------------------//
     private static AppDbContext NewDb() => new(new DbContextOptionsBuilder<AppDbContext>()
         .UseInMemoryDatabase(Guid.NewGuid().ToString()).Options);
 }
