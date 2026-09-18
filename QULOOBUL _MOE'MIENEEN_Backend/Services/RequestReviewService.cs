@@ -11,7 +11,8 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
     /// Each transition writes a Request_Status_History row, notifies the requester, records an
     /// audit row, and pushes a SignalR event — all in one Unit of Work.
     /// </summary>
-    public class RequestReviewService(AppDbContext db, AuditService audit, NotificationService notify)
+    public class RequestReviewService(
+        AppDbContext db, AuditService audit, NotificationService notify, EmailService email)
     {
         public const string ReviewPermission = "ReviewRequests";
 //----------------------------------------------------------------------------------------------------------------------//
@@ -98,13 +99,14 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
 
             var message = $"Your resource request #{requestId} was {target.ToLowerInvariant()}." +
                           (string.IsNullOrWhiteSpace(note) ? "" : $" Note: {note}");
-            await notify.QueueAsync(request.RequestedBy, "RequestReviewed", message,
+            var notification = await notify.QueueAsync(request.RequestedBy, "RequestReviewed", message,
                 nameof(ResourceRequest), requestId);
             audit.Record(reviewerId, approve ? "request.approve" : "request.decline",
                 nameof(ResourceRequest), requestId);
 
             await db.SaveChangesAsync();
             await notify.PushAsync(request.RequestedBy, "requestReviewed", new { requestId, status = target });
+            await email.SendAsync(notification, $"Your resource request was {target.ToLowerInvariant()}");
             return request;
         }
 //----------------------------------------------------------------------------------------------------------------------//
@@ -119,12 +121,13 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             Lifecycle.EnsureRequestMove(request.Status, "Completed");
             request.Status = "Completed";
             AddHistory(requestId, "Completed", actorId);
-            await notify.QueueAsync(request.RequestedBy, "RequestCompleted",
+            var notification = await notify.QueueAsync(request.RequestedBy, "RequestCompleted",
                 $"Your resource request #{requestId} has been fulfilled.", nameof(ResourceRequest), requestId);
             audit.Record(actorId, "request.complete", nameof(ResourceRequest), requestId);
 
             await db.SaveChangesAsync();
             await notify.PushAsync(request.RequestedBy, "requestReviewed", new { requestId, status = "Completed" });
+            await email.SendAsync(notification, "Your resource request was fulfilled");
             return request;
         }
 //----------------------------------------------------------------------------------------------------------------------//

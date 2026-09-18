@@ -12,7 +12,8 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
     /// happens only after the commit succeeds.
     /// Also owns the ProjectTask lifecycle guard (SM-01).
     /// </summary>
-    public class TaskAssignmentService(AppDbContext db, AuditService audit, NotificationService notify)
+    public class TaskAssignmentService(
+        AppDbContext db, AuditService audit, NotificationService notify, EmailService email)
     {
         /// <summary>
         /// Assign <paramref name="assigneeId"/> to <paramref name="taskId"/>. Tasks may be assigned
@@ -46,13 +47,14 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
                 task.Status.Equals(Lifecycle.TaskStart, StringComparison.OrdinalIgnoreCase))
                 MoveStatus(task, "In Progress", assignedById);
 
-            await notify.QueueAsync(assigneeId, "TaskAssigned",
+            var notification = await notify.QueueAsync(assigneeId, "TaskAssigned",
                 $"You have been assigned to task \"{task.Title}\".", nameof(ProjectTask), taskId);
             audit.Record(assignedById, "task.assign", nameof(TaskAssignment), taskId);
 
             await db.SaveChangesAsync(); // UoW commit: assignment + status + history + notification + audit
             await notify.PushAsync(assigneeId, "taskAssigned",
                 new { taskId, title = task.Title, assignment.AssignmentId });
+            await email.SendAsync(notification, "A task was assigned to you");
             await notify.BroadcastAsync("boardChanged", new { projectId = task.ProjectId });
 
             return assignment;
