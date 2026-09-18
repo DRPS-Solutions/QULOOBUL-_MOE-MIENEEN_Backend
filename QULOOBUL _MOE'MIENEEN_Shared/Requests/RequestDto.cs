@@ -8,7 +8,8 @@ namespace QULOOBUL__MOE_MIENEEN_Shared.Requests
     public record ResourceRequestDto(
     int RequestId, int RequestedBy, int CategoryId, string CategoryName,
     string Status, string Priority, DateTime DateSubmitted, int? ReviewedBy,
-    IReadOnlyList<RequestStatusHistoryDto> History);
+    IReadOnlyList<RequestStatusHistoryDto> History,
+    string? Detail);
 
     public record CreateResourceRequest
     {

@@ -2,10 +2,11 @@
 using QULOOBUL__MOE_MIENEEN_Backend.Data;
 using QULOOBUL__MOE_MIENEEN_Backend.Models.Project;
 using QULOOBUL__MOE_MIENEEN_Shared.Directory;
+using static QULOOBUL__MOE_MIENEEN_Shared.Classes.Common;
 
 namespace QULOOBUL__MOE_MIENEEN_Backend.Services
 {
-    /// <summary>UC-06 admin dashboard — read-only aggregate over staff, tasks, requests.</summary>
+    /// <summary>UC-06 admin dashboard - read-only aggregate over staff, tasks, requests.</summary>
     public class StaffOverviewService(AppDbContext db)
     {
         public Task<List<StaffOverviewRow>> RowsAsync() =>
@@ -17,9 +18,11 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
                 db.TaskAssignments.Count(a => a.UserId == u.UserId && a.Task!.Status != "Done" && a.Task.Deadline < DateTime.UtcNow),
                 db.ResourceRequests.Count(r => r.RequestedBy == u.UserId && r.Status == "Pending")))
                 .ToListAsync();
-
+//----------------------------------------------------------------------------------------------------------------------//
+        /// <summary>The seeded automation account is an implementation detail, not a colleague.</summary>
         public Task<List<UserSummaryDto>> StaffAsync() =>
-            db.Users.Select(u => new UserSummaryDto(
+            db.Users.Where(u => u.Email != SystemAccountEmail).Select(u => new UserSummaryDto(
                 u.UserId, u.FirstName + " " + u.Surname, u.Email, u.Role!.RoleName, u.IsActive)).ToListAsync();
     }
 }
+//---------------------------DDDDDDDDDDDoooooooooooooo END OF FILE DDDDDDDDDDDoooooooooooooo---------------------------//

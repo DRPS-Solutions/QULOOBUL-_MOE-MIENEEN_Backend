@@ -1,16 +1,173 @@
 ﻿@inherits LayoutComponentBase
-<div class="page">
-    <div class="sidebar">
-        <NavMenu />
-    </div>
+@using MudBlazor
+@implements IDisposable
+@inject AppDataService AppData
 
-    <main>
-        <div class="top-row px-4">
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
+<MudThemeProvider IsDarkMode="isDarkMode" Theme="_theme" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+@if (AppData.CurrentUser is null)
+{
+    <div class="page @(isDarkMode ? "dark-mode" : "")">
+        <div class="drps-login-wrap">
+            <button class="drps-login-theme-toggle"
+                    type="button"
+                    title="@(isDarkMode ? "Switch to light mode" : "Switch to dark mode")"
+                    @onclick="ToggleDarkMode">
+                <MudIcon Icon="@(isDarkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)" Size="Size.Small" />
+            </button>
+
+            <div class="drps-login-card">
+                <img src="images/logos/QULOOBUL MOE'MIENEEN Logo.png" alt="Company Logo" class="drps-login-logo" />
+                <MudText Typo="Typo.h5" Class="drps-login-title">QULOOBUL MOE'MIENEEN</MudText>
+                <MudText Typo="Typo.body2" Class="drps-login-subtitle">Sign in to continue</MudText>
+
+                <MudTextField @bind-Value="emailInput"
+                              Label="Email"
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense"
+                              InputType="InputType.Email"
+                              Immediate="true"
+                              @onkeydown="OnLoginKeyDown"
+                              Class="mt-4 mb-3" />
+
+                <MudTextField @bind-Value="passwordInput"
+                              Label="Password"
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense"
+                              InputType="InputType.Password"
+                              Immediate="true"
+                              @onkeydown="OnLoginKeyDown"
+                              Class="mb-2" />
+
+                @if (loginError is not null)
+                {
+                    <MudText Typo="Typo.caption" Color="Color.Error" Class="drps-login-hint">
+                        @loginError
+                    </MudText>
+                }
+
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           FullWidth="true"
+                           Class="mt-4"
+                           Disabled="@(!CanLogin)"
+                           OnClick="Login">
+                    @(loggingIn ? "Signing in..." : "Log In")
+                </MudButton>
+            </div>
         </div>
+    </div>
+}
+else
+{
+    <div class="page @(isDarkMode ? "dark-mode" : "") @(isVerticalNav ? "nav-vertical" : "")">
+        <header class="top-navbar">
+            <NavMenu IsDarkMode="isDarkMode"
+                     IsVerticalNav="isVerticalNav"
+                     OnToggleDarkMode="ToggleDarkMode"
+                     OnToggleNavOrientation="ToggleNavOrientation"
+                     CanSeeTasks="AppData.CanSeeTasks"
+                     CanSeeRequests="AppData.CanSeeRequests"
+                     CanSeeMeetings="AppData.CanSeeMeetings"
+                     CanSeeUserManagement="AppData.CanSeeUserManagement"
+                     CanSeeEvents="AppData.CanSeeEvents"
+                     OnLogout="Logout" />
+        </header>
 
-        <article class="content px-4">
-            @Body
-        </article>
-    </main>
+        <main>
+            <article class="content px-4">
+                @* Pages read the signed-in user from AppDataService. *@
+                @Body
+            </article>
+        </main>
+    </div>
+}
+
+<div id="blazor-error-ui" data-nosnippet>
+    An unhandled error has occurred.
+    <a href="." class="reload">Reload</a>
+    <span class="dismiss">🗙</span>
 </div>
+
+@code {
+    // Both settings live here since MainLayout wraps every page - it
+    // cascades IsDarkMode/IsVerticalNav down to NavMenu (for the toggle
+    // buttons) and applies matching classes to the outer .page element,
+    // which every page's own stylesheet keys its dark-mode overrides off.
+    private bool isDarkMode = false;
+    private bool isVerticalNav = false;
+
+    // Signed-in state lives in AppDataService (AppData.CurrentUser null =
+    // show the login screen instead of NavMenu + @Body). Tab visibility
+    // comes from AppData.CanSee*, the one place the role matrix lives.
+    private string emailInput = string.Empty;
+    private string passwordInput = string.Empty;
+    private string? loginError = null;
+    private bool loggingIn = false;
+
+    private bool CanLogin =>
+        !loggingIn && !string.IsNullOrWhiteSpace(emailInput) && !string.IsNullOrWhiteSpace(passwordInput);
+
+    private void ToggleDarkMode() => isDarkMode = !isDarkMode;
+
+    private void ToggleNavOrientation() => isVerticalNav = !isVerticalNav;
+
+    // UC-01: the API checks the credentials and returns a JWT.
+    private async Task Login()
+    {
+        if (!CanLogin) return;
+        loggingIn = true;
+        loginError = await AppData.LoginAsync(emailInput, passwordInput);
+        loggingIn = false;
+        if (loginError is null) passwordInput = string.Empty;
+    }
+
+    private async Task OnLoginKeyDown(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await Login();
+    }
+
+    private async Task Logout()
+    {
+        await AppData.LogoutAsync();
+        passwordInput = string.Empty;
+        loginError = null;
+    }
+
+    // Re-render when the session ends elsewhere (e.g. an expired token).
+    protected override void OnInitialized() => AppData.OnChange += StateHasChanged;
+
+    public void Dispose() => AppData.OnChange -= StateHasChanged;
+
+    // Drives MudThemeProvider so built-in MudBlazor components (buttons,
+    // dialogs, tables, inputs, snackbars) switch palette automatically
+    // alongside the custom DRPS-styled cards on each page.
+    private MudTheme _theme = new MudTheme
+    {
+        PaletteLight = new PaletteLight
+        {
+            Primary = "#3C7A63",
+            Secondary = "#2F5C4C",
+            Info = "#2A5CD1",
+            AppbarBackground = "#12271F",
+            Background = "#F5F3EC",
+            Surface = "#FFFFFF"
+        },
+        PaletteDark = new PaletteDark
+        {
+            Primary = "#6FA98C",
+            Secondary = "#3C7A63",
+            Info = "#5B84D6",
+            AppbarBackground = "#12271F",
+            Background = "#0B1B21",
+            Surface = "#1E362B",
+            DrawerBackground = "#0B1B21",
+            AppbarText = "#FFFFFF",
+            TextPrimary = "#E9F0EA",
+            TextSecondary = "#93A69A"
+        }
+    };
+}

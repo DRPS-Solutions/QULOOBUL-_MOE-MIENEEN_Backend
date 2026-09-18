@@ -22,11 +22,13 @@ builder.Services.AddDbContext<AppDbContext>(o => o
     .UseSeeding((db, _) => DbSeeder.Seed((AppDbContext)db, builder.Configuration)));
 
 builder.Services.AddSignalR();
+builder.Services.AddHttpClient();     // EmailService talks to the Resend REST API
 
+// UC-07 needs this: BlobStorageService cannot resolve without it. Locally it points at Azurite
+// ("UseDevelopmentStorage=true"); in production the connection string comes from Key Vault.
 builder.Services.AddSingleton(_ => new BlobServiceClient(
     builder.Configuration.GetConnectionString("BlobStorage") ?? "UseDevelopmentStorage=true"));
-
-// --- Auth ---
+// ------------------------------------------------------- Auth ---------------------------------------------------------------
 var jwt = builder.Configuration.GetSection("Jwt");
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(o =>
@@ -66,10 +68,12 @@ builder.Services.AddCors(o => o.AddDefaultPolicy(p => p
     .WithOrigins(builder.Configuration.GetSection("Cors:Origins").Get<string[]>() ?? [])
     .AllowAnyHeader().AllowAnyMethod().AllowCredentials()));
 
-// --- Use-case services ---
+// ------------------------------------------------------ Use-case services -------------------------------------------------
 builder.Services.AddScoped<JwtTokenFactory>();
 builder.Services.AddScoped<AuditService>();
+builder.Services.AddScoped<AccessGuard>();
 builder.Services.AddScoped<NotificationService>();
+builder.Services.AddScoped<EmailService>();
 builder.Services.AddScoped<BlobStorageService>();
 builder.Services.AddScoped<FileUploadService>();
 builder.Services.AddScoped<FileManagementService>    ();
@@ -82,6 +86,12 @@ builder.Services.AddScoped<ProjectService>();
 builder.Services.AddScoped<StaffOverviewService>();
 builder.Services.AddScoped<NotificationQueryService>();
 builder.Services.AddScoped<ReportingService>();
+builder.Services.AddScoped<UserService>();
+builder.Services.AddScoped<EventService>();
+
+// SM-02's 48-hour escalation, SM-01's deadline reminders, and Task_Schedule's recurring-task
+// generation: the transitions the doc drives from a clock rather than from a user action.
+builder.Services.AddHostedService<MaintenanceJobs>();
 
 var app = builder.Build();
 

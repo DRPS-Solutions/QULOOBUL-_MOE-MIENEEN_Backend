@@ -1,0 +1,500 @@
+@page "/requests"
+@using MudBlazor
+@implements IDisposable
+@inject IDialogService DialogService
+@inject AppDataService AppData
+
+<PageTitle>Resource Requests</PageTitle>
+
+@* =====================================================================
+   STYLE BLOCK
+   Same DRPS palette-as-CSS-variables approach as the other pages
+   (Tasks.razor, Events.razor, UserManagement.razor), scoped under
+   .drps-requests so it doesn't leak into MudBlazor's global theme.
+   ===================================================================== *@
+<style>
+    .drps-requests {
+        --drps-navy-900: #12271F;
+        --drps-navy-800: #1C3D32;
+        --drps-blue-600: #2F5C4C;
+        --drps-blue-500: #3C7A63;
+        --drps-blue-400: #6FA98C;
+        --drps-bg: #F5F3EC;
+        --drps-surface: #FFFFFF;
+        --drps-text-muted: #75806F;
+        --drps-tint-blue: #EAF2ED;
+        --drps-tint-amber: #F6EBD3;
+        --drps-tint-red: #FCEEF0;
+        --drps-tint-green: #E7F3EB;
+        --drps-border-soft: #E7E4D8;
+        --drps-empty: #B7B2A0;
+        --drps-shadow: rgba(11, 22, 38, 0.06);
+        background: var(--drps-bg);
+        min-height: 100%;
+        padding-bottom: 2rem;
+    }
+
+    .drps-requests-header {
+        background: linear-gradient(135deg, var(--drps-navy-900) 0%, var(--drps-blue-600) 100%);
+        border-radius: 16px;
+        padding: 20px 24px;
+        color: white;
+        margin-bottom: 20px;
+    }
+
+    .drps-requests-header .drps-subtitle {
+        color: rgba(255, 255, 255, 0.75);
+        font-size: 0.85rem;
+        margin-top: 4px;
+    }
+
+    .drps-card {
+        background: var(--drps-surface);
+        border-radius: 16px;
+        padding: 20px 24px;
+        box-shadow: 0 2px 10px var(--drps-shadow);
+    }
+
+    .drps-card-title {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-weight: 600;
+        color: var(--drps-navy-800);
+        margin-bottom: 16px;
+    }
+
+    /* --- Status filter chips above the request list --- */
+    .drps-filter-row {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-bottom: 16px;
+    }
+
+    .drps-filter-chip {
+        padding: 6px 14px;
+        border-radius: 999px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        cursor: pointer;
+        color: var(--drps-text-muted);
+        background: var(--drps-bg);
+        border: 1px solid var(--drps-border-soft);
+        transition: background 0.15s ease, color 0.15s ease;
+    }
+
+    .drps-filter-chip:hover {
+        background: var(--drps-tint-blue);
+    }
+
+    .drps-filter-chip.active {
+        background: var(--drps-blue-500);
+        border-color: var(--drps-blue-500);
+        color: white;
+    }
+
+    /* --- Individual request card --- */
+    .drps-request-item {
+        border: 1px solid var(--drps-border-soft);
+        border-radius: 12px;
+        padding: 14px 16px;
+        margin-bottom: 12px;
+    }
+
+    .drps-request-item:last-child {
+        margin-bottom: 0;
+    }
+
+    .drps-request-top {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+    }
+
+    .drps-request-title {
+        font-weight: 600;
+        color: var(--drps-navy-800);
+        font-size: 0.95rem;
+    }
+
+    .drps-request-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-top: 4px;
+        font-size: 0.76rem;
+        color: var(--drps-text-muted);
+    }
+
+    .drps-request-meta span {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    /* The request's detail text after its first line (quantity, link, notes). */
+    .drps-request-notes {
+        margin-top: 8px;
+        font-size: 0.82rem;
+        color: var(--drps-navy-800);
+        opacity: 0.85;
+        white-space: pre-line;
+    }
+
+    .drps-request-review {
+        margin-top: 8px;
+        font-size: 0.76rem;
+        color: var(--drps-text-muted);
+        font-style: italic;
+    }
+
+    .drps-status-chip {
+        flex-shrink: 0;
+        padding: 4px 10px;
+        border-radius: 999px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        white-space: nowrap;
+    }
+
+    .drps-status-chip.pending {
+        background: var(--drps-tint-amber);
+        color: #B9862E;
+    }
+
+    .drps-status-chip.approved,
+    .drps-status-chip.completed {
+        background: var(--drps-tint-green);
+        color: #2E9E5B;
+    }
+
+    .drps-status-chip.declined {
+        background: var(--drps-tint-red);
+        color: #E0435C;
+    }
+
+    .drps-request-actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 10px;
+    }
+
+    .drps-requests-empty {
+        color: var(--drps-empty);
+        font-size: 0.85rem;
+        text-align: center;
+        padding: 30px 0;
+    }
+
+    /* --- Dark mode overrides --- */
+    .page.dark-mode .drps-requests {
+        --drps-bg: #0B1B21;
+        --drps-surface: #1E362B;
+        --drps-text-muted: #93A69A;
+        --drps-navy-800: #E9F0EA;
+        --drps-tint-blue: rgba(60, 122, 99, 0.16);
+        --drps-tint-amber: rgba(185, 134, 46, 0.18);
+        --drps-tint-red: rgba(224, 67, 92, 0.16);
+        --drps-tint-green: rgba(46, 158, 91, 0.16);
+        --drps-border-soft: #2E4A3B;
+        --drps-empty: #4E5F52;
+        --drps-shadow: rgba(0, 0, 0, 0.35);
+    }
+</style>
+
+@* =====================================================================
+   MARKUP
+   Left column: submission form, open to every role that can see the page.
+   Right column: request list with a status filter. Reviewers (the
+   ReviewRequests permission) see everyone's requests plus Approve/Deny;
+   everyone else sees only their own - the API applies both rules.
+   ===================================================================== *@
+<div class="drps-requests">
+    <MudContainer MaxWidth="MaxWidth.Large" Class="pt-6">
+
+        <div class="drps-requests-header">
+            <MudText Typo="Typo.h6" Style="font-weight:600;">Resource Requests</MudText>
+            <div class="drps-subtitle">Request equipment, supplies, or maintenance - optionally tie it to an event or task.</div>
+        </div>
+
+        <MudGrid>
+            @* --- Left column: submission form --- *@
+            <MudItem xs="12" md="5">
+                <div class="drps-card">
+                    <div class="drps-card-title">
+                        <MudIcon Icon="@Icons.Material.Filled.AddBox" Size="Size.Small" />
+                        New Request
+                    </div>
+
+                    <MudTextField T="string" @bind-Value="newRequest.Title" Label="What do you need?" Variant="Variant.Outlined" Class="mb-3" />
+
+                    <MudSelect T="int?" Label="Category" Variant="Variant.Outlined" @bind-Value="newRequest.CategoryId"
+                               ToStringFunc="@(id => categories.FirstOrDefault(c => c.CategoryId == id)?.CategoryName)" Class="mb-3">
+                        @foreach (var category in categories)
+                        {
+                            <MudSelectItem T="int?" Value="@category.CategoryId">@category.CategoryName</MudSelectItem>
+                        }
+                    </MudSelect>
+
+                    <MudTextField T="string" @bind-Value="newRequest.Amount" Label="Quantity / Amount (optional)" Placeholder="e.g. 2 laptops, R 5,000" Variant="Variant.Outlined" Class="mb-3" />
+
+                    @* Linking to an Event or Task is optional - "None" is
+                       the default and skips the second dropdown entirely. *@
+                    <MudSelect T="string" Label="Link to (optional)" Variant="Variant.Outlined" @bind-Value="newRequest.LinkType" Class="mb-3">
+                        <MudSelectItem T="string" Value="@("None")">Not linked</MudSelectItem>
+                        <MudSelectItem T="string" Value="@("Event")">An event</MudSelectItem>
+                        <MudSelectItem T="string" Value="@("Task")">A task</MudSelectItem>
+                    </MudSelect>
+
+                    @if (newRequest.LinkType == "Event")
+                    {
+                        <MudSelect T="int?" Label="Which event?" Variant="Variant.Outlined" @bind-Value="newRequest.LinkedId"
+                                   ToStringFunc="@(id => AppData.ProjectName(id))" Class="mb-3">
+                            @foreach (var project in AppData.EventProjects)
+                            {
+                                <MudSelectItem T="int?" Value="@project.ProjectId">@project.ProjectName</MudSelectItem>
+                            }
+                        </MudSelect>
+                    }
+                    else if (newRequest.LinkType == "Task")
+                    {
+                        <MudSelect T="int?" Label="Which task? (next two weeks)" Variant="Variant.Outlined" @bind-Value="newRequest.LinkedId"
+                                   ToStringFunc="@(id => AppData.Tasks.FirstOrDefault(t => t.TaskId == id)?.Title)" Class="mb-3">
+                            @foreach (var task in AppData.Tasks)
+                            {
+                                <MudSelectItem T="int?" Value="@task.TaskId">@task.Title</MudSelectItem>
+                            }
+                        </MudSelect>
+                    }
+
+                    <MudTextField T="string" @bind-Value="newRequest.Notes" Label="Justification / notes" Variant="Variant.Outlined" Lines="3" Class="mb-4" />
+
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" Disabled="@(!CanSubmit)" OnClick="SubmitRequest">
+                        @(submitting ? "Submitting..." : "Submit Request")
+                    </MudButton>
+                </div>
+            </MudItem>
+
+            @* --- Right column: request list --- *@
+            <MudItem xs="12" md="7">
+                <div class="drps-card">
+                    <div class="drps-card-title">
+                        <MudIcon Icon="@Icons.Material.Filled.Inbox" Size="Size.Small" />
+                        @(CanReview ? "All Requests" : "My Requests")
+                    </div>
+
+                    @* Status filter - "All" plus one chip per SM-02 status. *@
+                    <div class="drps-filter-row">
+                        <div class="drps-filter-chip @(activeFilter is null ? "active" : "")" @onclick="() => activeFilter = null">
+                            All (@AppData.Requests.Count)
+                        </div>
+                        @foreach (var status in Statuses)
+                        {
+                            <div class="drps-filter-chip @(activeFilter == status ? "active" : "")" @onclick="() => activeFilter = status">
+                                @status (@AppData.Requests.Count(r => r.Status == status))
+                            </div>
+                        }
+                    </div>
+
+                    @if (!FilteredRequests.Any())
+                    {
+                        <div class="drps-requests-empty">No requests here yet.</div>
+                    }
+                    else
+                    {
+                        @foreach (var req in FilteredRequests)
+                        {
+                            var (title, notes) = SplitDetail(req);
+                            <div class="drps-request-item">
+                                <div class="drps-request-top">
+                                    <div>
+                                        <div class="drps-request-title">@title</div>
+                                        <div class="drps-request-meta">
+                                            <span><MudIcon Icon="@GetCategoryIcon(req.CategoryName)" Size="Size.Small" /> @req.CategoryName</span>
+                                            <span><MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Small" /> @AppData.UserName(req.RequestedBy)</span>
+                                            <span><MudIcon Icon="@Icons.Material.Filled.Schedule" Size="Size.Small" /> @AppDataService.Local(req.DateSubmitted).ToString("d MMM, h:mm tt")</span>
+                                        </div>
+                                    </div>
+                                    <div class="drps-status-chip @req.Status.ToLower()">@req.Status</div>
+                                </div>
+
+                                @if (!string.IsNullOrWhiteSpace(notes))
+                                {
+                                    <div class="drps-request-notes">@notes</div>
+                                }
+
+                                @* Once reviewed, show who by and when - visible to everyone. *@
+                                @if (req.Status != "Pending" && req.ReviewedBy is not null)
+                                {
+                                    <div class="drps-request-review">
+                                        @req.Status by @AppData.UserName(req.ReviewedBy)@ReviewedOn(req)
+                                    </div>
+                                }
+
+                                @* Approve/Deny only render for reviewers, only while still
+                                   Pending, and never on their own request (the API refuses
+                                   self-review). *@
+                                @if (CanReview && req.Status == "Pending" && req.RequestedBy != AppData.CurrentUser?.UserId)
+                                {
+                                    <div class="drps-request-actions">
+                                        <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Success" OnClick="@(() => Review(req, true, null))">
+                                            Approve
+                                        </MudButton>
+                                        <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Error" OnClick="@(() => DenyRequest(req, title))">
+                                            Deny
+                                        </MudButton>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    }
+                </div>
+            </MudItem>
+        </MudGrid>
+
+    </MudContainer>
+</div>
+
+@* =====================================================================
+   CODE-BEHIND
+   ===================================================================== *@
+@code {
+    // The API decides who may review (and re-checks on every review);
+    // this only decides whether to show the buttons.
+    private bool CanReview => AppData.HasPermission(Permissions.ReviewRequests);
+
+    // SM-02 statuses, in lifecycle order.
+    private static readonly string[] Statuses = ["Pending", "Approved", "Declined", "Completed"];
+
+    private IReadOnlyList<RequestCategoryDto> categories = [];
+
+    // --- Submission form state ---
+    private RequestFormModel newRequest = new();
+    private bool submitting;
+
+    private bool CanSubmit =>
+        !submitting &&
+        !string.IsNullOrWhiteSpace(newRequest.Title) &&
+        newRequest.CategoryId.HasValue &&
+        (newRequest.LinkType == "None" || newRequest.LinkedId.HasValue);
+
+    private async Task SubmitRequest()
+    {
+        if (!CanSubmit) return;
+
+        var linkedName = newRequest.LinkType switch
+        {
+            "Event" => AppData.ProjectName(newRequest.LinkedId),
+            "Task" => AppData.Tasks.FirstOrDefault(t => t.TaskId == newRequest.LinkedId)?.Title,
+            _ => null
+        };
+
+        // A request stores one Detail text; its first line is the title.
+        var detail = string.Join("\n", new[]
+        {
+            newRequest.Title.Trim(),
+            string.IsNullOrWhiteSpace(newRequest.Amount) ? null : $"Quantity: {newRequest.Amount.Trim()}",
+            linkedName is null ? null : $"For {newRequest.LinkType.ToLower()}: {linkedName}",
+            newRequest.Notes?.Trim(),
+        }.Where(line => !string.IsNullOrWhiteSpace(line)));
+
+        submitting = true;
+        var id = await AppData.SendAsync<int?>(HttpMethod.Post, "api/requests",
+            new CreateResourceRequest { CategoryId = newRequest.CategoryId!.Value, Detail = detail });
+        submitting = false;
+        if (id is null) return;
+
+        await AppData.RefreshRequestsAsync();
+        // Keep the category, since people often submit a few similar requests in a row.
+        newRequest = new RequestFormModel { CategoryId = newRequest.CategoryId };
+    }
+
+    // --- Status filter above the list. Null means "All". ---
+    private string? activeFilter = null;
+
+    private IEnumerable<ResourceRequestDto> FilteredRequests =>
+        activeFilter is null ? AppData.Requests : AppData.Requests.Where(r => r.Status == activeFilter);
+
+    private static (string Title, string? Notes) SplitDetail(ResourceRequestDto req)
+    {
+        var parts = (req.Detail ?? req.CategoryName).Split('\n', 2);
+        return (parts[0], parts.Length > 1 ? parts[1] : null);
+    }
+
+    // The latest history row is the review (or completion) itself.
+    private static string ReviewedOn(ResourceRequestDto req) =>
+        req.History.LastOrDefault(x => x.NewStatus == req.Status) is { } review
+            ? $" on {AppDataService.Local(review.TimeCreated):d MMM}"
+            : "";
+
+    // --- Review actions (UC-05). The API notifies the requester. ---
+    private async Task Review(ResourceRequestDto req, bool approve, string? note)
+    {
+        if (await AppData.SendAsync(HttpMethod.Post, $"api/requests/{req.RequestId}/review",
+                new ReviewRequestRequest { Approve = approve, Note = note }))
+            await AppData.RefreshRequestsAsync();
+    }
+
+    // Deny opens DenyRequestDialog so the reviewer can optionally leave
+    // a reason; it goes into the requester's notification. Cancelling
+    // the dialog leaves the request Pending.
+    private async Task DenyRequest(ResourceRequestDto req, string title)
+    {
+        var parameters = new DialogParameters<DenyRequestDialog>
+        {
+            { x => x.RequestTitle, title }
+        };
+        var options = new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true, CloseOnEscapeKey = true };
+
+        var dialog = await DialogService.ShowAsync<DenyRequestDialog>("Deny request", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+        {
+            var reason = result.Data as string;
+            await Review(req, false, string.IsNullOrWhiteSpace(reason) ? null : reason.Trim());
+        }
+    }
+
+    // Maps a request category to a MudBlazor icon.
+    private static string GetCategoryIcon(string category) => category switch
+    {
+        "Maintenance" => Icons.Material.Filled.Handyman,
+        "Equipment" => Icons.Material.Filled.Build,
+        _ => Icons.Material.Filled.Inventory2
+    };
+
+    // Lightweight model bound to the submission form on the left, kept
+    // separate so a half-filled form never touches the request list.
+    // LinkType stays a string ("None"/"Event"/"Task") to drive which
+    // dropdown renders; LinkedId is the chosen project's or task's id.
+    private class RequestFormModel
+    {
+        public string Title { get; set; } = string.Empty;
+        public int? CategoryId { get; set; }
+        public string? Amount { get; set; }
+        public string? Notes { get; set; }
+        public string LinkType { get; set; } = "None";
+        public int? LinkedId { get; set; }
+    }
+
+    // Re-render when requests refresh - including SignalR pushes when a
+    // request is submitted or reviewed elsewhere.
+    protected override async Task OnInitializedAsync()
+    {
+        AppData.OnChange += StateHasChanged;
+        var categoriesLoad = AppData.GetAsync<List<RequestCategoryDto>>("api/requests/categories");
+        await Task.WhenAll(categoriesLoad, AppData.RefreshRequestsAsync(),
+            AppData.LoadTasksAsync(DateTime.Today, DateTime.Today.AddDays(14)));
+        categories = await categoriesLoad ?? [];
+    }
+
+    public void Dispose()
+    {
+        AppData.OnChange -= StateHasChanged;
+    }
+}

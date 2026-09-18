@@ -6,8 +6,29 @@ using QULOOBUL__MOE_MIENEEN_Shared.Collaboration;
 namespace QULOOBUL__MOE_MIENEEN_Backend.Services
 {
     /// <summary>UC-03: create meetings, record/approve minutes. Author + date are set server-side.</summary>
-    public class MeetingMinutesService(AppDbContext db, AuditService audit)
+    public class MeetingMinutesService(AppDbContext db, AuditService audit, AccessGuard guard)
     {
+        /// <summary>
+        /// The caller's meetings, newest first, with the latest minutes (edits append a new record).
+        /// Organised-by or invited-to only, per the anti-IDOR NFR; an admin sees all of them.
+        /// </summary>
+        public async Task<List<MeetingDto>> ListAsync(int userId)
+        {
+            var q = db.Meetings.AsQueryable();
+            if (!await guard.IsAdminAsync(userId))
+                q = q.Where(m => m.OrganiserId == userId
+                              || db.MeetingAttendees.Any(a => a.MeetingId == m.MeetingId && a.UserId == userId));
+
+            return await q.OrderByDescending(m => m.MeetingDate).Select(m => new MeetingDto(
+                m.MeetingId, m.OrganiserId, m.Title, m.MeetingDate,
+                db.MeetingAttendees.Where(a => a.MeetingId == m.MeetingId).Select(a => a.UserId).ToList(),
+                db.MeetingMinutes.Where(x => x.MeetingId == m.MeetingId).OrderByDescending(x => x.MinutesId)
+                    .Select(x => new MeetingMinutesDto(
+                        x.MinutesId, x.MeetingId, x.RecordedBy, x.TimeRecorded, x.MinutesText, x.IsAiDraft, x.ApprovedBy))
+                    .FirstOrDefault()))
+                .ToListAsync();
+        }
+//----------------------------------------------------------------------------------------------------------------------//
         public async Task<int> CreateMeetingAsync(CreateMeetingRequest req, int organiserId)
         {
             var meeting = new Meeting { OrganiserId = organiserId, Title = req.Title, MeetingDate = req.MeetingDate };
@@ -21,11 +42,10 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             await db.SaveChangesAsync();
             return meeting.MeetingId;
         }
-
+//----------------------------------------------------------------------------------------------------------------------//
         public async Task<MeetingMinutesDto> RecordAsync(int meetingId, RecordMinutesRequest req, int recordedBy)
         {
-            if (!await db.Meetings.AnyAsync(m => m.MeetingId == meetingId))
-                throw new KeyNotFoundException($"Meeting {meetingId} not found.");
+            await guard.EnsureMeetingAsync(recordedBy, meetingId);
 
             var minutes = new MeetingMinutes
             {
@@ -40,7 +60,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             await db.SaveChangesAsync();
             return Map(minutes);
         }
-
+//----------------------------------------------------------------------------------------------------------------------//
         public async Task<MeetingMinutesDto> ApproveAsync(int minutesId, int approverId)
         {
             var minutes = await db.MeetingMinutes.FindAsync(minutesId)
@@ -51,15 +71,16 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             await db.SaveChangesAsync();
             return Map(minutes);
         }
-
+//----------------------------------------------------------------------------------------------------------------------//
         public Task<List<MeetingMinutesDto>> SearchAsync(string? keyword, DateTime? from, DateTime? to) =>
             db.MeetingMinutes
                 .Where(m => (keyword == null || m.MinutesText.Contains(keyword))
                          && (from == null || m.TimeRecorded >= from)
                          && (to == null || m.TimeRecorded <= to))
                 .Select(m => Map(m)).ToListAsync();
-
+//----------------------------------------------------------------------------------------------------------------------//
         private static MeetingMinutesDto Map(MeetingMinutes m) => new(
             m.MinutesId, m.MeetingId, m.RecordedBy, m.TimeRecorded, m.MinutesText, m.IsAiDraft, m.ApprovedBy);
     }
 }
+//---------------------------DDDDDDDDDDDoooooooooooooo END OF FILE DDDDDDDDDDDoooooooooooooo---------------------------//

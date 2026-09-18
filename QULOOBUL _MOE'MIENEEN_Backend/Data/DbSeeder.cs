@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Identity;
 using QULOOBUL__MOE_MIENEEN_Backend.Models.File;
 using QULOOBUL__MOE_MIENEEN_Backend.Models.IdentityAndAccess;
+using QULOOBUL__MOE_MIENEEN_Backend.Models.Project;
 using QULOOBUL__MOE_MIENEEN_Backend.Models.Request;
 using static QULOOBUL__MOE_MIENEEN_Shared.Classes.Common;
 
@@ -54,19 +55,50 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Data
             // The first admin comes from config (user-secrets locally, pipeline secrets in CD), never from code.
             var email = config["Seed:AdminEmail"];
             var password = config["Seed:AdminPassword"];
-            if (db.Users.Any() || string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
-                return;
-
-            var admin = new User
+            if (!db.Users.Any() && !string.IsNullOrWhiteSpace(email) && !string.IsNullOrWhiteSpace(password))
             {
-                RoleId = db.Roles.Single(r => r.RoleName == Roles.Admin).RoleId,
-                FirstName = "System",
-                Surname = "Admin",
-                Email = email,
-            };
-            admin.PasswordHash = new PasswordHasher<User>().HashPassword(admin, password);
-            db.Users.Add(admin);
-            db.SaveChanges();
+                var admin = new User
+                {
+                    RoleId = db.Roles.Single(r => r.RoleName == Roles.Admin).RoleId,
+                    FirstName = "System",
+                    Surname = "Admin",
+                    Email = email,
+                };
+                admin.PasswordHash = new PasswordHasher<User>().HashPassword(admin, password);
+                db.Users.Add(admin);
+                db.SaveChanges();
+            }
+
+            // The actor for clock-driven transitions in MaintenanceJobs. Every history and audit row
+            // needs a resolvable user FK, and an escalation has no human behind it. Inactive and with
+            // no usable password hash, so it can neither log in nor be assigned work.
+            if (!db.Users.Any(u => u.Email == SystemAccountEmail))
+            {
+                db.Users.Add(new User
+                {
+                    RoleId = db.Roles.Single(r => r.RoleName == Roles.Staff).RoleId,
+                    FirstName = "System",
+                    Surname = "Automation",
+                    Email = SystemAccountEmail,
+                    IsActive = false,
+                });
+                db.SaveChanges();
+            }
+
+            // Every task needs a project; standalone daily tasks go in this one, owned by an admin.
+            var adminId = db.Users.Where(u => u.Role!.RoleName == Roles.Admin)
+                .OrderBy(u => u.UserId).Select(u => (int?)u.UserId).FirstOrDefault();
+            if (adminId is not null && !db.Projects.Any(p => p.ProjectName == DailyTasksProject))
+            {
+                db.Projects.Add(new Project
+                {
+                    OwnerId = adminId.Value,
+                    ProjectName = DailyTasksProject,
+                    Status = "Active",
+                    Description = "Standalone day-to-day tasks not tied to an event or project.",
+                });
+                db.SaveChanges();
+            }
         }
     }
 }

@@ -12,7 +12,8 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
     /// happens only after the commit succeeds.
     /// Also owns the ProjectTask lifecycle guard (SM-01).
     /// </summary>
-    public class TaskAssignmentService(AppDbContext db, AuditService audit, NotificationService notify)
+    public class TaskAssignmentService(
+        AppDbContext db, AuditService audit, NotificationService notify, EmailService email)
     {
         /// <summary>
         /// Assign <paramref name="assigneeId"/> to <paramref name="taskId"/>. Tasks may be assigned
@@ -46,17 +47,38 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
                 task.Status.Equals(Lifecycle.TaskStart, StringComparison.OrdinalIgnoreCase))
                 MoveStatus(task, "In Progress", assignedById);
 
-            await notify.QueueAsync(assigneeId, "TaskAssigned",
+            var notification = await notify.QueueAsync(assigneeId, "TaskAssigned",
                 $"You have been assigned to task \"{task.Title}\".", nameof(ProjectTask), taskId);
             audit.Record(assignedById, "task.assign", nameof(TaskAssignment), taskId);
 
             await db.SaveChangesAsync(); // UoW commit: assignment + status + history + notification + audit
             await notify.PushAsync(assigneeId, "taskAssigned",
                 new { taskId, title = task.Title, assignment.AssignmentId });
+            await email.SendAsync(notification, "A task was assigned to you");
+            await notify.BroadcastAsync("boardChanged", new { projectId = task.ProjectId });
 
             return assignment;
         }
+//----------------------------------------------------------------------------------------------------------------------//
+        /// <summary>UC-04 reassign: take <paramref name="userId"/> off a task. Same hierarchy rule as
+        /// assigning: nobody removes someone more senior than themselves.</summary>
+        public async Task UnassignAsync(int taskId, int userId, int actorId)
+        {
+            var assignment = await db.TaskAssignments.Include(a => a.User).Include(a => a.Task)
+                .FirstOrDefaultAsync(a => a.TaskId == taskId && a.UserId == userId)
+                ?? throw new KeyNotFoundException("That user is not assigned to this task.");
+            var actor = await db.Users.FindAsync(actorId)
+                ?? throw new KeyNotFoundException($"User {actorId} not found.");
 
+            if (await LevelOf(actor.RoleId) > await LevelOf(assignment.User!.RoleId))
+                throw new InvalidOperationException("You may not unassign someone higher in the hierarchy.");
+
+            db.TaskAssignments.Remove(assignment);
+            audit.Record(actorId, "task.unassign", nameof(TaskAssignment), taskId);
+            await db.SaveChangesAsync();
+            await notify.BroadcastAsync("boardChanged", new { projectId = assignment.Task!.ProjectId });
+        }
+//----------------------------------------------------------------------------------------------------------------------//
         /// <summary>SM-01 guarded status change, callable directly by a task-board move.</summary>
         public async Task ChangeStatusAsync(int taskId, string newStatus, int changedById)
         {
@@ -66,7 +88,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             audit.Record(changedById, "task.status", nameof(ProjectTask), taskId);
             await db.SaveChangesAsync();
         }
-
+//----------------------------------------------------------------------------------------------------------------------//
         private void MoveStatus(ProjectTask task, string newStatus, int changedById)
         {
             if (string.Equals(task.Status, newStatus, StringComparison.OrdinalIgnoreCase))
@@ -90,7 +112,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
                 TimeCreated = DateTime.UtcNow,
             });
         }
-
+//----------------------------------------------------------------------------------------------------------------------//
         private async Task<int> LevelOf(int roleId)
         {
             var role = await db.Roles.FindAsync(roleId)

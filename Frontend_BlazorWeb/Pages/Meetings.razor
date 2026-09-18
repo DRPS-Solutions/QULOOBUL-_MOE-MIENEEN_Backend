@@ -1,0 +1,419 @@
+@page "/meetings"
+@using MudBlazor
+@inject AppDataService AppData
+
+<PageTitle>Meeting Minutes</PageTitle>
+
+<style>
+    .drps-meeting {
+        --drps-navy-900: #12271F;
+        --drps-navy-800: #1C3D32;
+        --drps-blue-600: #2F5C4C;
+        --drps-blue-500: #3C7A63;
+        --drps-blue-400: #6FA98C;
+        --drps-bg: #F5F3EC;
+        --drps-surface: #FFFFFF;
+        --drps-text-muted: #75806F;
+        --drps-tint-blue: #EAF2ED;
+        --drps-tint-amber: #F6EBD3;
+        --drps-border-soft: #E7E4D8;
+        --drps-outline: #DAD3BE;
+        --drps-empty: #B7B2A0;
+        --drps-shadow: rgba(11, 22, 38, 0.06);
+        background: var(--drps-bg);
+        min-height: 100%;
+        padding-bottom: 2rem;
+    }
+
+    .drps-meeting-header {
+        background: linear-gradient(135deg, var(--drps-navy-900) 0%, var(--drps-blue-600) 100%);
+        border-radius: 16px;
+        padding: 20px 24px;
+        color: white;
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        flex-wrap: wrap;
+    }
+
+    .drps-meeting-title-field .mud-input-outlined-border {
+        border-color: rgba(255, 255, 255, 0.35) !important;
+    }
+
+    .drps-meeting-title-field .mud-input-slot,
+    .drps-meeting-title-field input {
+        color: white !important;
+    }
+
+    .drps-meeting-title-field .mud-input-label {
+        color: rgba(255, 255, 255, 0.7) !important;
+    }
+
+    .drps-header-actions {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        flex-shrink: 0;
+    }
+
+    .drps-card {
+        background: var(--drps-surface);
+        border-radius: 16px;
+        padding: 20px;
+        box-shadow: 0 2px 10px var(--drps-shadow);
+        height: 100%;
+    }
+
+    /* Meeting list rows open the minutes view on click. */
+    .drps-meeting-row {
+        cursor: pointer;
+    }
+
+    .drps-card-title {
+        font-weight: 600;
+        color: var(--drps-navy-800);
+        margin-bottom: 12px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .drps-note-add-row {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 12px;
+    }
+
+    .drps-note-type-toggle {
+        display: flex;
+        gap: 6px;
+        margin-bottom: 10px;
+    }
+
+    .drps-note-type-btn {
+        border: 1px solid var(--drps-outline);
+        background: var(--drps-surface);
+        color: var(--drps-text-muted);
+        border-radius: 999px;
+        padding: 4px 12px;
+        font-size: 0.72rem;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+
+    .drps-note-type-btn.selected {
+        background: var(--drps-blue-500);
+        border-color: var(--drps-blue-500);
+        color: white;
+    }
+
+    .drps-note-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        max-height: 420px;
+        overflow-y: auto;
+    }
+
+    .drps-note-item {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 8px 10px;
+        border-radius: 8px;
+        border-left: 3px solid var(--drps-blue-500);
+        background: var(--drps-tint-blue);
+    }
+
+    .drps-note-item.action {
+        border-left-color: #B9862E;
+        background: var(--drps-tint-amber);
+    }
+
+    .drps-note-item-text {
+        font-size: 0.83rem;
+        color: var(--drps-navy-800);
+    }
+
+    .drps-note-item-meta {
+        font-size: 0.68rem;
+        color: var(--drps-text-muted);
+        margin-top: 2px;
+    }
+
+    .drps-note-empty {
+        color: var(--drps-empty);
+        font-size: 0.8rem;
+        text-align: center;
+        padding: 24px 0;
+    }
+
+    /* --- Dark mode overrides, applied when MainLayout's toggle sets
+       .dark-mode on the outer .page element --- */
+    .page.dark-mode .drps-meeting {
+        --drps-bg: #0B1B21;
+        --drps-surface: #1E362B;
+        --drps-text-muted: #93A69A;
+        --drps-navy-800: #E9F0EA;
+        --drps-tint-blue: rgba(60, 122, 99, 0.16);
+        --drps-tint-amber: rgba(185, 134, 46, 0.18);
+        --drps-border-soft: #2E4A3B;
+        --drps-outline: #2C4436;
+        --drps-empty: #4E5F52;
+        --drps-shadow: rgba(0, 0, 0, 0.35);
+    }
+</style>
+
+<div class="drps-meeting">
+    <MudContainer MaxWidth="MaxWidth.Large" Class="pt-6">
+
+        @if (active is null)
+        {
+            @* --- MEETINGS LIST VIEW --- *@
+            <div class="drps-meeting-header">
+                <MudText Typo="Typo.h6" Style="font-weight:600;">Meeting Minutes</MudText>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="StartNewMeeting">
+                    New Meeting
+                </MudButton>
+            </div>
+
+            <div class="drps-card">
+                <MudTable T="MeetingDto" Items="meetings" Hover="true" Striped="false" Elevation="0" Loading="loading"
+                          RowClass="drps-meeting-row" OnRowClick="@((TableRowClickEventArgs<MeetingDto> e) => { if (e.Item is not null) OpenExistingMeeting(e.Item); })">
+                    <HeaderContent>
+                        <MudTh>Topic / Title</MudTh>
+                        <MudTh>Date</MudTh>
+                        <MudTh>Organizer</MudTh>
+                        <MudTh>Minutes</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Topic"><b>@context.Title</b></MudTd>
+                        <MudTd DataLabel="Date">@context.MeetingDate.ToString("dd MMM yyyy")</MudTd>
+                        <MudTd DataLabel="Organizer">@AppData.UserName(context.OrganiserId)</MudTd>
+                        <MudTd DataLabel="Minutes">@(context.Minutes is null ? "Not recorded" : "Recorded")</MudTd>
+                    </RowTemplate>
+                    <NoRecordsContent>
+                        <MudText Typo="Typo.body2">No meetings recorded yet.</MudText>
+                    </NoRecordsContent>
+                </MudTable>
+            </div>
+        }
+        else
+        {
+            @* --- MINUTES SCREEN: a new meeting, or one opened from the list --- *@
+            <div class="drps-meeting-header">
+                <div class="d-flex align-center gap-3">
+                    <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" Color="Color.Surface" OnClick="BackToList" />
+                    @* A meeting's title is fixed once it exists (the API has no rename). *@
+                    <MudTextField T="string"
+                                  @bind-Value="active.Title"
+                                  Placeholder="Untitled meeting"
+                                  Variant="Variant.Outlined"
+                                  Class="drps-meeting-title-field"
+                                  Style="max-width:320px;"
+                                  MaxLength="200"
+                                  ReadOnly="@(active.MeetingId is not null)"
+                                  Label="Meeting title" />
+                </div>
+
+                <div class="drps-header-actions">
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Success"
+                               StartIcon="@Icons.Material.Filled.Check"
+                               Disabled="@(!CanSave)"
+                               OnClick="SaveMeeting">
+                        @(saving ? "Saving..." : active.MeetingId is null ? "Finish Meeting" : "Save Minutes")
+                    </MudButton>
+                </div>
+            </div>
+
+            <MudGrid>
+                <MudItem xs="12" md="7">
+                    <div class="drps-card">
+                        <div class="drps-card-title">
+                            <MudIcon Icon="@Icons.Material.Filled.Description" Size="Size.Small" />
+                            Meeting Minutes
+                        </div>
+                        <MudTextField T="string"
+                                      @bind-Value="active.MinutesText"
+                                      Placeholder="Type meeting minutes here as the discussion happens..."
+                                      Variant="Variant.Outlined"
+                                      Lines="16"
+                                      FullWidth="true" />
+                    </div>
+                </MudItem>
+
+                <MudItem xs="12" md="5">
+                    <div class="drps-card">
+                        <div class="drps-card-title">
+                            <MudIcon Icon="@Icons.Material.Filled.PlaylistAddCheck" Size="Size.Small" />
+                            Notes &amp; Action Items
+                        </div>
+
+                        <div class="drps-note-type-toggle">
+                            <span class="drps-note-type-btn @(!addingActionItem ? "selected" : "")" @onclick="() => addingActionItem = false">Note</span>
+                            <span class="drps-note-type-btn @(addingActionItem ? "selected" : "")" @onclick="() => addingActionItem = true">Action Item</span>
+                        </div>
+
+                        <div class="drps-note-add-row">
+                            <MudTextField T="string"
+                                          @bind-Value="noteInput"
+                                          Placeholder="Add a note or action item..."
+                                          Variant="Variant.Outlined"
+                                          FullWidth="true"
+                                          Immediate="true"
+                                          OnKeyUp="HandleNoteKeyUp" />
+                            <MudIconButton Icon="@Icons.Material.Filled.Add"
+                                           Color="Color.Primary"
+                                           Variant="Variant.Filled"
+                                           OnClick="AddNote" />
+                        </div>
+
+                        <div class="drps-note-list">
+                            @if (!notes.Any())
+                            {
+                                <div class="drps-note-empty">Nothing captured yet - notes are added to the minutes when you save.</div>
+                            }
+                            else
+                            {
+                                @foreach (var note in notes)
+                                {
+                                    <div class="drps-note-item @(note.IsActionItem ? "action" : "")">
+                                        <div>
+                                            <div class="drps-note-item-text">@note.Text</div>
+                                            <div class="drps-note-item-meta">@(note.IsActionItem ? "Action item" : "Note")</div>
+                                        </div>
+                                        <MudIconButton Icon="@Icons.Material.Filled.Close"
+                                                       Size="Size.Small"
+                                                       OnClick="() => notes.Remove(note)" />
+                                    </div>
+                                }
+                            }
+                        </div>
+                    </div>
+                </MudItem>
+            </MudGrid>
+        }
+
+    </MudContainer>
+</div>
+
+@code {
+    private IReadOnlyList<MeetingDto> meetings = [];
+    private bool loading = true;
+
+    // The meeting open on the minutes screen; null shows the list.
+    private MeetingForm? active;
+    private string originalMinutes = string.Empty;
+    private readonly List<MeetingNote> notes = [];
+    private string noteInput = string.Empty;
+    private bool addingActionItem = false;
+    private bool saving;
+
+    // A new meeting can always be finished; an existing one only once its
+    // minutes have changed.
+    private bool CanSave => active is not null && !saving &&
+        (active.MeetingId is null || (ComposedMinutes() is { Length: > 0 } minutes && minutes != originalMinutes));
+
+    protected override Task OnInitializedAsync() => LoadMeetings();
+
+    private async Task LoadMeetings()
+    {
+        loading = true;
+        meetings = await AppData.GetAsync<List<MeetingDto>>("api/meetings") ?? [];
+        loading = false;
+    }
+
+    private void StartNewMeeting() => Open(new MeetingForm());
+
+    // UC-03 alternate flow: reopen a saved meeting to edit or append to
+    // its minutes. Saving records a new minutes entry; the list shows the
+    // latest.
+    private void OpenExistingMeeting(MeetingDto meeting) => Open(new MeetingForm
+    {
+        MeetingId = meeting.MeetingId,
+        Title = meeting.Title,
+        MinutesText = meeting.Minutes?.MinutesText ?? string.Empty,
+    });
+
+    private void Open(MeetingForm meeting)
+    {
+        active = meeting;
+        originalMinutes = meeting.MinutesText;
+        notes.Clear();
+        noteInput = string.Empty;
+        addingActionItem = false;
+    }
+
+    // Leaves without saving.
+    private void BackToList() => active = null;
+
+    private void AddNote()
+    {
+        if (string.IsNullOrWhiteSpace(noteInput)) return;
+        notes.Add(new MeetingNote(noteInput.Trim(), addingActionItem));
+        noteInput = string.Empty;
+    }
+
+    private void HandleNoteKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") AddNote();
+    }
+
+    // The ERD keeps minutes as one text per record, so notes and action
+    // items are appended to it when saved.
+    private string ComposedMinutes() => string.Join("\n\n", new[]
+    {
+        active!.MinutesText.Trim(),
+        Section("Notes", notes.Where(n => !n.IsActionItem)),
+        Section("Action items", notes.Where(n => n.IsActionItem)),
+    }.Where(s => s.Length > 0));
+
+    private static string Section(string heading, IEnumerable<MeetingNote> items) =>
+        items.Any() ? $"{heading}:\n" + string.Join("\n", items.Select(n => $"- {n.Text}")) : "";
+
+    // "Finish Meeting" creates the meeting (the API sets the signed-in user
+    // as organiser), then records its minutes if there are any. "Save
+    // Minutes" records a new minutes entry for an existing meeting.
+    private async Task SaveMeeting()
+    {
+        if (!CanSave) return;
+        var meeting = active!;
+        var minutes = ComposedMinutes();
+        saving = true;
+
+        if (meeting.MeetingId is null)
+        {
+            // Remember the id straight away, so a retry after a failed
+            // minutes save doesn't create the meeting twice.
+            meeting.MeetingId = await AppData.SendAsync<int?>(HttpMethod.Post, "api/meetings", new CreateMeetingRequest
+            {
+                Title = string.IsNullOrWhiteSpace(meeting.Title) ? "Untitled meeting" : meeting.Title.Trim(),
+                MeetingDate = AppDataService.Wall(DateTime.Now),
+            });
+        }
+
+        var saved = meeting.MeetingId is not null && (minutes.Length == 0 ||
+            await AppData.SendAsync(HttpMethod.Post, $"api/meetings/{meeting.MeetingId}/minutes",
+                new RecordMinutesRequest { MinutesText = minutes }));
+        saving = false;
+
+        if (saved)
+        {
+            active = null;
+            await LoadMeetings();
+        }
+    }
+
+    private record MeetingNote(string Text, bool IsActionItem);
+
+    private class MeetingForm
+    {
+        public int? MeetingId { get; set; } // null until the meeting exists
+        public string Title { get; set; } = string.Empty;
+        public string MinutesText { get; set; } = string.Empty;
+    }
+}

@@ -60,16 +60,20 @@ namespace QULOOBUL__MOE_MIENEEN_Shared.Directory
         public string Status { get; init; } = "Active";
 
         public string? Description { get; init; }
+
+        /// <summary>The project's coordinator; defaults to the creator.</summary>
+        public int? OwnerId { get; init; }
     }
 
     public record UpdateProjectRequest
     {
-        [MaxLength(200)] 
+        [MaxLength(200)]
         public string? ProjectName { get; init; }
 
-        [MaxLength(30)] 
+        [MaxLength(30)]
         public string? Status { get; init; }
         public string? Description { get; init; }
+        public int? OwnerId { get; init; }
     }
 
     public record ProjectMemberDto(int UserId, string FullName, DateTime DateAdded);

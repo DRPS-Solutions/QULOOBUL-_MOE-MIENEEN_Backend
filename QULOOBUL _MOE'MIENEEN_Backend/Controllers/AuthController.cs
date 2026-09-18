@@ -9,6 +9,11 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Controllers
     [Route("api/[controller]")]
     public class AuthController(AuthService auth) : ControllerBase
     {
+        /// <summary>
+        /// Login user and return JWT token
+        /// </summary>
+        /// <param name="req"></param>
+        /// <returns></returns>
         [HttpPost("login"), AllowAnonymous]
         public async Task<ActionResult<AuthResponse>> Login(LoginRequest req) => Ok(await auth.LoginAsync(req));
     }

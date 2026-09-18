@@ -1,7 +1,292 @@
 ﻿@page "/"
+@using MudBlazor
+@implements IDisposable
+@inject AppDataService AppData
 
-<PageTitle>Home</PageTitle>
+<PageTitle>Today's Tasks</PageTitle>
 
-<h1>Hello, world!</h1>
+<style>
+    .drps-home {
+        --drps-navy-800: #1C3D32;
+        --drps-blue-500: #3C7A63;
+        --drps-blue-400: #6FA98C;
+        --drps-bg: #F5F3EC;
+        --drps-surface: #FFFFFF;
+        --drps-text-muted: #75806F;
+        --drps-border-soft: #E7E4D8;
+        --drps-tint-green: #E7F3EB;
+        --drps-tint-green-border: #A9CDB8;
+        --drps-hairline: #F1EEE2;
+        --drps-empty: #B7B2A0;
+        --drps-shadow: rgba(11, 22, 38, 0.06);
+        background: var(--drps-bg);
+        min-height: calc(100vh - 70px);
+        padding-bottom: 2rem;
+    }
 
-Welcome to your new app.
+    .drps-header {
+        background: linear-gradient(135deg, #12271F 0%, #2F5C4C 100%);
+        border-radius: 16px;
+        padding: 20px 24px;
+        color: white;
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .drps-card {
+        background: var(--drps-surface);
+        border-radius: 16px;
+        padding: 24px;
+        box-shadow: 0 2px 10px var(--drps-shadow);
+        min-height: 70vh;
+    }
+
+    .task-item {
+        border: 1px solid var(--drps-border-soft);
+        border-radius: 12px;
+        padding: 12px 16px;
+        margin-bottom: 12px;
+        background: var(--drps-surface);
+        transition: background 0.2s ease;
+    }
+
+        .task-item.completed {
+            background: var(--drps-tint-green);
+            border-color: var(--drps-tint-green-border);
+        }
+
+    .drps-summary-card {
+        background: var(--drps-surface);
+        border-radius: 16px;
+        padding: 24px;
+        box-shadow: 0 2px 10px var(--drps-shadow);
+        height: 100%;
+    }
+
+    .drps-summary-title {
+        font-weight: 600;
+        color: var(--drps-navy-800);
+        margin-bottom: 12px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .drps-summary-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        padding: 10px 0;
+        border-bottom: 1px solid var(--drps-hairline);
+    }
+
+    .drps-summary-item:last-child {
+        border-bottom: none;
+    }
+
+    .drps-summary-avatar {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--drps-blue-400) 0%, var(--drps-blue-500) 100%);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        font-size: 0.72rem;
+        flex-shrink: 0;
+    }
+
+    .drps-summary-task {
+        font-size: 0.85rem;
+        font-weight: 500;
+        color: var(--drps-navy-800);
+    }
+
+    .drps-summary-by {
+        font-size: 0.74rem;
+        color: var(--drps-text-muted);
+    }
+
+    .drps-summary-empty {
+        color: var(--drps-empty);
+        font-size: 0.82rem;
+        text-align: center;
+        padding: 24px 0;
+    }
+
+    .drps-event-tag {
+        display: inline-block;
+        margin-left: 8px;
+        padding: 1px 8px;
+        border-radius: 999px;
+        background: var(--drps-tint-green);
+        color: var(--drps-blue-500);
+        font-size: 0.68rem;
+        font-weight: 600;
+        vertical-align: middle;
+    }
+
+    /* --- Dark mode overrides --- */
+    .page.dark-mode .drps-home {
+        --drps-bg: #0B1B21;
+        --drps-surface: #1E362B;
+        --drps-text-muted: #93A69A;
+        --drps-navy-800: #E9F0EA;
+        --drps-border-soft: #2E4A3B;
+        --drps-tint-green: rgba(46, 158, 91, 0.16);
+        --drps-tint-green-border: rgba(46, 158, 91, 0.4);
+        --drps-hairline: #2E4A3B;
+        --drps-empty: #4E5F52;
+        --drps-shadow: rgba(0, 0, 0, 0.35);
+    }
+</style>
+
+<div class="drps-home">
+    <MudContainer MaxWidth="MaxWidth.Large" Class="pt-6">
+        @* Locked Header *@
+        <div class="drps-header">
+            <div>
+                <MudText Typo="Typo.h6" Style="font-weight:600;">Daily Schedule</MudText>
+                <MudText Typo="Typo.body2" Style="opacity: 0.85;">
+                    @DateTime.Today.ToString("dddd, dd MMMM yyyy")
+                </MudText>
+            </div>
+            <MudChip T="string" Color="Color.Primary" Variant="Variant.Filled">
+                @completedCount of @todayTasks.Count completed today
+            </MudChip>
+        </div>
+
+        <MudGrid>
+            <MudItem xs="12" md="8">
+                <div class="drps-card">
+                    <div class="d-flex align-center justify-space-between mb-4">
+                        <MudText Typo="Typo.h6">Today's Active Tasks</MudText>
+                        <MudButton Variant="Variant.Text"
+                                   Color="Color.Primary"
+                                   Size="Size.Small"
+                                   EndIcon="@Icons.Material.Filled.ArrowForward"
+                                   Href="tasks">
+                            Open Daily Tasks
+                        </MudButton>
+                    </div>
+
+                    @if (!todayTasks.Any())
+                    {
+                        <div class="drps-summary-empty">Nothing scheduled for today.</div>
+                    }
+                    else
+                    {
+                        @foreach (var task in todayTasks)
+                        {
+                            var assignees = AppData.AssigneeNames(task);
+                            <div class="task-item @(task.IsDone() ? "completed" : "")">
+                                <MudGrid Class="align-items-center">
+                                    <MudItem xs="12" sm="1">
+                                        <MudCheckBox T="bool"
+                                                     Value="task.IsDone()"
+                                                     ValueChanged="@((bool done) => AppData.SetTaskDoneAsync(task, done))"
+                                                     Color="Color.Success" />
+                                    </MudItem>
+
+                                    <MudItem xs="12" sm="7">
+                                        <MudText Typo="Typo.body1" Style="@(task.IsDone() ? "text-decoration: line-through; color: #888;" : "font-weight: 500;")">
+                                            @task.Title
+                                            @if (AppData.EventName(task) is { } eventName)
+                                            {
+                                                <span class="drps-event-tag">@eventName</span>
+                                            }
+                                        </MudText>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                            @(task.IsAllDay() ? "All day" : task.Deadline.ToString("h:mm tt"))
+                                            @(assignees.Length == 0 ? "" : $" \u00b7 {assignees}")
+                                        </MudText>
+                                    </MudItem>
+
+                                    <MudItem xs="12" sm="4">
+                                        @if (task.IsDone() && task.CompletedBy is not null)
+                                        {
+                                            <MudText Typo="Typo.caption" Color="Color.Success" Style="font-weight:500;">
+                                                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Small" Class="mr-1" />
+                                                Completed by @AppData.UserName(task.CompletedBy)
+                                            </MudText>
+                                        }
+                                    </MudItem>
+                                </MudGrid>
+                            </div>
+                        }
+                    }
+                </div>
+            </MudItem>
+
+            <MudItem xs="12" md="4">
+                <div class="drps-summary-card">
+                    <div class="drps-summary-title">
+                        <MudIcon Icon="@Icons.Material.Filled.FactCheck" Size="Size.Small" />
+                        Completed Today
+                    </div>
+
+                    @if (!CompletedTasks.Any())
+                    {
+                        <div class="drps-summary-empty">Nothing completed yet today</div>
+                    }
+                    else
+                    {
+                        @foreach (var task in CompletedTasks)
+                        {
+                            var completedBy = AppData.UserName(task.CompletedBy);
+                            <div class="drps-summary-item">
+                                <div class="drps-summary-avatar">@GetInitials(completedBy)</div>
+                                <div>
+                                    <div class="drps-summary-task">@task.Title</div>
+                                    <div class="drps-summary-by">@completedBy</div>
+                                </div>
+                            </div>
+                        }
+                    }
+                </div>
+            </MudItem>
+        </MudGrid>
+    </MudContainer>
+</div>
+
+@code {
+    // Home is a view over the same AppData.Tasks list Tasks.razor (Daily
+    // Tasks) uses, loaded here for today only. Ticking a box completes the
+    // task through the API as the signed-in user (the API records who);
+    // the API then pushes "boardChanged" so every open page refreshes.
+    private IReadOnlyList<TaskCardDto> todayTasks =>
+        AppData.Tasks.Where(t => t.Deadline.Date == DateTime.Today).ToList();
+
+    // Number of today's tasks marked complete - drives the header chip.
+    private int completedCount => todayTasks.Count(t => t.IsDone());
+
+    // Completed tasks for the "Completed Today" panel.
+    private IEnumerable<TaskCardDto> CompletedTasks =>
+        todayTasks.Where(t => t.IsDone() && t.CompletedBy is not null);
+
+    // Initials for the small avatar badge in the completion summary.
+    private static string GetInitials(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "?";
+        return string.Concat(name.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                                  .Select(part => part[0]))
+                      .ToUpper();
+    }
+
+    // Re-render when the task list refreshes (our own changes, or a
+    // SignalR push after someone else's).
+    protected override async Task OnInitializedAsync()
+    {
+        AppData.OnChange += StateHasChanged;
+        await AppData.LoadTasksAsync(DateTime.Today, DateTime.Today.AddDays(1));
+    }
+
+    public void Dispose()
+    {
+        AppData.OnChange -= StateHasChanged;
+    }
+}
