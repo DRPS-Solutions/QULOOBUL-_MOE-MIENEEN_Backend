@@ -19,6 +19,12 @@ namespace QULOOBUL__MOE_MIENEEN_Shared.Classes
         /// <summary>Every task belongs to a project; standalone daily tasks live in this seeded one.</summary>
         public const string DailyTasksProject = "Daily Tasks";
 //----------------------------------------------------------------------------------------------------------------------//
+        /// <summary>
+        /// The actor recorded against clock-driven transitions (escalation, deadline reminders,
+        /// generated recurring tasks). Seeded with no usable password, so it cannot log in.
+        /// </summary>
+        public const string SystemAccountEmail = "system@quloobul.local";
+//----------------------------------------------------------------------------------------------------------------------//
         public static class Roles
         {
             public const string Admin = "Admin";

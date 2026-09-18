@@ -11,8 +11,12 @@ namespace QULOOBUL__MOE_MIENEEN_Shared.Files
         [Required, MaxLength(260)] 
         public string FileName { get; init; } = string.Empty;
 
-        [Required, MaxLength(100)] 
+        [Required, MaxLength(100)]
         public string FileType { get; init; } = string.Empty;
+
+        /// <summary>Checked against the SD-04 upload limit before a SAS is issued.</summary>
+        [Required, Range(1, long.MaxValue)]
+        public long SizeBytes { get; init; }
 
         [Required]
         public int CategoryId { get; init; }

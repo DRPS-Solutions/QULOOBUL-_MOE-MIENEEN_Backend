@@ -9,6 +9,9 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Data
     {
         public const string TaskStart = "To Do";
         public const string RequestStart = "Pending";
+
+        /// <summary>SM-02: reached by the 48-hour guard in MaintenanceJobs, never by a user action.</summary>
+        public const string RequestEscalated = "Escalated";
 //----------------------------------------------------------------------------------------------------------------------//
         private static readonly Dictionary<string, string[]> Task = new(StringComparer.OrdinalIgnoreCase)
         {
@@ -20,7 +23,10 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Data
 //----------------------------------------------------------------------------------------------------------------------//
         private static readonly Dictionary<string, string[]> Request = new(StringComparer.OrdinalIgnoreCase)
         {
-            ["Pending"] = ["Approved", "Declined"],
+            // ponytail: SM-02's "Under Review" and the 30-day resubmit window are still missing; this
+            // table covers the escalation path only, because that is what the 48-hour job needs.
+            ["Pending"] = ["Approved", "Declined", RequestEscalated],
+            [RequestEscalated] = ["Approved", "Declined"], // escalation must not dead-end the request
             ["Approved"] = ["Completed"],
         };
 //----------------------------------------------------------------------------------------------------------------------//
