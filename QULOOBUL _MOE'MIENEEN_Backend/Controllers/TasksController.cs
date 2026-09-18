@@ -8,14 +8,14 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Controllers
     {
         [HttpGet("~/api/projects/{projectId:int}/board")]
         public async Task<ActionResult<IReadOnlyList<TaskCardDto>>> Board(int projectId) =>
-            Ok(await tasks.BoardAsync(projectId));
+            Ok(await tasks.BoardAsync(projectId, UserId()));
 //----------------------------------------------------------------------------------------------------------------------//
         [HttpGet]
         public async Task<ActionResult<IReadOnlyList<TaskCardDto>>> List(DateTime? from, DateTime? to, int? assigneeId) =>
-            Ok(await tasks.ListAsync(from, to, assigneeId));
+            Ok(await tasks.ListAsync(from, to, assigneeId, UserId()));
 //----------------------------------------------------------------------------------------------------------------------//
         [HttpGet("{id:int}")]
-        public async Task<ActionResult<TaskDetailDto>> Get(int id) => Ok(await tasks.DetailAsync(id));
+        public async Task<ActionResult<TaskDetailDto>> Get(int id) => Ok(await tasks.DetailAsync(id, UserId()));
 //----------------------------------------------------------------------------------------------------------------------//
         [HttpPost]
         public async Task<ActionResult<TaskCardDto>> Create(CreateTaskRequest req) =>

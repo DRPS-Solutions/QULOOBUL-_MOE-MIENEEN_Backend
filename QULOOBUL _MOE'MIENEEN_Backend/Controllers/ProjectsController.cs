@@ -8,10 +8,10 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Controllers
     public class ProjectsController(ProjectService projects) : ApiControllerBase
     {
         [HttpGet]
-        public async Task<ActionResult<List<ProjectSummaryDto>>> List() => Ok(await projects.ListAsync());
+        public async Task<ActionResult<List<ProjectSummaryDto>>> List() => Ok(await projects.ListAsync(UserId()));
 //----------------------------------------------------------------------------------------------------------------------//
         [HttpGet("{id:int}")]
-        public async Task<ActionResult<ProjectDto>> Get(int id) => Ok(await projects.GetAsync(id));
+        public async Task<ActionResult<ProjectDto>> Get(int id) => Ok(await projects.GetAsync(id, UserId()));
 //----------------------------------------------------------------------------------------------------------------------//
         [HttpPost]
         public async Task<ActionResult<ProjectDto>> Create(CreateProjectRequest req) =>
@@ -22,7 +22,8 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Controllers
             Ok(await projects.UpdateAsync(id, req, UserId()));
 //----------------------------------------------------------------------------------------------------------------------//
         [HttpGet("{id:int}/members")]
-        public async Task<ActionResult<List<ProjectMemberDto>>> Members(int id) => Ok(await projects.MembersAsync(id));
+        public async Task<ActionResult<List<ProjectMemberDto>>> Members(int id) =>
+            Ok(await projects.MembersAsync(id, UserId()));
 //----------------------------------------------------------------------------------------------------------------------//
         [HttpPost("{id:int}/members")]
         public async Task<IActionResult> AddMember(int id, AddProjectMemberRequest req)
