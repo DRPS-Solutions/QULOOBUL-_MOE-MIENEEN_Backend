@@ -3,12 +3,131 @@
     x:Class="Frontend_Mobile.AppShell"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-    xmlns:local="clr-namespace:Frontend_Mobile"
-    Title="Frontend_Mobile">
+    xmlns:pages="clr-namespace:Frontend_Mobile.Pages"
+    Title="QULOOBUL MOE'MIENEEN"
+    FlyoutBehavior="Disabled">
 
-    <ShellContent
-        Title="Home"
-        ContentTemplate="{DataTemplate local:MainPage}"
-        Route="MainPage" />
+    <!-- The drawer + top bar from AppNavHost.kt. Menu items are gated by the
+         same role rules as NavMenu.razor; Meetings / User Management are still
+         "Coming soon" stubs, exactly as in the Android port. -->
+
+    <Shell.FlyoutHeader>
+        <Grid ColumnDefinitions="Auto,*"
+              Padding="20"
+              BackgroundColor="{AppThemeBinding Light={StaticResource Surface}, Dark={StaticResource SurfaceDark}}">
+            <Image Source="logo.png" HeightRequest="32" WidthRequest="32" Aspect="AspectFit" />
+            <Label Grid.Column="1"
+                   Text="QULOOBUL MOE'MIENEEN"
+                   Style="{StaticResource TitleMedium}"
+                   VerticalOptions="Center"
+                   Margin="10,0,0,0" />
+        </Grid>
+    </Shell.FlyoutHeader>
+
+    <!-- Set on the Shell so every page inherits the same bar: title, the bell
+         with its unread badge, and the dark-mode switch. -->
+    <Shell.TitleView>
+        <Grid ColumnDefinitions="*,Auto,Auto" VerticalOptions="Fill">
+
+            <Label Text="QULOOBUL MOE'MIENEEN"
+                   TextColor="{StaticResource White}"
+                   FontSize="16"
+                   FontAttributes="Bold"
+                   VerticalOptions="Center" />
+
+            <Grid Grid.Column="1" WidthRequest="46">
+                <Button Text="&#x1F514;"
+                        Clicked="OnOpenNotifications"
+                        BackgroundColor="Transparent"
+                        TextColor="{StaticResource White}"
+                        FontSize="18"
+                        Padding="0"
+                        CornerRadius="0" />
+                <Border IsVisible="{Binding HasUnread}"
+                        BackgroundColor="{StaticResource StatusDenied}"
+                        StrokeThickness="0"
+                        StrokeShape="RoundRectangle 8"
+                        HeightRequest="16"
+                        MinimumWidthRequest="16"
+                        Padding="4,0"
+                        HorizontalOptions="End"
+                        VerticalOptions="Start"
+                        Margin="0,4,2,0"
+                        InputTransparent="True">
+                    <Label Text="{Binding UnreadBadge}"
+                           TextColor="{StaticResource White}"
+                           FontSize="9"
+                           HorizontalOptions="Center"
+                           VerticalOptions="Center" />
+                </Border>
+            </Grid>
+
+            <Button Grid.Column="2"
+                    x:Name="ThemeToggle"
+                    Clicked="OnToggleTheme"
+                    BackgroundColor="Transparent"
+                    TextColor="{StaticResource White}"
+                    FontSize="18"
+                    WidthRequest="44"
+                    Padding="0"
+                    CornerRadius="0" />
+
+        </Grid>
+    </Shell.TitleView>
+
+    <!-- Login is a route inside the Shell, not a separate root page. Swapping
+         the window's root between a ContentPage and a Shell crashes Android's
+         fragment manager (dotnet/maui#21257), so the Shell owns the whole
+         session and just navigates between //login and //home. The flyout is
+         Disabled until login and switched on in AppShell.xaml.cs. -->
+    <ShellContent Route="login"
+                  ContentTemplate="{DataTemplate pages:LoginPage}"
+                  FlyoutItemIsVisible="False" />
+
+    <FlyoutItem Title="Home" Route="home">
+        <ShellContent ContentTemplate="{DataTemplate pages:HomePage}" />
+    </FlyoutItem>
+
+    <FlyoutItem Title="Daily Tasks" Route="tasks">
+        <ShellContent ContentTemplate="{DataTemplate pages:TasksPage}" />
+    </FlyoutItem>
+
+    <FlyoutItem Title="Resource Requests" Route="requests">
+        <ShellContent ContentTemplate="{DataTemplate pages:RequestsPage}" />
+    </FlyoutItem>
+
+    <FlyoutItem Title="Meetings" Route="meetings" IsVisible="{Binding CanSeeMeetings}">
+        <ShellContent>
+            <ShellContent.Content>
+                <pages:ComingSoonPage FeatureName="Meetings" />
+            </ShellContent.Content>
+        </ShellContent>
+    </FlyoutItem>
+
+    <FlyoutItem Title="User Management" Route="users" IsVisible="{Binding CanSeeUserManagement}">
+        <ShellContent>
+            <ShellContent.Content>
+                <pages:ComingSoonPage FeatureName="User Management" />
+            </ShellContent.Content>
+        </ShellContent>
+    </FlyoutItem>
+
+    <FlyoutItem Title="Event Planning" Route="events" IsVisible="{Binding CanSeeEvents}">
+        <ShellContent ContentTemplate="{DataTemplate pages:EventsPage}" />
+    </FlyoutItem>
+
+    <!-- Reached from the bell in the title bar, not listed in the drawer -
+         same as the Android port. -->
+    <ShellContent Title="Notifications"
+                  Route="notifications"
+                  ContentTemplate="{DataTemplate pages:NotificationsPage}"
+                  FlyoutItemIsVisible="False" />
+
+    <Shell.FlyoutFooter>
+        <Button Text="Log out"
+                Clicked="OnLogout"
+                Style="{StaticResource OutlineButton}"
+                Margin="16,8,16,20" />
+    </Shell.FlyoutFooter>
 
 </Shell>

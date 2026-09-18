@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ContentPage
+    x:Class="Frontend_Mobile.Pages.CreateTaskPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    Title="New task">
+
+    <!-- CreateTaskDialog.razor. Compose used an AlertDialog; MAUI has no
+         equivalent inline dialog for a form this size, so it's a modal page. -->
+
+    <ScrollView>
+        <VerticalStackLayout Padding="20" Spacing="12">
+
+            <Label Text="New task" Style="{StaticResource TitleLarge}" Margin="0,0,0,4" />
+
+            <Border Style="{StaticResource FieldBox}">
+                <Entry x:Name="TitleEntry" Placeholder="Task title" TextChanged="OnTitleChanged" />
+            </Border>
+
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                <VerticalStackLayout>
+                    <Label Text="Date" Style="{StaticResource LabelSmall}" />
+                    <Border Style="{StaticResource FieldBox}">
+                        <DatePicker x:Name="DateField" Format="dd MMM yyyy" />
+                    </Border>
+                </VerticalStackLayout>
+                <VerticalStackLayout x:Name="TimeSection" Grid.Column="1">
+                    <Label Text="Time" Style="{StaticResource LabelSmall}" />
+                    <Border Style="{StaticResource FieldBox}">
+                        <TimePicker x:Name="TimeField" Format="h:mm tt" />
+                    </Border>
+                </VerticalStackLayout>
+            </Grid>
+
+            <HorizontalStackLayout Spacing="4">
+                <CheckBox x:Name="AllDayBox" CheckedChanged="OnAllDayChanged" VerticalOptions="Center" />
+                <Label Text="All day" VerticalOptions="Center" />
+            </HorizontalStackLayout>
+
+            <VerticalStackLayout>
+                <Label Text="Category" Style="{StaticResource LabelSmall}" />
+                <Border Style="{StaticResource FieldBox}">
+                    <Picker x:Name="CategoryPicker" Title="Category" />
+                </Border>
+            </VerticalStackLayout>
+
+            <VerticalStackLayout>
+                <Label Text="Priority" Style="{StaticResource LabelSmall}" />
+                <Border Style="{StaticResource FieldBox}">
+                    <Picker x:Name="PriorityPicker" Title="Priority" />
+                </Border>
+            </VerticalStackLayout>
+
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="10" Margin="0,12,0,0">
+                <Button Text="Cancel" Style="{StaticResource OutlineButton}" Clicked="OnCancel" />
+                <Button x:Name="CreateButton"
+                        Grid.Column="1"
+                        Text="Create task"
+                        IsEnabled="False"
+                        Clicked="OnCreate" />
+            </Grid>
+
+        </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>

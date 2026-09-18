@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ContentPage
+    x:Class="Frontend_Mobile.Pages.LoginPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    Shell.NavBarIsVisible="False"
+    Title="Sign in">
+
+    <!-- MainLayout.razor's login card (rendered while currentRole is null).
+         Prototype sign-in: role only, no password. -->
+
+    <Grid>
+        <Button
+            x:Name="ThemeToggle"
+            Clicked="OnToggleTheme"
+            HorizontalOptions="End"
+            VerticalOptions="Start"
+            Margin="16"
+            Padding="10,6"
+            CornerRadius="18"
+            BackgroundColor="Transparent"
+            FontSize="18"
+            TextColor="{AppThemeBinding Light={StaticResource TextPrimary}, Dark={StaticResource TextPrimaryDark}}" />
+
+        <ScrollView>
+            <Border Style="{StaticResource Card}"
+                    Padding="28"
+                    StrokeShape="RoundRectangle 20"
+                    Margin="24"
+                    VerticalOptions="Center">
+                <VerticalStackLayout Spacing="0">
+
+                    <Image Source="logo.png"
+                           HeightRequest="72"
+                           WidthRequest="72"
+                           Aspect="AspectFit"
+                           HorizontalOptions="Center" />
+
+                    <Label Text="QULOOBUL MOE'MIENEEN"
+                           Style="{StaticResource TitleLarge}"
+                           HorizontalTextAlignment="Center"
+                           Margin="0,12,0,0" />
+
+                    <Label Text="Sign in to continue"
+                           Style="{StaticResource Muted}"
+                           FontSize="14"
+                           HorizontalTextAlignment="Center"
+                           Margin="0,4,0,20" />
+
+                    <Border Style="{StaticResource FieldBox}">
+                        <Entry x:Name="NameEntry" Placeholder="Full name" />
+                    </Border>
+
+                    <Border Style="{StaticResource FieldBox}" Margin="0,12,0,0">
+                        <Picker x:Name="RolePicker"
+                                Title="Role"
+                                SelectedIndexChanged="OnRoleChanged" />
+                    </Border>
+
+                    <Label x:Name="RoleHint"
+                           Text="Pick a role to see which tabs it can access."
+                           Style="{StaticResource Muted}"
+                           Margin="0,8,0,0" />
+
+                    <Button x:Name="LoginButton"
+                            Text="Log In"
+                            IsEnabled="False"
+                            Clicked="OnLogin"
+                            Margin="0,20,0,0" />
+
+                    <Label Text="Prototype sign-in - role only, no password yet."
+                           Style="{StaticResource LabelSmall}"
+                           HorizontalTextAlignment="Center"
+                           Margin="0,16,0,0" />
+
+                </VerticalStackLayout>
+            </Border>
+        </ScrollView>
+    </Grid>
+
+</ContentPage>
