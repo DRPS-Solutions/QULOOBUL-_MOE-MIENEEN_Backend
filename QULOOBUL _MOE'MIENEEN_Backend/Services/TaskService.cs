@@ -9,27 +9,36 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
     /// <summary>UC-02 / UC-04: task CRUD and the live kanban board. Status moves delegate to
     /// TaskAssignmentService.ChangeStatusAsync so SM-01 stays in one place.</summary>
     public class TaskService(
-        AppDbContext db, TaskAssignmentService assignments, AuditService audit, NotificationService notify)
+        AppDbContext db, TaskAssignmentService assignments, AuditService audit,
+        NotificationService notify, AccessGuard guard)
     {
-        public async Task<IReadOnlyList<TaskCardDto>> BoardAsync(int projectId) =>
-            await Cards(db.Tasks.Where(t => t.ProjectId == projectId)).ToListAsync();
+        /// <summary>The board is filtered, not refused: on a shared project each caller sees their own work.</summary>
+        public async Task<IReadOnlyList<TaskCardDto>> BoardAsync(int projectId, int userId)
+        {
+            if (!await db.Projects.AnyAsync(p => p.ProjectId == projectId))
+                throw new KeyNotFoundException($"Project {projectId} not found.");
+            var visible = guard.VisibleTasks(
+                db.Tasks.Where(t => t.ProjectId == projectId), userId, await guard.IsAdminAsync(userId));
+            return await Cards(visible).ToListAsync();
+        }
 //----------------------------------------------------------------------------------------------------------------------//
         /// <summary>Calendar/overview list: tasks due in [from, to), optionally only one assignee's.
         /// ponytail: with only an assignee the list is that user's whole history; page it once
         /// one user has thousands of tasks.</summary>
-        public async Task<IReadOnlyList<TaskCardDto>> ListAsync(DateTime? from, DateTime? to, int? assigneeId)
+        public async Task<IReadOnlyList<TaskCardDto>> ListAsync(
+            DateTime? from, DateTime? to, int? assigneeId, int userId)
         {
             var q = db.Tasks.AsQueryable();
             if (from is { } f) q = q.Where(t => t.Deadline >= f);
             if (to is { } e) q = q.Where(t => t.Deadline < e);
             if (assigneeId is { } a) q = q.Where(t => db.TaskAssignments.Any(x => x.TaskId == t.TaskId && x.UserId == a));
+            q = guard.VisibleTasks(q, userId, await guard.IsAdminAsync(userId));
             return await Cards(q).ToListAsync();
         }
 //----------------------------------------------------------------------------------------------------------------------//
         public async Task<TaskCardDto> CreateAsync(CreateTaskRequest req, int creatorId)
         {
-            if (!await db.Projects.AnyAsync(p => p.ProjectId == req.ProjectId))
-                throw new KeyNotFoundException($"Project {req.ProjectId} not found.");
+            await guard.EnsureProjectAsync(creatorId, req.ProjectId);
 
             var task = new ProjectTask
             {
@@ -42,8 +51,17 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
                 Deadline = req.Deadline,
             };
             db.Tasks.Add(task);
-            audit.Record(creatorId, "task.create", nameof(ProjectTask), 0);
-            await db.SaveChangesAsync();
+            // SM-01's createTask action is "/ record TaskStatusHistory": the history table is the
+            // system of record, so the opening state belongs in it like every later move.
+            db.TaskStatusHistory.Add(new TaskStatusHistory
+            {
+                Task = task,
+                NewStatus = Lifecycle.TaskStart,
+                ChangedBy = creatorId,
+                TimeCreated = DateTime.UtcNow,
+            });
+            await db.SaveChangesAsync();                 // assigns task.TaskId
+            await audit.RecordAndSaveAsync(creatorId, "task.create", nameof(ProjectTask), task.TaskId);
 
             var card = await Card(task.TaskId);
             await notify.BroadcastAsync("boardChanged", new { projectId = req.ProjectId });
@@ -52,6 +70,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
 //----------------------------------------------------------------------------------------------------------------------//
         public async Task<TaskCardDto> UpdateAsync(int taskId, UpdateTaskRequest req, int actorId)
         {
+            await guard.EnsureTaskAsync(actorId, taskId);
             var task = await db.Tasks.FindAsync(taskId)
                 ?? throw new KeyNotFoundException($"Task {taskId} not found.");
 
