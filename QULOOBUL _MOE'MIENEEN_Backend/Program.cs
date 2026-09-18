@@ -23,9 +23,9 @@ builder.Services.AddDbContext<AppDbContext>(o => o
 
 builder.Services.AddSignalR();
 
-builder.Services.AddSingleton(_ => new BlobServiceClient(
+/*builder.Services.AddSingleton(_ => new BlobServiceClient(
     builder.Configuration.GetConnectionString("BlobStorage") ?? "UseDevelopmentStorage=true"));
-
+*/
 // ------------------------------------------------------- Auth ---------------------------------------------------------------
 var jwt = builder.Configuration.GetSection("Jwt");
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
