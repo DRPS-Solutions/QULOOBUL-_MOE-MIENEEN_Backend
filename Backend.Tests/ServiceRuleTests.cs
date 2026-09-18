@@ -32,7 +32,7 @@ public class ServiceRuleTests
             new ResourceRequest { Requester = bob, Category = category, Status = "Pending" });
         await db.SaveChangesAsync();
 
-        var requests = new RequestReviewService(db, new AuditService(db), null!);
+        var requests = new RequestReviewService(db, new AuditService(db), null!, null!);
 
         Assert.Equal(2, (await requests.ListAsync(reviewer.UserId)).Count);
         Assert.Equal(new[] { alice.UserId }, (await requests.ListAsync(alice.UserId)).Select(r => r.RequestedBy));
