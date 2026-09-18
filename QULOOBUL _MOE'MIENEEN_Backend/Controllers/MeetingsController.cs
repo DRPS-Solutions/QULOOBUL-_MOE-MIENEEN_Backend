@@ -7,7 +7,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Controllers
     public class MeetingsController(MeetingMinutesService meetings) : ApiControllerBase
     {
         [HttpGet]
-        public async Task<ActionResult<List<MeetingDto>>> List() => Ok(await meetings.ListAsync());
+        public async Task<ActionResult<List<MeetingDto>>> List() => Ok(await meetings.ListAsync(UserId()));
 //----------------------------------------------------------------------------------------------------------------------//
         [HttpPost]
         public async Task<ActionResult<int>> Create(CreateMeetingRequest req) =>

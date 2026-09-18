@@ -6,11 +6,20 @@ using QULOOBUL__MOE_MIENEEN_Shared.Collaboration;
 namespace QULOOBUL__MOE_MIENEEN_Backend.Services
 {
     /// <summary>UC-03: create meetings, record/approve minutes. Author + date are set server-side.</summary>
-    public class MeetingMinutesService(AppDbContext db, AuditService audit)
+    public class MeetingMinutesService(AppDbContext db, AuditService audit, AccessGuard guard)
     {
-        /// <summary>Every meeting, newest first, with its latest minutes (edits append a new record).</summary>
-        public Task<List<MeetingDto>> ListAsync() =>
-            db.Meetings.OrderByDescending(m => m.MeetingDate).Select(m => new MeetingDto(
+        /// <summary>
+        /// The caller's meetings, newest first, with the latest minutes (edits append a new record).
+        /// Organised-by or invited-to only, per the anti-IDOR NFR; an admin sees all of them.
+        /// </summary>
+        public async Task<List<MeetingDto>> ListAsync(int userId)
+        {
+            var q = db.Meetings.AsQueryable();
+            if (!await guard.IsAdminAsync(userId))
+                q = q.Where(m => m.OrganiserId == userId
+                              || db.MeetingAttendees.Any(a => a.MeetingId == m.MeetingId && a.UserId == userId));
+
+            return await q.OrderByDescending(m => m.MeetingDate).Select(m => new MeetingDto(
                 m.MeetingId, m.OrganiserId, m.Title, m.MeetingDate,
                 db.MeetingAttendees.Where(a => a.MeetingId == m.MeetingId).Select(a => a.UserId).ToList(),
                 db.MeetingMinutes.Where(x => x.MeetingId == m.MeetingId).OrderByDescending(x => x.MinutesId)
@@ -18,6 +27,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
                         x.MinutesId, x.MeetingId, x.RecordedBy, x.TimeRecorded, x.MinutesText, x.IsAiDraft, x.ApprovedBy))
                     .FirstOrDefault()))
                 .ToListAsync();
+        }
 //----------------------------------------------------------------------------------------------------------------------//
         public async Task<int> CreateMeetingAsync(CreateMeetingRequest req, int organiserId)
         {
@@ -35,8 +45,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
 //----------------------------------------------------------------------------------------------------------------------//
         public async Task<MeetingMinutesDto> RecordAsync(int meetingId, RecordMinutesRequest req, int recordedBy)
         {
-            if (!await db.Meetings.AnyAsync(m => m.MeetingId == meetingId))
-                throw new KeyNotFoundException($"Meeting {meetingId} not found.");
+            await guard.EnsureMeetingAsync(recordedBy, meetingId);
 
             var minutes = new MeetingMinutes
             {
