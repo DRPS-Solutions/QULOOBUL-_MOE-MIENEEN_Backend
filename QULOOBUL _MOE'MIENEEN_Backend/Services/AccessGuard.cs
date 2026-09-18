@@ -38,6 +38,17 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
                 throw new UnauthorizedAccessException("You do not have access to this project.");
         }
 //----------------------------------------------------------------------------------------------------------------------//
+        /// <summary>Least privilege: changing a project or its roster is the owner's or an admin's.</summary>
+        public async Task EnsureProjectOwnerAsync(int userId, int projectId)
+        {
+            var ownerId = await db.Projects.Where(p => p.ProjectId == projectId)
+                .Select(p => (int?)p.OwnerId).FirstOrDefaultAsync()
+                ?? throw new KeyNotFoundException($"Project {projectId} not found.");
+
+            if (ownerId != userId && !await IsAdminAsync(userId))
+                throw new UnauthorizedAccessException("Only the project owner or an admin may change this project.");
+        }
+//----------------------------------------------------------------------------------------------------------------------//
         public async Task EnsureTaskAsync(int userId, int taskId)
         {
             var task = await db.Tasks.FindAsync(taskId)

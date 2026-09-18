@@ -5,25 +5,38 @@ using Microsoft.EntityFrameworkCore;
 
 namespace QULOOBUL__MOE_MIENEEN_Backend.Services
 {
-    public class ProjectService(AppDbContext db, AuditService audit, NotificationService notify)
+    public class ProjectService(AppDbContext db, AuditService audit, NotificationService notify, AccessGuard guard)
     {
-        public Task<List<ProjectSummaryDto>> ListAsync() =>
-            db.Projects.OrderBy(p => p.ProjectName).Select(p => new ProjectSummaryDto(
+        /// <summary>Only the projects the caller belongs to (ProjectMember: "sees only that project").</summary>
+        public async Task<List<ProjectSummaryDto>> ListAsync(int userId)
+        {
+            var q = db.Projects.AsQueryable();
+            if (!await guard.IsAdminAsync(userId))
+                q = q.Where(p => p.OwnerId == userId
+                              || db.ProjectMembers.Any(m => m.ProjectId == p.ProjectId && m.UserId == userId));
+
+            return await q.OrderBy(p => p.ProjectName).Select(p => new ProjectSummaryDto(
                 p.ProjectId, p.ProjectName, p.Status,
                 db.ProjectMembers.Count(m => m.ProjectId == p.ProjectId),
                 db.Tasks.Count(t => t.ProjectId == p.ProjectId && t.Status != "Done"))).ToListAsync();
+        }
 //----------------------------------------------------------------------------------------------------------------------//
-        public async Task<ProjectDto> GetAsync(int id) =>
-            await db.Projects.Where(p => p.ProjectId == id)
+        public async Task<ProjectDto> GetAsync(int id, int userId)
+        {
+            await guard.EnsureProjectAsync(userId, id);
+            return await db.Projects.Where(p => p.ProjectId == id)
                 .Select(p => new ProjectDto(p.ProjectId, p.OwnerId, p.ProjectName, p.Status, p.Description))
-                .FirstOrDefaultAsync()
-            ?? throw new KeyNotFoundException($"Project {id} not found.");
+                .FirstAsync();
+        }
 //----------------------------------------------------------------------------------------------------------------------//
-        public Task<List<ProjectMemberDto>> MembersAsync(int projectId) =>
-            db.ProjectMembers.Where(m => m.ProjectId == projectId)
+        public async Task<List<ProjectMemberDto>> MembersAsync(int projectId, int userId)
+        {
+            await guard.EnsureProjectAsync(userId, projectId);
+            return await db.ProjectMembers.Where(m => m.ProjectId == projectId)
                 .OrderBy(m => m.User!.FirstName).ThenBy(m => m.User!.Surname)
                 .Select(m => new ProjectMemberDto(m.UserId, m.User!.FirstName + " " + m.User.Surname, m.DateAdded))
                 .ToListAsync();
+        }
 //----------------------------------------------------------------------------------------------------------------------//
         public async Task<ProjectDto> CreateAsync(CreateProjectRequest req, int actorId)
         {
@@ -31,13 +44,14 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             await EnsureActiveUser(ownerId);
             var p = new Project { OwnerId = ownerId, ProjectName = req.ProjectName, Status = req.Status, Description = req.Description };
             db.Projects.Add(p);
-            audit.Record(actorId, "project.create", nameof(Project), 0);
-            await db.SaveChangesAsync();
+            await db.SaveChangesAsync();                 // assigns p.ProjectId
+            await audit.RecordAndSaveAsync(actorId, "project.create", nameof(Project), p.ProjectId);
             return new ProjectDto(p.ProjectId, p.OwnerId, p.ProjectName, p.Status, p.Description);
         }
 //----------------------------------------------------------------------------------------------------------------------//
         public async Task<ProjectDto> UpdateAsync(int id, UpdateProjectRequest req, int actorId)
         {
+            await guard.EnsureProjectOwnerAsync(actorId, id);
             var p = await db.Projects.FindAsync(id) ?? throw new KeyNotFoundException($"Project {id} not found.");
             if (req.ProjectName is { } n) p.ProjectName = n;
             if (req.Status is { } s) p.Status = s;
@@ -54,6 +68,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
 //----------------------------------------------------------------------------------------------------------------------//
         public async Task AddMemberAsync(int projectId, int userId, int actorId)
         {
+            await guard.EnsureProjectOwnerAsync(actorId, projectId);
             var projectName = await db.Projects.Where(p => p.ProjectId == projectId)
                 .Select(p => p.ProjectName).FirstOrDefaultAsync()
                 ?? throw new KeyNotFoundException($"Project {projectId} not found.");

@@ -81,8 +81,8 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             if (req.PercentComplete is { } pc) task.PercentComplete = pc;
             if (req.ProjectId is { } pid && pid != task.ProjectId)
             {
-                if (!await db.Projects.AnyAsync(p => p.ProjectId == pid))
-                    throw new KeyNotFoundException($"Project {pid} not found.");
+                // Moving a task into a project the caller cannot see would hand it to strangers.
+                await guard.EnsureProjectAsync(actorId, pid);
                 task.ProjectId = pid;
             }
 
@@ -95,6 +95,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
         /// <summary>Kanban column move - SM-01 enforced by TaskAssignmentService.</summary>
         public async Task MoveAsync(int taskId, string newStatus, int actorId)
         {
+            await guard.EnsureTaskAsync(actorId, taskId);
             await assignments.ChangeStatusAsync(taskId, newStatus, actorId);
             var projectId = await db.Tasks.Where(t => t.TaskId == taskId).Select(t => t.ProjectId).FirstAsync();
             await notify.BroadcastAsync("boardChanged", new { projectId });
@@ -102,8 +103,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
 //----------------------------------------------------------------------------------------------------------------------//
         public async Task<TaskCommentDto> AddCommentAsync(int taskId, string text, int userId)
         {
-            if (!await db.Tasks.AnyAsync(t => t.TaskId == taskId))
-                throw new KeyNotFoundException($"Task {taskId} not found.");
+            await guard.EnsureTaskAsync(userId, taskId);
 
             var c = new TaskComment { TaskId = taskId, UserId = userId, Comment = text, TimeCreated = DateTime.UtcNow };
             db.TaskComments.Add(c);
@@ -111,8 +111,9 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             return new TaskCommentDto(c.CommentId, c.UserId, c.Comment, c.TimeCreated);
         }
 //----------------------------------------------------------------------------------------------------------------------//
-        public async Task<TaskDetailDto> DetailAsync(int taskId)
+        public async Task<TaskDetailDto> DetailAsync(int taskId, int userId)
         {
+            await guard.EnsureTaskAsync(userId, taskId);
             var task = await db.Tasks.FindAsync(taskId)
                 ?? throw new KeyNotFoundException($"Task {taskId} not found.");
             var comments = await db.TaskComments.Where(c => c.TaskId == taskId)
