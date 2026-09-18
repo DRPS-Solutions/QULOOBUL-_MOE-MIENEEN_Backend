@@ -1,13 +1,19 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using QULOOBUL__MOE_MIENEEN_Backend.Data;
+using QULOOBUL__MOE_MIENEEN_Backend.Models.NotificationsAudit;
 using QULOOBUL__MOE_MIENEEN_Shared.Reports;
 
 namespace QULOOBUL__MOE_MIENEEN_Backend.Services
 {
-    /// <summary>UC-09: aggregate task/workload/project data over a period. Read-only.</summary>
+    /// <summary>UC-09: aggregate task/workload/project data over a period.</summary>
     public class ReportingService(AppDbContext db)
     {
-        public async Task<ReportDto> BuildAsync(ReportRequest req)
+        /// <summary>
+        /// Builds the dashboard figures and records that the report was run. The Report row is the
+        /// "who asked what, and when" trail the audit NFR expects; the figures themselves are
+        /// recomputed rather than stored, so a later read never shows stale numbers.
+        /// </summary>
+        public async Task<ReportDto> BuildAsync(ReportRequest req, int generatedBy)
         {
             if (req.PeriodEnd < req.PeriodStart)
                 throw new ArgumentException("PeriodEnd must be on or after PeriodStart.");
@@ -42,7 +48,20 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
                 p.ProjectId, p.ProjectName, p.Total, p.Done,
                 p.Total == 0 ? 0 : Math.Round(100.0 * p.Done / p.Total, 1))).ToList();
 
+            db.Reports.Add(new Report
+            {
+                GeneratedBy = generatedBy,
+                SubjectUserId = req.SubjectUserId,
+                ReportType = req.ReportType,
+                DateGenerated = DateTime.UtcNow,
+                PeriodStart = req.PeriodStart,
+                PeriodEnd = req.PeriodEnd,
+                FilePath = string.Empty,     // set once UC-09's "export" produces a file in Blob Storage
+            });
+            await db.SaveChangesAsync();
+
             return new ReportDto(req.ReportType, req.PeriodStart, req.PeriodEnd, completion, workload, progressStats);
         }
     }
 }
+//---------------------------DDDDDDDDDDDoooooooooooooo END OF FILE DDDDDDDDDDDoooooooooooooo---------------------------//

@@ -26,8 +26,8 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             };
             user.PasswordHash = auth.Hash(user, req.TempPassword);
             db.Users.Add(user);
-            audit.Record(actorId, "user.create", nameof(User), 0);
-            await db.SaveChangesAsync();
+            await db.SaveChangesAsync();                 // assigns user.UserId
+            await audit.RecordAndSaveAsync(actorId, "user.create", nameof(User), user.UserId);
 
             return new UserDto(user.UserId, user.FirstName, user.Surname, user.Email, user.CellNo, role.RoleName, user.IsActive);
         }

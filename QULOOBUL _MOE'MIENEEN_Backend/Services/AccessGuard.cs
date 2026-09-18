@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using QULOOBUL__MOE_MIENEEN_Backend.Data;
+using QULOOBUL__MOE_MIENEEN_Backend.Models.File;
 using QULOOBUL__MOE_MIENEEN_Backend.Models.Project;
 using static QULOOBUL__MOE_MIENEEN_Shared.Classes.Common;
 
@@ -101,6 +102,22 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
                 || db.Projects.Any(p => p.ProjectId == t.ProjectId && p.OwnerId == userId)
                 || db.ProjectMembers.Any(m => m.ProjectId == t.ProjectId && m.UserId == userId)
                 || db.TaskAssignments.Any(a => a.TaskId == t.TaskId && a.UserId == userId));
+//----------------------------------------------------------------------------------------------------------------------//
+        /// <summary>
+        /// The library listing counterpart of <see cref="EnsureFileAsync"/>: a file is visible when its
+        /// task or its meeting is, and an unattached one only to its uploader.
+        /// </summary>
+        public IQueryable<FileUpload> VisibleFiles(IQueryable<FileUpload> files, int userId, bool isAdmin) =>
+            isAdmin ? files : files.Where(f =>
+                f.UploadedBy == userId
+                || db.Tasks.Any(t => t.TaskId == f.TaskId
+                    && (t.CreatedBy == userId
+                        || db.Projects.Any(p => p.ProjectId == t.ProjectId && p.OwnerId == userId)
+                        || db.ProjectMembers.Any(m => m.ProjectId == t.ProjectId && m.UserId == userId)
+                        || db.TaskAssignments.Any(a => a.TaskId == t.TaskId && a.UserId == userId)))
+                || db.Meetings.Any(m => m.MeetingId == f.MeetingId
+                    && (m.OrganiserId == userId
+                        || db.MeetingAttendees.Any(a => a.MeetingId == m.MeetingId && a.UserId == userId))));
     }
 }
 //---------------------------DDDDDDDDDDDoooooooooooooo END OF FILE DDDDDDDDDDDoooooooooooooo---------------------------//

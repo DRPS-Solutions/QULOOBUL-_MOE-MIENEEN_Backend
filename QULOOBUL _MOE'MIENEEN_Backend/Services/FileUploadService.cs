@@ -9,9 +9,22 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
     /// The API only ever writes the File_Upload metadata row and hands back a single-blob SAS;
     /// the bytes go straight from the client to Blob Storage.
     /// </summary>
-    public class FileUploadService(AppDbContext db, BlobStorageService blob, AuditService audit)
+    public class FileUploadService(
+        AppDbContext db, BlobStorageService blob, AuditService audit, IConfiguration config)
     {
         public const string Container = "attachments";
+
+        /// <summary>SD-04: validate(file) [ size &lt;= 25 MB AND fileType is permitted ].</summary>
+        public const long DefaultMaxBytes = 25L * 1024 * 1024;
+
+        private static readonly string[] DefaultExtensions =
+            [".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
+             ".txt", ".csv", ".png", ".jpg", ".jpeg", ".gif", ".webp"];
+
+        private long MaxBytes => config.GetValue<long?>("Files:MaxBytes") ?? DefaultMaxBytes;
+
+        private string[] AllowedExtensions =>
+            config.GetSection("Files:AllowedExtensions").Get<string[]>() ?? DefaultExtensions;
 //----------------------------------------------------------------------------------------------------------------------//
         /// <summary>At most one attachment context may be set (architecture doc / CK_FileUpload_OneContext).</summary>
         public record AttachmentContext(int? TaskId = null, int? MeetingId = null, DateTime? PeriodMonth = null)
@@ -26,10 +39,24 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
         /// blob path (container/blobName), not a public URL.
         /// </summary>
         public async Task<UploadTicket> CreateUploadAsync(
-            int uploadedBy, int categoryId, string fileName, string fileType, AttachmentContext context)
+            int uploadedBy, int categoryId, string fileName, string fileType, long sizeBytes,
+            AttachmentContext context)
         {
             if (string.IsNullOrWhiteSpace(fileName))
                 throw new ArgumentException("File name is required.", nameof(fileName));
+
+            // SD-04 validates before a SAS is issued: once the client holds one, the bytes go
+            // straight to Blob Storage and the API never sees them again.
+            if (sizeBytes <= 0 || sizeBytes > MaxBytes)
+                throw new ArgumentException(
+                    $"Files must be between 1 byte and {MaxBytes / (1024 * 1024)} MB.", nameof(sizeBytes));
+
+            var extension = Path.GetExtension(fileName);
+            if (string.IsNullOrEmpty(extension)
+                || !AllowedExtensions.Contains(extension, StringComparer.OrdinalIgnoreCase))
+                throw new ArgumentException(
+                    $"\"{extension}\" is not a permitted file type.", nameof(fileName));
+
             if (context.Count > 1)
                 throw new InvalidOperationException("A file may be attached to only one of: task, meeting, period.");
             if (!await db.FileCategories.AnyAsync(c => c.CategoryId == categoryId))
@@ -39,7 +66,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             if (context.MeetingId is int m && !await db.Meetings.AnyAsync(x => x.MeetingId == m))
                 throw new InvalidOperationException($"Unknown meeting {m}.");
 
-            var blobName = $"{Guid.NewGuid():N}{Path.GetExtension(fileName)}";
+            var blobName = $"{Guid.NewGuid():N}{extension}";
 
             var file = new FileUpload
             {

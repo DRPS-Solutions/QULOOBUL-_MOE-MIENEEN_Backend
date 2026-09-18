@@ -86,6 +86,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
 //----------------------------------------------------------------------------------------------------------------------//
         public async Task RemoveMemberAsync(int projectId, int userId, int actorId)
         {
+            await guard.EnsureProjectOwnerAsync(actorId, projectId);
             var member = await db.ProjectMembers.FirstOrDefaultAsync(m => m.ProjectId == projectId && m.UserId == userId)
                 ?? throw new KeyNotFoundException("That user is not on this project.");
             db.ProjectMembers.Remove(member);
