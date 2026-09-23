@@ -59,6 +59,9 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
         /// <summary>UC-08 alternate flow — admin broadcast.</summary>
         public async Task SendAsync(SendNotificationRequest req, int senderId)
         {
+            var ids = req.UserIds.Distinct().ToList();
+            if (await db.Users.CountAsync(u => ids.Contains(u.UserId) && u.IsActive) != ids.Count)
+                throw new ArgumentException("Every recipient must be an active user.");
             foreach (var uid in req.UserIds.Distinct())
                 await notify.QueueAsync(uid, req.Type, req.Message, "announcement", 0, ignorePreferences: true);
             audit.Record(senderId, "notification.broadcast", "Notification", 0);

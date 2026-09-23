@@ -85,6 +85,18 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             throw new UnauthorizedAccessException("You do not have access to this meeting.");
         }
 //----------------------------------------------------------------------------------------------------------------------//
+        /// <summary>Events are public within the organisation, but only the organiser or an admin
+        /// changes who is on one.</summary>
+        public async Task EnsureEventOrganiserAsync(int userId, int eventId)
+        {
+            var organiserId = await db.Events.Where(e => e.EventId == eventId)
+                .Select(e => (int?)e.OrganiserId).FirstOrDefaultAsync()
+                ?? throw new KeyNotFoundException($"Event {eventId} not found.");
+
+            if (organiserId != userId && !await IsAdminAsync(userId))
+                throw new UnauthorizedAccessException("Only the event organiser or an admin may change its attendees.");
+        }
+//----------------------------------------------------------------------------------------------------------------------//
         /// <summary>A file inherits the access rule of whatever it is attached to; an unattached
         /// file (a monthly report filed against a period) is the uploader's and an admin's.</summary>
         public async Task EnsureFileAsync(int userId, int fileId)

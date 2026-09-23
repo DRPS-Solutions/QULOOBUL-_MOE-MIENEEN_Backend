@@ -1,6 +1,8 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using QULOOBUL__MOE_MIENEEN_Backend.Services;
 using QULOOBUL__MOE_MIENEEN_Shared.Notifications;
+using static QULOOBUL__MOE_MIENEEN_Shared.Classes.Common;
 
 namespace QULOOBUL__MOE_MIENEEN_Backend.Controllers
 {
@@ -35,6 +37,14 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Controllers
         public async Task<IActionResult> SetPreferences(UpdateNotificationPreferencesRequest req)
         {
             await notifications.SetPreferencesAsync(UserId(), req.Preferences);
+            return NoContent();
+        }
+//----------------------------------------------------------------------------------------------------------------------//
+        /// <summary>UC-08 alternate flow: an admin messages chosen users directly, past their preferences.</summary>
+        [HttpPost("send"), Authorize(Policy = Permissions.ManageUsers)]
+        public async Task<IActionResult> Send(SendNotificationRequest req)
+        {
+            await notifications.SendAsync(req, UserId());
             return NoContent();
         }
     }

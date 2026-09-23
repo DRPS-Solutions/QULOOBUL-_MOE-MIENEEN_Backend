@@ -14,7 +14,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
     /// collision. Add a duration column and switch these two checks to an interval overlap if the
     /// client starts booking overlapping half-day events.
     /// </summary>
-    public class EventService(AppDbContext db, AuditService audit, NotificationService notify)
+    public class EventService(AppDbContext db, AuditService audit, NotificationService notify, AccessGuard guard)
     {
         public const string Invited = "Invited";
 //----------------------------------------------------------------------------------------------------------------------//
@@ -61,6 +61,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
         {
             var ev = await db.Events.FindAsync(eventId)
                 ?? throw new KeyNotFoundException($"Event {eventId} not found.");
+            await guard.EnsureEventOrganiserAsync(actorId, eventId);
             if (!await db.Users.AnyAsync(u => u.UserId == userId && u.IsActive))
                 throw new InvalidOperationException($"User {userId} does not exist or is deactivated.");
             if (await db.EventAttendees.AnyAsync(a => a.EventId == eventId && a.UserId == userId))
@@ -90,8 +91,10 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             await db.SaveChangesAsync();
         }
 //----------------------------------------------------------------------------------------------------------------------//
+        /// <summary>The organiser or an admin removes anyone; an attendee may only drop themselves.</summary>
         public async Task RemoveAttendeeAsync(int eventId, int userId, int actorId)
         {
+            if (userId != actorId) await guard.EnsureEventOrganiserAsync(actorId, eventId);
             var attendee = await db.EventAttendees
                 .FirstOrDefaultAsync(a => a.EventId == eventId && a.UserId == userId)
                 ?? throw new KeyNotFoundException("That user is not on this event.");
