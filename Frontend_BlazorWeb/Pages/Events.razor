@@ -516,6 +516,14 @@
         await AppData.RefreshProjectsAsync();
     }
 
+    // events?project=4 (a notification's link, UC-08 step 3) opens that project's detail.
+    [SupplyParameterFromQuery(Name = "project")] public int? DeepLinkProjectId { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (DeepLinkProjectId is { } id && selected?.ProjectId != id) await SelectProject(id);
+    }
+
     public void Dispose()
     {
         AppData.OnChange -= StateHasChanged;

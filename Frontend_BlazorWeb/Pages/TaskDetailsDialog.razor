@@ -88,6 +88,25 @@
                 Completed@(Task.CompletedBy is null ? "" : $" by {AppData.UserName(Task.CompletedBy)}")
             </MudAlert>
         }
+
+        @* --- Comments (UC-04 "add details to tasks"). Posted straight away,
+           independent of "Save changes", since the API keeps them append-only. --- *@
+        <MudText Typo="Typo.subtitle2" Class="mt-4 mb-2">Comments (@comments.Count)</MudText>
+        @foreach (var c in comments)
+        {
+            <MudPaper Elevation="0" Outlined="true" Class="pa-2 mb-2">
+                <MudText Typo="Typo.caption" Style="opacity:0.7;">
+                    @AppData.UserName(c.UserId) · @AppDataService.Local(c.TimeCreated).ToString("dd MMM, HH:mm")
+                </MudText>
+                <MudText Typo="Typo.body2" Style="white-space:pre-wrap;">@c.Comment</MudText>
+            </MudPaper>
+        }
+        <div class="d-flex gap-2 align-center">
+            <MudTextField T="string" @bind-Value="newComment" Label="Add a comment" Variant="Variant.Outlined"
+                          Margin="Margin.Dense" MaxLength="2000" Immediate="true" />
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" Disabled="@(string.IsNullOrWhiteSpace(newComment) || posting)"
+                       OnClick="PostComment">Post</MudButton>
+        </div>
     </DialogContent>
     <DialogActions>
         <MudButton OnClick="Cancel">Cancel</MudButton>
@@ -122,6 +141,27 @@
     private int? assigneeId;
     private string taskType = "Daily";
     private int? projectId;
+
+    private List<TaskCommentDto> comments = [];
+    private string newComment = string.Empty;
+    private bool posting;
+
+    protected override async Task OnInitializedAsync()
+    {
+        comments = (await AppData.GetAsync<TaskDetailDto>($"api/tasks/{Task.TaskId}"))?.Comments.ToList() ?? [];
+    }
+
+    private async Task PostComment()
+    {
+        posting = true;
+        if (await AppData.SendAsync<TaskCommentDto>(HttpMethod.Post, $"api/tasks/{Task.TaskId}/comments",
+                new AddTaskCommentRequest { Comment = newComment.Trim() }) is { } added)
+        {
+            comments.Add(added);
+            newComment = string.Empty;
+        }
+        posting = false;
+    }
 
     protected override void OnInitialized()
     {

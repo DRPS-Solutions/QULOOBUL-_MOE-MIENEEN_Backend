@@ -3,6 +3,7 @@
 @implements IDisposable
 @inject AppDataService AppData
 @inject NavigationManager Navigation
+@inject ISnackbar Snackbar
 
 <PageTitle>Notifications</PageTitle>
 
@@ -220,6 +221,27 @@
             </MudButton>
         </div>
 
+        @* UC-08 alternate flow: an admin messages chosen people directly. *@
+        @if (CanSend)
+        {
+            <div class="drps-card mb-4">
+                <MudText Typo="Typo.subtitle1" Style="font-weight:600;" Class="mb-2">Send an announcement</MudText>
+                <MudSelect T="int" Label="Recipients" Variant="Variant.Outlined" MultiSelection="true"
+                           @bind-SelectedValues="recipients" ToStringFunc="@(id => AppData.UserName(id))" Class="mb-3">
+                    @foreach (var user in AppData.Users.Where(u => u.IsActive).OrderBy(u => u.FullName))
+                    {
+                        <MudSelectItem T="int" Value="@user.UserId">@user.FullName</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudTextField T="string" @bind-Value="announcement" Label="Message" Variant="Variant.Outlined"
+                              Lines="2" MaxLength="500" Immediate="true" Class="mb-3" />
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SendAnnouncement"
+                           Disabled="@(sending || !recipients.Any() || string.IsNullOrWhiteSpace(announcement))">
+                    @(sending ? "Sending..." : "Send")
+                </MudButton>
+            </div>
+        }
+
         <div class="drps-card">
             <div class="drps-filter-row">
                 <div class="drps-filter-chip @(activeFilter is null ? "active" : "")" @onclick="@(() => activeFilter = null)">
@@ -331,7 +353,16 @@
     {
         if (!n.IsRead) await AppData.MarkReadAsync([n.NotificationId]);
 
-        var destination = KindOf(n) switch
+        // The item itself when the notification names one; otherwise the page for its kind.
+        var destination = (n.EntityType, n.EntityId) switch
+        {
+            ("ProjectTask", { } id) => AppData.CanSeeTasks ? $"tasks?task={id}" : "",
+            ("ResourceRequest", { } id) when AppData.CanSeeRequests => $"requests?id={id}",
+            ("Project", { } id) when AppData.CanSeeEvents => $"events?project={id}",
+            ("Event", { } id) => $"calendar?event={id}",
+            ("User", _) when AppData.CanSeeUserManagement => "users",
+            _ => null
+        } ?? KindOf(n) switch
         {
             Kind.ResourceRequest when AppData.CanSeeRequests => "requests",
             Kind.EventAssignment when AppData.CanSeeEvents => "events",
@@ -339,6 +370,24 @@
             _ => null
         };
         if (destination is not null) Navigation.NavigateTo(destination);
+    }
+
+    private bool CanSend => AppData.HasPermission(Permissions.ManageUsers);
+    private IEnumerable<int> recipients = [];
+    private string announcement = string.Empty;
+    private bool sending;
+
+    private async Task SendAnnouncement()
+    {
+        sending = true;
+        if (await AppData.SendAsync(HttpMethod.Post, "api/notifications/send",
+                new SendNotificationRequest { UserIds = recipients.ToList(), Message = announcement.Trim() }))
+        {
+            Snackbar.Add($"Sent to {recipients.Count()} {(recipients.Count() == 1 ? "person" : "people")}.", Severity.Success);
+            recipients = [];
+            announcement = string.Empty;
+        }
+        sending = false;
     }
 
     private Task MarkAllAsRead() =>

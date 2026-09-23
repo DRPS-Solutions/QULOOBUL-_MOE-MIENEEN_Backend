@@ -725,6 +725,19 @@
 
     private Task LoadWeek() => AppData.LoadTasksAsync(weekStart, weekStart.AddDays(7));
 
+    // tasks?task=12 (a notification's link, UC-08 step 3): jump to the task's week and open it.
+    [SupplyParameterFromQuery(Name = "task")] public int? DeepLinkTaskId { get; set; }
+    private int? openedDeepLink;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (DeepLinkTaskId is not { } id || id == openedDeepLink) return;
+        openedDeepLink = id;
+        if (await AppData.GetAsync<TaskDetailDto>($"api/tasks/{id}") is not { } detail) return;
+        await ShowDay(detail.Deadline);
+        if (AppData.Tasks.FirstOrDefault(t => t.TaskId == id) is { } card) _ = OnOpenTaskDetails(card);
+    }
+
     // Re-render when the task list refreshes - our own changes, or a
     // SignalR push after someone else's - so the timeline never goes stale.
     protected override async Task OnInitializedAsync()

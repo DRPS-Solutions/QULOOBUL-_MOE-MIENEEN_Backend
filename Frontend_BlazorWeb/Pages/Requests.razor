@@ -309,7 +309,7 @@
                         @foreach (var req in FilteredRequests)
                         {
                             var (title, notes) = SplitDetail(req);
-                            <div class="drps-request-item">
+                            <div class="drps-request-item" style="@(req.RequestId == DeepLinkId ? "outline:2px solid var(--drps-blue-500);" : "")">
                                 <div class="drps-request-top">
                                     <div>
                                         <div class="drps-request-title">@title</div>
@@ -338,7 +338,7 @@
                                 @* Approve/Deny only render for reviewers, only while still
                                    Pending, and never on their own request (the API refuses
                                    self-review). *@
-                                @if (CanReview && req.Status == "Pending" && req.RequestedBy != AppData.CurrentUser?.UserId)
+                                @if (CanReview && (req.Status is "Pending" or "Escalated" or "Under Review") && req.RequestedBy != AppData.CurrentUser?.UserId)
                                 {
                                     <div class="drps-request-actions">
                                         <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Success" OnClick="@(() => Review(req, true, null))">
@@ -346,6 +346,16 @@
                                         </MudButton>
                                         <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Error" OnClick="@(() => DenyRequest(req, title))">
                                             Deny
+                                        </MudButton>
+                                    </div>
+                                }
+
+                                @* SM-02 fulfil: an approved request is closed once the items are handed over. *@
+                                @if (CanReview && req.Status == "Approved")
+                                {
+                                    <div class="drps-request-actions">
+                                        <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" OnClick="@(() => Complete(req))">
+                                            Mark fulfilled
                                         </MudButton>
                                     </div>
                                 }
@@ -416,8 +426,18 @@
     // --- Status filter above the list. Null means "All". ---
     private string? activeFilter = null;
 
+    // requests?id=7 (a notification's link): that request is outlined and listed first.
+    [SupplyParameterFromQuery(Name = "id")] public int? DeepLinkId { get; set; }
+
     private IEnumerable<ResourceRequestDto> FilteredRequests =>
-        activeFilter is null ? AppData.Requests : AppData.Requests.Where(r => r.Status == activeFilter);
+        (activeFilter is null ? AppData.Requests : AppData.Requests.Where(r => r.Status == activeFilter))
+        .OrderByDescending(r => r.RequestId == DeepLinkId);
+
+    private async Task Complete(ResourceRequestDto req)
+    {
+        if (await AppData.SendAsync(HttpMethod.Post, $"api/requests/{req.RequestId}/complete"))
+            await AppData.RefreshRequestsAsync();
+    }
 
     private static (string Title, string? Notes) SplitDetail(ResourceRequestDto req)
     {
