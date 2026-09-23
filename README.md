@@ -107,7 +107,7 @@ Five modelling decisions carry business rules and shouldn't be "tidied away":
   only that project; this is the table the authorisation check reads.
 
 All FKs are `Restrict` on delete, with unique pairs and a `CK_FileUpload_OneContext` check
-constraint. Two migrations: `InitialCreate` and `AddTaskDescriptionAndRequestDetail`.
+constraint. One migration: `InitialCreate`.
 
 ## API
 

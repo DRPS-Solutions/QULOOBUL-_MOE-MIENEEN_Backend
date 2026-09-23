@@ -115,7 +115,12 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
                     Email = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: false),
                     CellNo = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: false),
                     PasswordHash = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: false),
-                    IsActive = table.Column<bool>(type: "bit", nullable: false)
+                    IsActive = table.Column<bool>(type: "bit", nullable: false),
+                    Status = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: false),
+                    FailedLoginCount = table.Column<int>(type: "int", nullable: false),
+                    PasswordTokenHash = table.Column<string>(type: "nvarchar(64)", maxLength: 64, nullable: true),
+                    PasswordTokenExpires = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    DeactivatedAt = table.Column<DateTime>(type: "datetime2", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -225,6 +230,33 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "Notification_Preference",
+                columns: table => new
+                {
+                    PreferenceId = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    UserId = table.Column<int>(type: "int", nullable: false),
+                    TypeId = table.Column<int>(type: "int", nullable: false),
+                    IsEnabled = table.Column<bool>(type: "bit", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Notification_Preference", x => x.PreferenceId);
+                    table.ForeignKey(
+                        name: "FK_Notification_Preference_Notification_Type_TypeId",
+                        column: x => x.TypeId,
+                        principalTable: "Notification_Type",
+                        principalColumn: "TypeId",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_Notification_Preference_User_UserId",
+                        column: x => x.UserId,
+                        principalTable: "User",
+                        principalColumn: "UserId",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "Project",
                 columns: table => new
                 {
@@ -288,7 +320,8 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
                     ReviewedBy = table.Column<int>(type: "int", nullable: true),
                     Status = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: false),
                     Priority = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: false),
-                    DateSubmitted = table.Column<DateTime>(type: "datetime2", nullable: false)
+                    DateSubmitted = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    Detail = table.Column<string>(type: "nvarchar(1000)", maxLength: 1000, nullable: true)
                 },
                 constraints: table =>
                 {
@@ -497,6 +530,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
                     CompletedBy = table.Column<int>(type: "int", nullable: true),
                     ScheduleId = table.Column<int>(type: "int", nullable: true),
                     Title = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: false),
+                    Description = table.Column<string>(type: "nvarchar(2000)", maxLength: 2000, nullable: true),
                     Priority = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: false),
                     Status = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: false),
                     Deadline = table.Column<DateTime>(type: "datetime2", nullable: false),
@@ -544,7 +578,8 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
                     FileName = table.Column<string>(type: "nvarchar(260)", maxLength: 260, nullable: false),
                     FileType = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
                     FilePath = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: false),
-                    PeriodMonth = table.Column<DateTime>(type: "datetime2", nullable: true)
+                    PeriodMonth = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    IsArchived = table.Column<bool>(type: "bit", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -664,6 +699,13 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
                 column: "UserId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_Event_Location_EventDate",
+                table: "Event",
+                columns: new[] { "Location", "EventDate" },
+                unique: true,
+                filter: "[Location] <> ''");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Event_OrganiserId",
                 table: "Event",
                 column: "OrganiserId");
@@ -739,6 +781,17 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
                 name: "IX_Notification_UserId",
                 table: "Notification",
                 column: "UserId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Notification_Preference_TypeId",
+                table: "Notification_Preference",
+                column: "TypeId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Notification_Preference_UserId_TypeId",
+                table: "Notification_Preference",
+                columns: new[] { "UserId", "TypeId" },
+                unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_Project_OwnerId",
@@ -895,6 +948,9 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
 
             migrationBuilder.DropTable(
                 name: "Notification");
+
+            migrationBuilder.DropTable(
+                name: "Notification_Preference");
 
             migrationBuilder.DropTable(
                 name: "Project_Member");

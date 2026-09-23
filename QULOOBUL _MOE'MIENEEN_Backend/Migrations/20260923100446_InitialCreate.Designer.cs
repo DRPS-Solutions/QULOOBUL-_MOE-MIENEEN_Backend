@@ -12,7 +12,7 @@ using QULOOBUL__MOE_MIENEEN_Backend.Data;
 namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260915210550_InitialCreate")]
+    [Migration("20260923100446_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -52,6 +52,10 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
                     b.HasKey("EventId");
 
                     b.HasIndex("OrganiserId");
+
+                    b.HasIndex("Location", "EventDate")
+                        .IsUnique()
+                        .HasFilter("[Location] <> ''");
 
                     b.ToTable("Event");
                 });
@@ -217,6 +221,9 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<bool>("IsArchived")
+                        .HasColumnType("bit");
+
                     b.Property<int?>("MeetingId")
                         .HasColumnType("int");
 
@@ -321,10 +328,16 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
 
+                    b.Property<DateTime?>("DeactivatedAt")
+                        .HasColumnType("datetime2");
+
                     b.Property<string>("Email")
                         .IsRequired()
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
+
+                    b.Property<int>("FailedLoginCount")
+                        .HasColumnType("int");
 
                     b.Property<string>("FirstName")
                         .IsRequired()
@@ -339,8 +352,20 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
 
+                    b.Property<DateTime?>("PasswordTokenExpires")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("PasswordTokenHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
                     b.Property<int>("RoleId")
                         .HasColumnType("int");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
 
                     b.Property<string>("Surname")
                         .IsRequired()
@@ -426,6 +451,33 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("Notification");
+                });
+
+            modelBuilder.Entity("QULOOBUL__MOE_MIENEEN_Backend.Models.NotificationsAudit.NotificationPreference", b =>
+                {
+                    b.Property<int>("PreferenceId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("PreferenceId"));
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("TypeId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("PreferenceId");
+
+                    b.HasIndex("TypeId");
+
+                    b.HasIndex("UserId", "TypeId")
+                        .IsUnique();
+
+                    b.ToTable("Notification_Preference");
                 });
 
             modelBuilder.Entity("QULOOBUL__MOE_MIENEEN_Backend.Models.NotificationsAudit.NotificationType", b =>
@@ -563,6 +615,10 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
                     b.Property<DateTime>("Deadline")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("Description")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
                     b.Property<int>("PercentComplete")
                         .HasColumnType("int");
 
@@ -662,6 +718,10 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
 
                     b.Property<DateTime>("DateSubmitted")
                         .HasColumnType("datetime2");
+
+                    b.Property<string>("Detail")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
 
                     b.Property<string>("Priority")
                         .IsRequired()
@@ -972,6 +1032,25 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
                 });
 
             modelBuilder.Entity("QULOOBUL__MOE_MIENEEN_Backend.Models.NotificationsAudit.Notification", b =>
+                {
+                    b.HasOne("QULOOBUL__MOE_MIENEEN_Backend.Models.NotificationsAudit.NotificationType", "Type")
+                        .WithMany()
+                        .HasForeignKey("TypeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("QULOOBUL__MOE_MIENEEN_Backend.Models.IdentityAndAccess.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Type");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("QULOOBUL__MOE_MIENEEN_Backend.Models.NotificationsAudit.NotificationPreference", b =>
                 {
                     b.HasOne("QULOOBUL__MOE_MIENEEN_Backend.Models.NotificationsAudit.NotificationType", "Type")
                         .WithMany()
