@@ -32,6 +32,8 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             var assigner = await db.Users.FindAsync(assignedById)
                 ?? throw new KeyNotFoundException($"User {assignedById} not found.");
 
+            if (Is(task.Status, Lifecycle.TaskCancelled) || Is(task.Status, Lifecycle.TaskArchived))
+                throw new InvalidOperationException($"Cannot assign a task that is {task.Status.ToLowerInvariant()}.");
             if (!assignee.IsActive)
                 throw new InvalidOperationException("Cannot assign a task to a deactivated user.");
 

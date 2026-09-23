@@ -5,7 +5,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace QULOOBUL__MOE_MIENEEN_Backend.Services
 {
-    public class ProjectService(AppDbContext db, AuditService audit, NotificationService notify, AccessGuard guard)
+    public class ProjectService(
+        AppDbContext db, AuditService audit, NotificationService notify, AccessGuard guard, TaskAssignmentService tasks)
     {
         /// <summary>Only the projects the caller belongs to (ProjectMember: "sees only that project").</summary>
         public async Task<List<ProjectSummaryDto>> ListAsync(int userId)
@@ -18,7 +19,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             return await q.OrderBy(p => p.ProjectName).Select(p => new ProjectSummaryDto(
                 p.ProjectId, p.ProjectName, p.Status,
                 db.ProjectMembers.Count(m => m.ProjectId == p.ProjectId),
-                db.Tasks.Count(t => t.ProjectId == p.ProjectId && t.Status != "Done"))).ToListAsync();
+                db.Tasks.Count(t => t.ProjectId == p.ProjectId && !Lifecycle.TaskFinished.Contains(t.Status)))).ToListAsync();
         }
 //----------------------------------------------------------------------------------------------------------------------//
         public async Task<ProjectDto> GetAsync(int id, int userId)
@@ -54,7 +55,14 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             await guard.EnsureProjectOwnerAsync(actorId, id);
             var p = await db.Projects.FindAsync(id) ?? throw new KeyNotFoundException($"Project {id} not found.");
             if (req.ProjectName is { } n) p.ProjectName = n;
-            if (req.Status is { } s) p.Status = s;
+            if (req.Status is { } s)
+            {
+                // SM-01 archive() [parent project is closed]: fires on the move into Closed, in this UoW.
+                if (s.Equals(Lifecycle.ProjectClosed, StringComparison.OrdinalIgnoreCase)
+                    && !p.Status.Equals(Lifecycle.ProjectClosed, StringComparison.OrdinalIgnoreCase))
+                    await tasks.ArchiveDoneTasksAsync(id, actorId);
+                p.Status = s;
+            }
             if (req.Description is { } d) p.Description = d;
             if (req.OwnerId is { } o)
             {

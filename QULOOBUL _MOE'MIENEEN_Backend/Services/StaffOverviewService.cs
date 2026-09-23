@@ -14,8 +14,8 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
                 u.UserId,
                 u.FirstName + " " + u.Surname,
                 u.Role!.RoleName,
-                db.TaskAssignments.Count(a => a.UserId == u.UserId && a.Task!.Status != "Done"),
-                db.TaskAssignments.Count(a => a.UserId == u.UserId && a.Task!.Status != "Done" && a.Task.Deadline < DateTime.UtcNow),
+                db.TaskAssignments.Count(a => a.UserId == u.UserId && !Lifecycle.TaskFinished.Contains(a.Task!.Status)),
+                db.TaskAssignments.Count(a => a.UserId == u.UserId && !Lifecycle.TaskFinished.Contains(a.Task!.Status) && a.Task.Deadline < DateTime.UtcNow),
                 db.ResourceRequests.Count(r => r.RequestedBy == u.UserId && r.Status == "Pending")))
                 .ToListAsync();
 //----------------------------------------------------------------------------------------------------------------------//
