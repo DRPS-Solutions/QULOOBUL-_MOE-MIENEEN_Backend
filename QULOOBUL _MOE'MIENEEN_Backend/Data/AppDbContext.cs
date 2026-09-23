@@ -54,6 +54,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Data
         public DbSet<NotificationType> NotificationTypes => Set<NotificationType>();
         public DbSet<NotificationPreference> NotificationPreferences => Set<NotificationPreference>();
         public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+        public DbSet<UserDirectoryEntry> UserDirectory => Set<UserDirectoryEntry>();
 //----------------------------------------------------------------------------------------------------------------------//
 
         /// <summary>
@@ -69,6 +70,26 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Data
             // multiple-cascade-path error without hand-writing every relationship.
             foreach (var fk in b.Model.GetEntityTypes().SelectMany(t => t.GetForeignKeys()))
                 fk.DeleteBehavior = DeleteBehavior.Restrict;
+
+            // ...then the per-relationship exceptions (architecture doc, "Delete behaviour is set per
+            // relationship"). Cascade: rows meaningless without their parent. Set null: optional links.
+            // Every FK to User stays NO ACTION, and so do the history tables.
+            b.Entity<TaskComment>().HasOne(x => x.Task).WithMany().HasForeignKey(x => x.TaskId).OnDelete(DeleteBehavior.Cascade);
+            b.Entity<TaskAssignment>().HasOne(x => x.Task).WithMany().HasForeignKey(x => x.TaskId).OnDelete(DeleteBehavior.Cascade);
+            b.Entity<ProjectMember>().HasOne(x => x.Project).WithMany().HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Cascade);
+            b.Entity<MeetingAttendee>().HasOne(x => x.Meeting).WithMany().HasForeignKey(x => x.MeetingId).OnDelete(DeleteBehavior.Cascade);
+            b.Entity<EventAttendee>().HasOne(x => x.Event).WithMany().HasForeignKey(x => x.EventId).OnDelete(DeleteBehavior.Cascade);
+            b.Entity<FileUpload>().HasOne(x => x.Task).WithMany().HasForeignKey(x => x.TaskId).OnDelete(DeleteBehavior.SetNull);
+            b.Entity<FileUpload>().HasOne(x => x.Meeting).WithMany().HasForeignKey(x => x.MeetingId).OnDelete(DeleteBehavior.SetNull);
+
+            // The access paths the use cases hit directly (architecture doc, "Indexing"); User.Email is below.
+            b.Entity<ProjectTask>().HasIndex(x => new { x.ProjectId, x.Status });   // the task board
+            b.Entity<Notification>().HasIndex(x => new { x.UserId, x.IsRead });     // the unread badge
+            b.Entity<AuditLog>().HasIndex(x => x.Timestamp);                        // time-ranged audit queries
+
+            // Staff directory reads a view that has no credential columns (defence in depth); created in
+            // the SecurityAndIndexes migration alongside the Notification row-level security policy.
+            b.Entity<UserDirectoryEntry>().HasNoKey().ToView("vw_UserDirectory");
 
             // Junction tables reject duplicate pairs (architecture doc, "Junction tables carry
             // their own surrogate key ... with a unique constraint on the pair").

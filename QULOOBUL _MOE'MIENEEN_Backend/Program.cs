@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using QULOOBUL__MOE_MIENEEN_Backend.SharedClasses.Auth;
+using QULOOBUL__MOE_MIENEEN_Backend.Controllers;
 using QULOOBUL__MOE_MIENEEN_Backend.Data;
 using QULOOBUL__MOE_MIENEEN_Backend.Hubs;
 using QULOOBUL__MOE_MIENEEN_Backend.SharedClasses.Middleware;
@@ -10,6 +11,7 @@ using QULOOBUL__MOE_MIENEEN_Backend.Services;
 using QULOOBUL__MOE_MIENEEN_Shared;
 using System.Security.Claims;
 using System.Text;
+using System.Threading.RateLimiting;
 using static QULOOBUL__MOE_MIENEEN_Shared.Classes.Common;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -18,8 +20,10 @@ builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 
 // UseSeeding runs after `dotnet ef database update` (and Migrate/EnsureCreated).
-builder.Services.AddDbContext<AppDbContext>(o => o
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddDbContext<AppDbContext>((sp, o) => o
     .UseSqlServer(builder.Configuration.GetConnectionString("Default"))
+    .AddInterceptors(new SessionContextInterceptor(sp.GetRequiredService<IHttpContextAccessor>()))
     .UseSeeding((db, _) => DbSeeder.Seed((AppDbContext)db, builder.Configuration)));
 
 builder.Services.AddSignalR();
@@ -78,6 +82,27 @@ builder.Services.AddCors(o => o.AddDefaultPolicy(p => p
     .WithOrigins(builder.Configuration.GetSection("Cors:Origins").Get<string[]>() ?? [])
     .AllowAnyHeader().AllowAnyMethod().AllowCredentials()));
 
+// Denial-of-service resilience: a per-caller budget (user id, else IP) for the whole API, and a much
+// tighter one on the anonymous credential routes so passwords and set-password tokens cannot be sprayed.
+builder.Services.AddRateLimiter(o =>
+{
+    o.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    o.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(c => RateLimitPartition.GetFixedWindowLimiter(
+        c.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? c.Connection.RemoteIpAddress?.ToString() ?? "",
+        _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = builder.Configuration.GetValue("RateLimit:PerMinute", 300),
+            Window = TimeSpan.FromMinutes(1),
+        }));
+    o.AddPolicy(AuthController.RateLimitPolicy, c => RateLimitPartition.GetFixedWindowLimiter(
+        c.Connection.RemoteIpAddress?.ToString() ?? "",
+        _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = builder.Configuration.GetValue("RateLimit:AuthPerMinute", 10),
+            Window = TimeSpan.FromMinutes(1),
+        }));
+});
+
 // ------------------------------------------------------ Use-case services -------------------------------------------------
 builder.Services.AddScoped<JwtTokenFactory>();
 builder.Services.AddScoped<AuditService>();
@@ -109,10 +134,19 @@ var app = builder.Build();
 if (app.Environment.IsDevelopment()) app.MapOpenApi();
 
 app.UseHttpsRedirection();
+// The API only ever returns JSON, so it may load nothing and be framed by nobody. The web client's
+// own CSP lives in Frontend_BlazorWeb/wwwroot/staticwebapp.config.json.
+app.Use((c, next) =>
+{
+    c.Response.Headers.ContentSecurityPolicy = "default-src 'none'; frame-ancestors 'none'";
+    c.Response.Headers.XContentTypeOptions = "nosniff";
+    return next(c);
+});
 app.UseCors();
 app.UseAuthentication();
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 app.UseAuthorization();
+app.UseRateLimiter();              // after authentication, so the global budget is per user
 app.UseMiddleware<AuditMiddleware>();
 
 app.MapControllers();
@@ -120,4 +154,6 @@ app.MapHub<NotificationHub>("/hubs/notifications").RequireAuthorization();
 app.MapGet("/health", () => Results.Ok(new { status = "ok" })).AllowAnonymous();
 
 app.Run();
+
+public partial class Program;       // WebApplicationFactory<Program> in Backend.Tests
 //---------------------------DDDDDDDDDDDoooooooooooooo END OF FILE DDDDDDDDDDDoooooooooooooo---------------------------//
