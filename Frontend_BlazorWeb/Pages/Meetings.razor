@@ -180,6 +180,42 @@
                 </MudButton>
             </div>
 
+            @* UC-03: search every set of minutes this user can see, by keyword and/or date. *@
+            <div class="drps-card mb-4">
+                <div class="d-flex gap-3 flex-wrap align-center">
+                    <MudTextField T="string" @bind-Value="searchText" Label="Search minutes" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                  Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" Style="min-width:220px;" />
+                    <MudDatePicker @bind-Date="searchFrom" Label="From" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width:160px;" Clearable="true" />
+                    <MudDatePicker @bind-Date="searchTo" Label="To" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width:160px;" Clearable="true" />
+                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="Search">Search</MudButton>
+                    @if (searchResults is not null)
+                    {
+                        <MudButton Variant="Variant.Text" OnClick="@(() => searchResults = null)">Clear</MudButton>
+                    }
+                </div>
+                @if (searchResults is not null)
+                {
+                    <div class="mt-3">
+                        @if (!searchResults.Any())
+                        {
+                            <MudText Typo="Typo.body2">No minutes match.</MudText>
+                        }
+                        @foreach (var hit in searchResults)
+                        {
+                            var meeting = meetings.FirstOrDefault(m => m.MeetingId == hit.MeetingId);
+                            <div class="drps-note-item" style="cursor:pointer;" @onclick="@(() => { if (meeting is not null) OpenExistingMeeting(meeting); })">
+                                <div>
+                                    <div class="drps-note-item-text"><b>@(meeting?.Title ?? $"Meeting #{hit.MeetingId}")</b></div>
+                                    <div class="drps-note-item-meta">
+                                        @AppDataService.Local(hit.TimeRecorded).ToString("dd MMM yyyy") · @Snippet(hit.MinutesText)
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+
             <div class="drps-card">
                 <MudTable T="MeetingDto" Items="meetings" Hover="true" Striped="false" Elevation="0" Loading="loading"
                           RowClass="drps-meeting-row" OnRowClick="@((TableRowClickEventArgs<MeetingDto> e) => { if (e.Item is not null) OpenExistingMeeting(e.Item); })">
@@ -193,7 +229,7 @@
                         <MudTd DataLabel="Topic"><b>@context.Title</b></MudTd>
                         <MudTd DataLabel="Date">@context.MeetingDate.ToString("dd MMM yyyy")</MudTd>
                         <MudTd DataLabel="Organizer">@AppData.UserName(context.OrganiserId)</MudTd>
-                        <MudTd DataLabel="Minutes">@(context.Minutes is null ? "Not recorded" : "Recorded")</MudTd>
+                        <MudTd DataLabel="Minutes">@(context.Minutes is null ? "Not recorded" : context.Minutes.ApprovedBy is null ? "Awaiting approval" : "Approved")</MudTd>
                     </RowTemplate>
                     <NoRecordsContent>
                         <MudText Typo="Typo.body2">No meetings recorded yet.</MudText>
@@ -220,6 +256,16 @@
                 </div>
 
                 <div class="drps-header-actions">
+                    @if (active.Minutes is { ApprovedBy: { } approver })
+                    {
+                        <MudChip T="string" Color="Color.Success" Icon="@Icons.Material.Filled.Verified">Approved by @AppData.UserName(approver)</MudChip>
+                    }
+                    else if (CanApprove)
+                    {
+                        <MudButton Variant="Variant.Outlined" Color="Color.Surface" StartIcon="@Icons.Material.Filled.Verified" OnClick="Approve">
+                            Approve minutes
+                        </MudButton>
+                    }
                     <MudButton Variant="Variant.Filled"
                                Color="Color.Success"
                                StartIcon="@Icons.Material.Filled.Check"
@@ -337,7 +383,37 @@
         MeetingId = meeting.MeetingId,
         Title = meeting.Title,
         MinutesText = meeting.Minutes?.MinutesText ?? string.Empty,
+        OrganiserId = meeting.OrganiserId,
+        Minutes = meeting.Minutes,
     });
+
+    // The API lets the organiser or an admin sign off the saved minutes, and only unchanged ones.
+    private bool CanApprove => active?.Minutes is not null && active.MinutesText == originalMinutes
+        && (active.OrganiserId == AppData.CurrentUser?.UserId || AppData.HasPermission(Permissions.ManageUsers));
+
+    private async Task Approve()
+    {
+        if (await AppData.SendAsync<MeetingMinutesDto>(HttpMethod.Post, $"api/meetings/minutes/{active!.Minutes!.MinutesId}/approve", new { }) is { } approved)
+        {
+            active.Minutes = approved;
+            await LoadMeetings();
+        }
+    }
+
+    private string searchText = string.Empty;
+    private DateTime? searchFrom, searchTo;
+    private List<MeetingMinutesDto>? searchResults;
+
+    private async Task Search()
+    {
+        var query = new List<string>();
+        if (!string.IsNullOrWhiteSpace(searchText)) query.Add($"q={Uri.EscapeDataString(searchText.Trim())}");
+        if (searchFrom is { } f) query.Add($"from={f:yyyy-MM-dd}");
+        if (searchTo is { } t) query.Add($"to={t.AddDays(1):yyyy-MM-dd}");
+        searchResults = await AppData.GetAsync<List<MeetingMinutesDto>>("api/meetings/minutes?" + string.Join("&", query)) ?? [];
+    }
+
+    private static string Snippet(string text) => text.Length <= 120 ? text : text[..120] + "…";
 
     private void Open(MeetingForm meeting)
     {
@@ -415,5 +491,7 @@
         public int? MeetingId { get; set; } // null until the meeting exists
         public string Title { get; set; } = string.Empty;
         public string MinutesText { get; set; } = string.Empty;
+        public int? OrganiserId { get; init; }
+        public MeetingMinutesDto? Minutes { get; set; }  // the saved version, for approval
     }
 }

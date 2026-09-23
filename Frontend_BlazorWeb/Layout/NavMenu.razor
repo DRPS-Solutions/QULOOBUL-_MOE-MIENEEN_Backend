@@ -70,6 +70,27 @@
                     </NavLink>
                 </div>
             }
+
+            @* Everyone: invitees answer RSVPs here, and every role shares files (UC-07). *@
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="calendar">
+                    <span class="bi bi-calendar-event-fill-nav-menu" aria-hidden="true"></span> Calendar
+                </NavLink>
+            </div>
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="files">
+                    <span class="bi bi-inbox-fill-nav-menu" aria-hidden="true"></span> Files
+                </NavLink>
+            </div>
+
+            @if (AppData.HasPermission(Permissions.GenerateReports))
+            {
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="reports">
+                        <span class="bi bi-check2-square-nav-menu" aria-hidden="true"></span> Reports
+                    </NavLink>
+                </div>
+            }
         </nav>
     </div>
 

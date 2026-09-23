@@ -373,7 +373,7 @@
     }
 
     private bool CanSend => AppData.HasPermission(Permissions.ManageUsers);
-    private IEnumerable<int> recipients = [];
+    private IReadOnlyCollection<int> recipients = [];
     private string announcement = string.Empty;
     private bool sending;
 
