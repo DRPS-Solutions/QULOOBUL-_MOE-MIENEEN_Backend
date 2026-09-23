@@ -368,7 +368,7 @@
     private bool CanReview => AppData.HasPermission(Permissions.ReviewRequests);
 
     // SM-02 statuses, in lifecycle order.
-    private static readonly string[] Statuses = ["Pending", "Approved", "Declined", "Completed"];
+    private static readonly string[] Statuses = ["Pending", "Escalated", "Under Review", "Approved", "Declined", "Completed"];
 
     private IReadOnlyList<RequestCategoryDto> categories = [];
 
