@@ -98,6 +98,7 @@ builder.Services.AddScoped<NotificationQueryService>();
 builder.Services.AddScoped<ReportingService>();
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<EventService>();
+builder.Services.AddScoped<TaskScheduleService>();
 
 // SM-02's 48-hour escalation, SM-01's deadline reminders, and Task_Schedule's recurring-task
 // generation: the transitions the doc drives from a clock rather than from a user action.

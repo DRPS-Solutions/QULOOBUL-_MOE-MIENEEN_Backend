@@ -27,19 +27,9 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             var task = await db.Tasks.FindAsync(taskId)
                 ?? throw new KeyNotFoundException($"Task {taskId} not found.");
 
-            var assignee = await db.Users.FindAsync(assigneeId)
-                ?? throw new KeyNotFoundException($"User {assigneeId} not found.");
-            var assigner = await db.Users.FindAsync(assignedById)
-                ?? throw new KeyNotFoundException($"User {assignedById} not found.");
-
             if (Is(task.Status, Lifecycle.TaskCancelled) || Is(task.Status, Lifecycle.TaskArchived))
                 throw new InvalidOperationException($"Cannot assign a task that is {task.Status.ToLowerInvariant()}.");
-            if (!assignee.IsActive)
-                throw new InvalidOperationException("Cannot assign a task to a deactivated user.");
-
-            // Lower hierarchy level = more authority. The assigner must be at least as senior.
-            if (await LevelOf(assigner.RoleId) > await LevelOf(assignee.RoleId))
-                throw new InvalidOperationException("A task may not be assigned to someone higher in the hierarchy.");
+            await EnsureMayAssignAsync(assignedById, assigneeId);
 
             if (await db.TaskAssignments.AnyAsync(a => a.TaskId == taskId && a.UserId == assigneeId))
                 throw new InvalidOperationException("That user is already assigned to this task.");
@@ -182,6 +172,23 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
                 ChangedBy = changedById,
                 TimeCreated = DateTime.UtcNow,
             });
+        }
+//----------------------------------------------------------------------------------------------------------------------//
+        /// <summary>
+        /// The assignment rule on its own, shared with recurring schedules: the assignee is active and
+        /// not higher in the hierarchy than the assigner (lower level = more authority).
+        /// </summary>
+        public async Task EnsureMayAssignAsync(int assignerId, int assigneeId)
+        {
+            var assignee = await db.Users.FindAsync(assigneeId)
+                ?? throw new KeyNotFoundException($"User {assigneeId} not found.");
+            var assigner = await db.Users.FindAsync(assignerId)
+                ?? throw new KeyNotFoundException($"User {assignerId} not found.");
+
+            if (!assignee.IsActive)
+                throw new InvalidOperationException("Cannot assign a task to a deactivated user.");
+            if (await LevelOf(assigner.RoleId) > await LevelOf(assignee.RoleId))
+                throw new InvalidOperationException("A task may not be assigned to someone higher in the hierarchy.");
         }
 //----------------------------------------------------------------------------------------------------------------------//
         private async Task<int> LevelOf(int roleId)
