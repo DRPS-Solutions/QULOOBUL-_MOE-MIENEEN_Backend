@@ -1,13 +1,25 @@
-using System.Collections.ObjectModel;
+using System.Net;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using System.Text.Json;
 using Frontend_Mobile.Models;
+using Microsoft.AspNetCore.SignalR.Client;
+using QULOOBUL__MOE_MIENEEN_Shared.Auth;
+using QULOOBUL__MOE_MIENEEN_Shared.Directory;
+using QULOOBUL__MOE_MIENEEN_Shared.Notifications;
+using QULOOBUL__MOE_MIENEEN_Shared.Requests;
+using QULOOBUL__MOE_MIENEEN_Shared.Tasks;
+using static QULOOBUL__MOE_MIENEEN_Shared.Classes.Common;
 
 namespace Frontend_Mobile.Data;
 
 /// <summary>
-/// Single in-memory source of truth, the direct port of the Android app's
-/// AppViewModel (itself standing in for MainLayout's session state plus each
-/// Razor page's demo lists). Everything resets on app restart, matching the
-/// prototype's "no real backend yet" behaviour.
+/// The mobile client's data layer: the same job as the web client's AppDataService.
+/// It signs in against the API, keeps the signed-in user plus the lists several
+/// pages share, and listens on the API's SignalR hub so those lists refresh when
+/// something changes server-side. Every HTTP call goes through Send, so failures
+/// look the same on every page (an alert) and an expired token signs the user out.
+/// Pages subscribe to <see cref="Changed"/> while they're on screen.
 /// </summary>
 public sealed class AppState : Observable
 {
@@ -15,159 +27,180 @@ public sealed class AppState : Observable
 
     private AppState() { }
 
-    // ----- Session (MainLayout.razor's currentRole / currentUserName) -----
+    // The API's https launch profile. Android's emulator reaches the host's localhost at 10.0.2.2.
+    // ponytail: hard-coded dev address; a physical phone or a deployed API needs this read from config.
+    private static readonly Uri ApiBase = new(DeviceInfo.Platform == DevicePlatform.Android
+        ? "https://10.0.2.2:7272/"
+        : "https://localhost:7272/");
 
-    private Role? _currentRole;
-    private string _currentUserName = string.Empty;
+    private const string SessionKey = "session";
 
-    public Role? CurrentRole
+    private readonly HttpClient _http = new(CreateHandler()) { BaseAddress = ApiBase };
+    private HubConnection? _hub;
+
+    /// <summary>Raised on the main thread whenever a shared list is reloaded.</summary>
+    public event Action? Changed;
+
+    // ----- Session (UC-01) -----
+
+    private AuthResponse? _currentUser;
+
+    public AuthResponse? CurrentUser
     {
-        get => _currentRole;
+        get => _currentUser;
         private set
         {
-            if (!Set(ref _currentRole, value)) return;
+            if (!Set(ref _currentUser, value)) return;
             Raise(nameof(IsLoggedIn));
-            Raise(nameof(IsAdmin));
+            Raise(nameof(CanSeeTasks));
+            Raise(nameof(CanSeeRequests));
             Raise(nameof(CanSeeMeetings));
-            Raise(nameof(CanSeeUserManagement));
             Raise(nameof(CanSeeEvents));
-            Raise(nameof(RoleLabel));
+            Raise(nameof(CanSeeUserManagement));
         }
     }
 
-    public string CurrentUserName
+    public bool IsLoggedIn => CurrentUser is not null;
+    public string? Role => CurrentUser?.Role;
+
+    // The spec's screen/role matrix, same rules as the web client. Home and
+    // Notifications are open to everyone; Staff and Imaamat get only those two.
+    public bool CanSeeTasks => Role is Roles.FacilityManager or Roles.SecondaryAdmin or Roles.Admin;
+    public bool CanSeeRequests => CanSeeTasks;
+    public bool CanSeeMeetings => Role is Roles.SecondaryAdmin or Roles.Admin;
+    public bool CanSeeEvents => CanSeeMeetings;
+    public bool CanSeeUserManagement => Role is Roles.Admin;
+
+    public bool CanReviewRequests => CurrentUser?.Permissions.Contains(Permissions.ReviewRequests) == true;
+
+    /// <summary>Returns null on success, otherwise the message for the login form.</summary>
+    public async Task<string?> LoginAsync(string email, string password)
     {
-        get => _currentUserName;
-        private set => Set(ref _currentUserName, value);
-    }
-
-    public bool IsLoggedIn => CurrentRole is not null;
-    public bool IsAdmin => CurrentRole == Role.Admin;
-    public bool CanSeeMeetings => CurrentRole?.CanSeeMeetings() == true;
-    public bool CanSeeUserManagement => CurrentRole?.CanSeeUserManagement() == true;
-    public bool CanSeeEvents => CurrentRole?.CanSeeEvents() == true;
-    public string RoleLabel => CurrentRole?.Label() ?? string.Empty;
-
-    public void Login(string name, Role role)
-    {
-        CurrentRole = role;
-        CurrentUserName = string.IsNullOrWhiteSpace(name) ? role.Label() : name.Trim();
-    }
-
-    public void Logout()
-    {
-        CurrentRole = null;
-        CurrentUserName = string.Empty;
-    }
-
-    // ----- Shared staff list (both "completed by" dialogs and the event form) -----
-
-    public IReadOnlyList<string> StaffMembers { get; } =
-    [
-        "Naledi Dube",
-        "Sipho Mokoena",
-        "Aisha Patel",
-        "Liam Fourie",
-        "Grace Adeyemi"
-    ];
-
-    // ----- Home dashboard (Home.razor's todayTasks) -----
-
-    public ObservableCollection<DailyTask> TodayTasks { get; } =
-    [
-        new() { Title = "Review Morning Dispatch Logs", Category = "Operations" },
-        new() { Title = "Submit Weekly Safety Checklist", Category = "Compliance" },
-        new() { Title = "Confirm Driver Schedules", Category = "Logistics" },
-        new() { Title = "Client Status Update Call", Category = "Management" }
-    ];
-
-    public void SetDailyTaskCompletion(DailyTask task, bool isChecked, string? completedBy)
-    {
-        task.IsCompleted = isChecked;
-        task.CompletedBy = isChecked ? completedBy : null;
-    }
-
-    // ----- Daily Tasks timeline (Tasks.razor's tasks) -----
-
-    public ObservableCollection<TaskItem> Tasks { get; } = BuildSeedTasks();
-
-    private static ObservableCollection<TaskItem> BuildSeedTasks()
-    {
-        var today = DateTime.Today;
-        return
-        [
-            new()
-            {
-                Title = "Volunteer check-in call",
-                ScheduledStart = today.AddHours(8),
-                Category = Category.Admin,
-                Priority = Priority.Low,
-                IsDone = true,
-                CompletedBy = "Naledi Dube"
-            },
-            new() { Title = "Prepare donor report", ScheduledStart = today.AddHours(9).AddMinutes(30), Category = Category.Admin, Priority = Priority.Medium },
-            new() { Title = "Site visit — Alexandra shelter", ScheduledStart = today.AddHours(11), Category = Category.Fieldwork, Priority = Priority.High },
-            new() { Title = "Team stand-up", ScheduledStart = today.AddHours(13), Category = Category.Meeting, Priority = Priority.Low },
-            new() { Title = "Grant proposal review", ScheduledStart = today.AddHours(15).AddMinutes(30), Category = Category.Admin, Priority = Priority.High },
-            new() { Title = "Community workshop setup", ScheduledStart = today.AddDays(1).AddHours(9), Category = Category.Fieldwork, Priority = Priority.Medium },
-            new() { Title = "Board meeting", ScheduledStart = today.AddDays(1).AddHours(14), Category = Category.Meeting, Priority = Priority.High },
-            new() { Title = "Inventory count", ScheduledStart = today.AddDays(2).AddHours(10), Category = Category.Fieldwork, Priority = Priority.Low },
-            new() { Title = "Submit grant report", ScheduledStart = today, Category = Category.Admin, Priority = Priority.High, IsAllDay = true },
-            new() { Title = "Renew office lease paperwork", ScheduledStart = today.AddDays(1), Category = Category.Admin, Priority = Priority.Medium, IsAllDay = true }
-        ];
-    }
-
-    public void SetTaskCompletion(TaskItem task, bool isChecked, string? completedBy)
-    {
-        task.IsDone = isChecked;
-        task.CompletedBy = isChecked ? completedBy : null;
-    }
-
-    public TaskItem AddTask(string title, DateTime date, TimeSpan? time, bool isAllDay, Category category, Priority priority)
-    {
-        var start = isAllDay || time is null ? date.Date : date.Date.Add(time.Value);
-        var task = new TaskItem
+        HttpResponseMessage res;
+        try
         {
-            Title = title.Trim(),
-            ScheduledStart = start,
-            Category = category,
-            Priority = priority,
-            IsAllDay = isAllDay
-        };
-        Tasks.Add(task);
-        return task;
-    }
-
-    // ----- Notifications (NotificationService.cs) -----
-
-    public ObservableCollection<NotificationItem> Notifications { get; } =
-    [
-        new()
-        {
-            Type = NotificationType.EventAssignment,
-            Title = "Added to Annual Donor Gala",
-            Message = "You've been added to the staff list for \"Annual Donor Gala\".",
-            LinkedName = "Annual Donor Gala",
-            Timestamp = DateTime.Now.AddHours(-3)
-        },
-        new()
-        {
-            Type = NotificationType.ResourceRequest,
-            Title = "New resource request",
-            Message = "Aisha Patel requested a projector for \"Annual Donor Gala\".",
-            LinkedName = "Annual Donor Gala",
-            Timestamp = DateTime.Now.AddDays(-2)
-        },
-        new()
-        {
-            Type = NotificationType.ResourceRequest,
-            Title = "Request approved",
-            Message = "Naledi Dube approved your \"Printing budget\" request.",
-            LinkedName = "Community Workshop",
-            Timestamp = DateTime.Now.AddDays(-4),
-            IsRead = true
+            res = await _http.PostAsJsonAsync("api/auth/login",
+                new LoginRequest { Email = email.Trim(), Password = password });
         }
-    ];
+        catch (HttpRequestException)
+        {
+            return $"Can't reach the server at {ApiBase}.";
+        }
+        if (!res.IsSuccessStatusCode) return await ErrorMessage(res);
+
+        var auth = (await res.Content.ReadFromJsonAsync<AuthResponse>())!;
+        await StartSessionAsync(auth);
+
+        // The token lives in the platform keystore (Android Keystore / iOS Keychain), never a plain file.
+        try { await SecureStorage.Default.SetAsync(SessionKey, JsonSerializer.Serialize(auth)); }
+        catch (Exception) { /* no secure store on this platform: the session just isn't remembered */ }
+        return null;
+    }
+
+    /// <summary>Resumes the last session from SecureStorage if its token hasn't expired.</summary>
+    public async Task<bool> TryRestoreAsync()
+    {
+        string? json = null;
+        try { json = await SecureStorage.Default.GetAsync(SessionKey); }
+        catch (Exception) { /* keystore unavailable or reset: sign in again */ }
+
+        if (json is null
+            || JsonSerializer.Deserialize<AuthResponse>(json) is not { } auth
+            || auth.ExpiresAtUtc <= DateTime.UtcNow.AddMinutes(1))
+            return false;
+
+        await StartSessionAsync(auth);
+        return IsLoggedIn;
+    }
+
+    private async Task StartSessionAsync(AuthResponse auth)
+    {
+        _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth.Token);
+        // Load names/projects first, so nothing shows as "User #3" on the first screen.
+        await Task.WhenAll(RefreshUsersAsync(), RefreshProjectsAsync(), RefreshNotificationsAsync());
+        CurrentUser = auth;
+        await ConnectHubAsync();
+    }
+
+    public async Task LogoutAsync()
+    {
+        CurrentUser = null;
+        _http.DefaultRequestHeaders.Authorization = null;
+        try { SecureStorage.Default.Remove(SessionKey); }
+        catch (Exception) { /* nothing was stored */ }
+        Users = [];
+        Projects = [];
+        Tasks = [];
+        Requests = [];
+        Notifications = [];
+        _taskWindowUrl = null;
+        RefreshNotificationCounts();
+        if (_hub is not null)
+        {
+            await _hub.DisposeAsync();
+            _hub = null;
+        }
+    }
+
+    // ----- Shared lists -----
+
+    public IReadOnlyList<UserSummaryDto> Users { get; private set; } = [];
+    public IReadOnlyList<ProjectSummaryDto> Projects { get; private set; } = [];
+    public IReadOnlyList<TaskCardDto> Tasks { get; private set; } = [];
+    public IReadOnlyList<ResourceRequestDto> Requests { get; private set; } = [];
+    public IReadOnlyList<NotificationDto> Notifications { get; private set; } = [];
+
+    // Tasks holds one date window at a time: whichever page is showing tasks asked for it.
+    private string? _taskWindowUrl;
+
+    public Task RefreshUsersAsync() => Refresh<UserSummaryDto>("api/users", l => Users = l);
+    public Task RefreshProjectsAsync() => Refresh<ProjectSummaryDto>("api/projects", l => Projects = l);
+    public Task RefreshRequestsAsync() => Refresh<ResourceRequestDto>("api/requests", l => Requests = l);
+
+    public Task RefreshNotificationsAsync() => Refresh<NotificationDto>("api/notifications", l =>
+    {
+        Notifications = l;
+        RefreshNotificationCounts();
+    });
+
+    public Task RefreshTasksAsync() =>
+        _taskWindowUrl is null ? Task.CompletedTask : Refresh<TaskCardDto>(_taskWindowUrl, l => Tasks = l);
+
+    /// <summary>Loads the tasks due in [from, to) into <see cref="Tasks"/>.</summary>
+    public Task LoadTasksAsync(DateTime from, DateTime to)
+    {
+        _taskWindowUrl = $"api/tasks?from={from:s}&to={to:s}";
+        return RefreshTasksAsync();
+    }
+
+    // Applied on the main thread: the Shell binds to the unread badge, and hub
+    // callbacks arrive on a background thread.
+    private async Task Refresh<T>(string url, Action<List<T>> apply)
+    {
+        if (await GetAsync<List<T>>(url) is not { } list) return;
+        await MainThread.InvokeOnMainThreadAsync(() =>
+        {
+            apply(list);
+            Changed?.Invoke();
+        });
+    }
+
+    public string UserName(int? id) =>
+        id is null ? "" : Users.FirstOrDefault(u => u.UserId == id)?.FullName ?? $"User #{id}";
+
+    public int? DailyProjectId => Projects.FirstOrDefault(p => p.ProjectName == DailyTasksProject)?.ProjectId;
+
+    // The UI's "events" are every project except the seeded daily-tasks one.
+    public IEnumerable<ProjectSummaryDto> EventProjects => Projects.Where(p => p.ProjectName != DailyTasksProject);
+
+    public string? ProjectName(int? id) => Projects.FirstOrDefault(p => p.ProjectId == id)?.ProjectName;
+
+    /// <summary>The event a task is linked to, or null for a daily task.</summary>
+    public string? EventName(TaskCardDto task) => task.ProjectId == DailyProjectId ? null : ProjectName(task.ProjectId);
+
+    public TaskItem ToItem(TaskCardDto card) => new(card, EventName(card), card.CompletedBy is null ? null : UserName(card.CompletedBy));
+
+    // ----- Notifications (UC-08) -----
 
     public int UnreadNotificationCount => Notifications.Count(n => !n.IsRead);
 
@@ -180,245 +213,202 @@ public sealed class AppState : Observable
 
     public bool HasUnread => UnreadNotificationCount > 0;
 
-    /// <summary>Re-reads the badge after anything touches read state.</summary>
-    public void RefreshNotificationCounts()
+    private void RefreshNotificationCounts()
     {
         Raise(nameof(UnreadNotificationCount));
         Raise(nameof(UnreadBadge));
         Raise(nameof(HasUnread));
     }
 
-    public void AddNotification(NotificationType type, string title, string message, string? linkedName = null)
+    public async Task MarkReadAsync(IReadOnlyList<int> ids)
     {
-        Notifications.Insert(0, new NotificationItem
+        if (ids.Count > 0 && await SendAsync(HttpMethod.Post, "api/notifications/read",
+                new MarkReadRequest { NotificationIds = ids }))
+            await RefreshNotificationsAsync();
+    }
+
+    // ----- Tasks (UC-02 / UC-04) -----
+
+    public async Task<bool> CreateTaskAsync(string title, DateTime start, string priority)
+    {
+        if (DailyProjectId is not { } projectId)
         {
-            Type = type,
+            await Alert($"The server has no \"{DailyTasksProject}\" project to hold daily tasks.");
+            return false;
+        }
+        var card = await SendAsync<TaskCardDto>(HttpMethod.Post, "api/tasks", new CreateTaskRequest
+        {
+            ProjectId = projectId,
             Title = title,
-            Message = message,
-            LinkedName = linkedName
+            Priority = priority,
+            Deadline = Wall(start),
         });
-        RefreshNotificationCounts();
+        await RefreshTasksAsync();
+        return card is not null;
     }
 
-    public void MarkNotificationAsRead(NotificationItem item)
+    /// <summary>
+    /// Ticking completes the task as the signed-in user (the API records who);
+    /// unticking reopens it. SM-01 has no To Do/Blocked → Done edge, so a tick walks
+    /// through In Progress first - two legal moves, each guarded by the API.
+    /// </summary>
+    public async Task SetTaskDoneAsync(TaskCardDto task, bool done)
     {
-        if (item.IsRead) return;
-        item.IsRead = true;
-        RefreshNotificationCounts();
+        var ok = true;
+        if (done && !IsStatus(task, "In Progress"))
+            ok = await Move(task.TaskId, "In Progress");
+        if (ok) await Move(task.TaskId, done ? "Done" : "In Progress");
+        await RefreshTasksAsync();
     }
 
-    public void MarkAllNotificationsAsRead()
+    private static bool IsStatus(TaskCardDto task, string status) =>
+        string.Equals(task.Status, status, StringComparison.OrdinalIgnoreCase);
+
+    private Task<bool> Move(int taskId, string status) =>
+        SendAsync(HttpMethod.Post, $"api/tasks/{taskId}/move", new MoveTaskRequest { NewStatus = status });
+
+    // ----- Resource requests (UC-05) -----
+
+    public async Task<bool> SubmitRequestAsync(int categoryId, string detail)
     {
-        foreach (var n in Notifications) n.IsRead = true;
-        RefreshNotificationCounts();
+        var id = await SendAsync<int?>(HttpMethod.Post, "api/requests",
+            new CreateResourceRequest { CategoryId = categoryId, Detail = detail });
+        await RefreshRequestsAsync();
+        return id is not null;
     }
 
-    public void ClearAllNotifications()
+    public async Task ReviewRequestAsync(int requestId, bool approve, string? note)
     {
-        Notifications.Clear();
-        RefreshNotificationCounts();
+        if (await SendAsync(HttpMethod.Post, $"api/requests/{requestId}/review",
+                new ReviewRequestRequest { Approve = approve, Note = note }))
+            await RefreshRequestsAsync();
     }
 
-    // ----- Resource requests (Requests.razor) -----
+    /// <summary>Reviewers act on requests still awaiting a decision, never their own.</summary>
+    public bool CanReview(ResourceRequestDto r) =>
+        CanReviewRequests
+        && r.Status is "Pending" or "Escalated"
+        && r.RequestedBy != CurrentUser?.UserId;
 
-    // Placeholder options for the "Link to" dropdowns; in a real app these
-    // would come from wherever Events/Tasks persist rather than being
-    // duplicated here.
-    public IReadOnlyList<string> EventOptions { get; } =
-        ["Annual Donor Gala", "Community Workshop", "Board Meeting"];
+    // ----- Live updates: the SignalR Observer from the architecture doc. The
+    // server says what changed; refetching that list keeps one data path. -----
 
-    public IReadOnlyList<string> TaskOptions { get; } =
-    [
-        "Site visit — Alexandra shelter",
-        "Grant proposal review",
-        "Community workshop setup",
-        "Inventory count"
-    ];
+    private async Task ConnectHubAsync()
+    {
+        _hub = new HubConnectionBuilder()
+            .WithUrl(new Uri(ApiBase, "hubs/notifications"), o =>
+            {
+                o.AccessTokenProvider = () => Task.FromResult(CurrentUser?.Token);
+                o.HttpMessageHandlerFactory = _ => CreateHandler();
+#if DEBUG
+                o.WebSocketConfiguration = ws => ws.RemoteCertificateValidationCallback =
+                    (_, cert, _, errors) => errors == System.Net.Security.SslPolicyErrors.None || IsDevCert(cert);
+#endif
+            })
+            .WithAutomaticReconnect()
+            .Build();
 
-    // Seeded across all three statuses so the filter chips and the Admin-only
-    // controls are visible without submitting anything first.
-    public ObservableCollection<ResourceRequest> Requests { get; } =
-    [
-        new()
+        On("boardChanged", RefreshTasksAsync);
+        On("taskAssigned", RefreshNotificationsAsync);
+        On("projectAssigned", RefreshNotificationsAsync, RefreshProjectsAsync);
+        On("requestSubmitted", RefreshNotificationsAsync, RefreshRequestsAsync);
+        On("requestReviewed", RefreshNotificationsAsync, RefreshRequestsAsync);
+        On("notification", RefreshNotificationsAsync);
+
+        try
         {
-            Title = "Projector for donor gala",
-            ResourceType = ResourceType.Equipment,
-            Amount = "1 projector",
-            Notes = "Needed for the sponsor highlight reel.",
-            LinkType = RequestLinkType.Event,
-            LinkedName = "Annual Donor Gala",
-            RequestedBy = "Aisha Patel",
-            RequestedDate = DateTime.Now.AddDays(-2)
-        },
-        new()
-        {
-            Title = "Additional volunteers",
-            ResourceType = ResourceType.Personnel,
-            Amount = "4 volunteers",
-            Notes = "Site visit needs extra hands for the day.",
-            LinkType = RequestLinkType.Task,
-            LinkedName = "Site visit — Alexandra shelter",
-            RequestedBy = "Sipho Mokoena",
-            RequestedDate = DateTime.Now.AddDays(-1)
-        },
-        new()
-        {
-            Title = "Printing budget",
-            ResourceType = ResourceType.Budget,
-            Amount = "R 1,200",
-            Notes = "Workshop handouts and signage.",
-            LinkType = RequestLinkType.Event,
-            LinkedName = "Community Workshop",
-            RequestedBy = "Grace Adeyemi",
-            RequestedDate = DateTime.Now.AddDays(-5),
-            Status = RequestStatus.Approved,
-            ReviewedBy = "Naledi Dube",
-            ReviewedDate = DateTime.Now.AddDays(-4)
-        },
-        new()
-        {
-            Title = "New laptop",
-            ResourceType = ResourceType.Equipment,
-            Amount = "1 laptop",
-            Notes = "Current one won't hold a charge.",
-            RequestedBy = "Liam Fourie",
-            RequestedDate = DateTime.Now.AddDays(-7),
-            Status = RequestStatus.Denied,
-            ReviewedBy = "Naledi Dube",
-            ReviewedDate = DateTime.Now.AddDays(-6),
-            DenyReason = "Budget's earmarked for Q3 - resubmit then."
+            await _hub.StartAsync();
         }
-    ];
-
-    public ResourceRequest SubmitRequest(
-        string title,
-        ResourceType resourceType,
-        string? amount,
-        string? notes,
-        RequestLinkType linkType,
-        string? linkedName)
-    {
-        var requestedBy = string.IsNullOrWhiteSpace(CurrentUserName) ? "You" : CurrentUserName;
-        var trimmedTitle = title.Trim();
-        var effectiveLinkedName = linkType == RequestLinkType.None ? null : linkedName;
-
-        var request = new ResourceRequest
+        catch (Exception)
         {
-            Title = trimmedTitle,
-            ResourceType = resourceType,
-            Amount = amount,
-            Notes = notes,
-            LinkType = linkType,
-            LinkedName = effectiveLinkedName,
-            RequestedBy = requestedBy,
-            RequestedDate = DateTime.Now
-        };
-        Requests.Add(request);
-
-        // Notifications aren't scoped to a recipient in this prototype; Admins
-        // would be the real audience for "new request awaiting review".
-        var suffix = effectiveLinkedName is null ? "." : $" for {effectiveLinkedName}.";
-        AddNotification(
-            NotificationType.ResourceRequest,
-            "New resource request",
-            $"{requestedBy} requested \"{trimmedTitle}\"{suffix}",
-            effectiveLinkedName);
-
-        return request;
-    }
-
-    // Approve needs no extra input, so it applies immediately.
-    public void ApproveRequest(ResourceRequest request)
-    {
-        var reviewedBy = string.IsNullOrWhiteSpace(CurrentUserName) ? "Admin" : CurrentUserName;
-        request.ReviewedBy = reviewedBy;
-        request.ReviewedDate = DateTime.Now;
-        request.Status = RequestStatus.Approved;
-
-        AddNotification(
-            NotificationType.ResourceRequest,
-            "Request approved",
-            $"{reviewedBy} approved your \"{request.Title}\" request.",
-            request.LinkedName);
-    }
-
-    // Deny runs behind a confirmation prompt so the admin can leave a reason;
-    // cancelling leaves the request Pending, so this only runs once a reason
-    // (possibly blank) is confirmed.
-    public void DenyRequest(ResourceRequest request, string? reason)
-    {
-        var reviewedBy = string.IsNullOrWhiteSpace(CurrentUserName) ? "Admin" : CurrentUserName;
-        request.ReviewedBy = reviewedBy;
-        request.ReviewedDate = DateTime.Now;
-        request.DenyReason = reason;
-        request.Status = RequestStatus.Denied;
-
-        var reasonSuffix = string.IsNullOrWhiteSpace(reason) ? string.Empty : $" Reason: {reason}";
-        AddNotification(
-            NotificationType.ResourceRequest,
-            "Request denied",
-            $"{reviewedBy} denied your \"{request.Title}\" request.{reasonSuffix}",
-            request.LinkedName);
-    }
-
-    // ----- Event planning (Events.razor) -----
-
-    public ObservableCollection<EventModel> PlannedEvents { get; } =
-    [
-        new()
-        {
-            Title = "Annual Donor Gala",
-            Description = "Formal evening event to thank major donors and showcase this year's impact numbers.",
-            Date = DateTime.Today.AddDays(14),
-            Time = new TimeSpan(18, 0, 0),
-            Location = "Cape Town Convention Centre",
-            Coordinator = "Aisha Patel",
-            EstimatedBudget = 85000,
-            EstimatedCapacity = 220,
-            StaffMembers = ["Aisha Patel", "Grace Adeyemi", "Naledi Dube"],
-            RequiredResources = ["Stage & PA system", "Catering (220 covers)", "Photographer"]
-        },
-        new()
-        {
-            Title = "Community Workshop",
-            Description = "Half-day skills workshop for local youth, run out of the Alexandra community hall.",
-            Date = DateTime.Today.AddDays(21),
-            Time = new TimeSpan(9, 30, 0),
-            Location = "Alexandra Community Hall",
-            Coordinator = "Sipho Mokoena",
-            EstimatedBudget = 12000,
-            EstimatedCapacity = 60,
-            StaffMembers = ["Sipho Mokoena", "Liam Fourie"],
-            RequiredResources = ["Projector", "Folding chairs (60)", "Printed handouts"]
-        }
-    ];
-
-    // "+ New" -> Save. Everyone on a brand-new event is newly assigned.
-    public void AddEvent(EventModel evt)
-    {
-        PlannedEvents.Add(evt);
-        NotifyAssignedStaff(evt, evt.StaffMembers);
-    }
-
-    // "Edit" -> Save. Diffs the staff lists so only newly-added people get a
-    // notification, same as SaveEvent's isEditing branch.
-    public void UpdateEvent(EventModel target, EventModel edited)
-    {
-        var newlyAdded = edited.StaffMembers.Except(target.StaffMembers).ToList();
-        target.CopyFrom(edited);
-        NotifyAssignedStaff(target, newlyAdded);
-    }
-
-    private void NotifyAssignedStaff(EventModel evt, IEnumerable<string> staff)
-    {
-        var dateLabel = evt.Date?.ToString("dd MMM") ?? "TBD";
-        foreach (var name in staff)
-        {
-            AddNotification(
-                NotificationType.EventAssignment,
-                $"Assigned to {evt.Title}",
-                $"{name} was added to the staff list for \"{evt.Title}\" on {dateLabel}.",
-                evt.Title);
+            await Alert("Live updates are unavailable; other people's changes appear when you reopen a page.");
         }
     }
+
+    private void On(string eventName, params Func<Task>[] refreshes) =>
+        _hub!.On<JsonElement>(eventName, _ => Task.WhenAll(refreshes.Select(refresh => refresh())));
+
+    // ----- HTTP. A failed call shows an alert and returns null/false. -----
+
+    public async Task<T?> GetAsync<T>(string url) =>
+        await Send(HttpMethod.Get, url, null) is { } res ? await res.Content.ReadFromJsonAsync<T>() : default;
+
+    public async Task<T?> SendAsync<T>(HttpMethod method, string url, object body) =>
+        await Send(method, url, body) is { } res ? await res.Content.ReadFromJsonAsync<T>() : default;
+
+    public async Task<bool> SendAsync(HttpMethod method, string url, object? body = null) =>
+        await Send(method, url, body) is not null;
+
+    private async Task<HttpResponseMessage?> Send(HttpMethod method, string url, object? body)
+    {
+        HttpResponseMessage res;
+        try
+        {
+            res = await _http.SendAsync(new HttpRequestMessage(method, url)
+            {
+                Content = body is null ? null : JsonContent.Create(body),
+            });
+        }
+        catch (HttpRequestException)
+        {
+            await Alert($"Can't reach the server at {ApiBase}.");
+            return null;
+        }
+        if (res.IsSuccessStatusCode) return res;
+
+        if (res.StatusCode != HttpStatusCode.Unauthorized)
+        {
+            await Alert(await ErrorMessage(res));
+        }
+        else if (CurrentUser is not null)
+        {
+            await MainThread.InvokeOnMainThreadAsync(AppShell.SignOutAsync);
+            await Alert("Your session has expired. Please sign in again.");
+        }
+        return null;
+    }
+
+    // The API's own errors are ErrorResponse { message }; model validation failures are ProblemDetails.
+    private static async Task<string> ErrorMessage(HttpResponseMessage res)
+    {
+        try
+        {
+            var json = await res.Content.ReadFromJsonAsync<JsonElement>();
+            if (json.TryGetProperty("message", out var message)) return message.GetString()!;
+            if (json.TryGetProperty("errors", out var errors))
+                return errors.EnumerateObject().SelectMany(e => e.Value.EnumerateArray()).First().GetString()!;
+        }
+        catch (Exception e) when (e is JsonException or NotSupportedException or InvalidOperationException)
+        {
+            // No JSON body (e.g. a bare 403); fall through to the status line.
+        }
+        return $"The server returned {(int)res.StatusCode} {res.ReasonPhrase}.";
+    }
+
+    private static Task Alert(string message) =>
+        MainThread.InvokeOnMainThreadAsync(() =>
+            Shell.Current?.DisplayAlertAsync("Something went wrong", message, "OK") ?? Task.CompletedTask);
+
+    private static HttpMessageHandler CreateHandler()
+    {
+        var handler = new HttpClientHandler();
+#if DEBUG
+        // The ASP.NET dev certificate is issued to localhost, so the emulator's 10.0.2.2
+        // fails hostname validation. Debug builds trust that one cert; release builds trust nothing extra.
+        handler.ServerCertificateCustomValidationCallback = (_, cert, _, errors) =>
+            errors == System.Net.Security.SslPolicyErrors.None || IsDevCert(cert);
+#endif
+        return handler;
+    }
+
+#if DEBUG
+    private static bool IsDevCert(System.Security.Cryptography.X509Certificates.X509Certificate? cert) =>
+        cert?.Issuer == "CN=localhost";
+#endif
+
+    // Deadlines are wall-clock times: send them without a UTC offset.
+    public static DateTime Wall(DateTime value) => DateTime.SpecifyKind(value, DateTimeKind.Unspecified);
+
+    // Times the server stamps itself (submitted, reviewed) are UTC.
+    public static DateTime Local(DateTime utc) => DateTime.SpecifyKind(utc, DateTimeKind.Utc).ToLocalTime();
 }

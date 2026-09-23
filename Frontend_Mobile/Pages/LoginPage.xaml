@@ -6,8 +6,8 @@
     Shell.NavBarIsVisible="False"
     Title="Sign in">
 
-    <!-- MainLayout.razor's login card (rendered while currentRole is null).
-         Prototype sign-in: role only, no password. -->
+    <!-- UC-01 sign-in against the API. The role, and so which drawer items
+         show, comes back from the server with the token. -->
 
     <Grid>
         <Button
@@ -48,18 +48,23 @@
                            Margin="0,4,0,20" />
 
                     <Border Style="{StaticResource FieldBox}">
-                        <Entry x:Name="NameEntry" Placeholder="Full name" />
+                        <Entry x:Name="EmailEntry"
+                               Placeholder="Email"
+                               Keyboard="Email"
+                               TextChanged="OnFormChanged" />
                     </Border>
 
                     <Border Style="{StaticResource FieldBox}" Margin="0,12,0,0">
-                        <Picker x:Name="RolePicker"
-                                Title="Role"
-                                SelectedIndexChanged="OnRoleChanged" />
+                        <Entry x:Name="PasswordEntry"
+                               Placeholder="Password"
+                               IsPassword="True"
+                               TextChanged="OnFormChanged"
+                               Completed="OnLogin" />
                     </Border>
 
-                    <Label x:Name="RoleHint"
-                           Text="Pick a role to see which tabs it can access."
-                           Style="{StaticResource Muted}"
+                    <Label x:Name="ErrorLabel"
+                           IsVisible="False"
+                           TextColor="{StaticResource StatusDenied}"
                            Margin="0,8,0,0" />
 
                     <Button x:Name="LoginButton"
@@ -67,11 +72,6 @@
                             IsEnabled="False"
                             Clicked="OnLogin"
                             Margin="0,20,0,0" />
-
-                    <Label Text="Prototype sign-in - role only, no password yet."
-                           Style="{StaticResource LabelSmall}"
-                           HorizontalTextAlignment="Center"
-                           Margin="0,16,0,0" />
 
                 </VerticalStackLayout>
             </Border>

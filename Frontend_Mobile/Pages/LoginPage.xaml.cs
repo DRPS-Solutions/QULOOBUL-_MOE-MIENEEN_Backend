@@ -1,43 +1,60 @@
 using Frontend_Mobile.Data;
-using Frontend_Mobile.Models;
 
 namespace Frontend_Mobile.Pages;
 
 public partial class LoginPage : ContentPage
 {
+    // Resume a remembered session once per app launch, not after every logout.
+    private static bool _restoreTried;
+    private bool _busy;
+
     public LoginPage()
     {
         InitializeComponent();
-        RolePicker.ItemsSource = (System.Collections.IList)RoleInfo.All;
         ThemeToggle.Text = App.ThemeGlyph;
     }
-
-    private Role? SelectedRole => (RolePicker.SelectedItem as Option<Role>)?.Value;
 
     /// <summary>
     /// The Shell keeps this page alive between sessions, so a logout has to
     /// leave a blank form behind rather than the previous user's details.
     /// </summary>
-    protected override void OnAppearing()
+    protected override async void OnAppearing()
     {
         base.OnAppearing();
         if (AppState.Current.IsLoggedIn) return;
-        NameEntry.Text = string.Empty;
-        RolePicker.SelectedItem = null;
+        EmailEntry.Text = string.Empty;
+        PasswordEntry.Text = string.Empty;
+        ErrorLabel.IsVisible = false;
         ThemeToggle.Text = App.ThemeGlyph;
+
+        if (_restoreTried) return;
+        _restoreTried = true;
+        SetBusy(true);
+        if (await AppState.Current.TryRestoreAsync()) await AppShell.EnterAppAsync();
+        SetBusy(false);
     }
 
-    private void OnRoleChanged(object? sender, EventArgs e)
+    private void OnFormChanged(object? sender, TextChangedEventArgs e) => SetBusy(_busy);
+
+    private void SetBusy(bool busy)
     {
-        RoleHint.Text = SelectedRole?.Hint() ?? "Pick a role to see which tabs it can access.";
-        LoginButton.IsEnabled = SelectedRole is not null;
+        _busy = busy;
+        LoginButton.Text = busy ? "Signing in..." : "Log In";
+        LoginButton.IsEnabled = !busy
+            && !string.IsNullOrWhiteSpace(EmailEntry.Text)
+            && !string.IsNullOrEmpty(PasswordEntry.Text);
     }
 
     private async void OnLogin(object? sender, EventArgs e)
     {
-        if (SelectedRole is not { } role) return;
-        AppState.Current.Login(NameEntry.Text ?? string.Empty, role);
-        await AppShell.EnterAppAsync();
+        if (!LoginButton.IsEnabled) return;
+        SetBusy(true);
+        var error = await AppState.Current.LoginAsync(EmailEntry.Text!, PasswordEntry.Text!);
+        SetBusy(false);
+
+        ErrorLabel.Text = error;
+        ErrorLabel.IsVisible = error is not null;
+        if (error is null) await AppShell.EnterAppAsync();
     }
 
     private void OnToggleTheme(object? sender, EventArgs e)
