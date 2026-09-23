@@ -116,11 +116,39 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
                 principalTable: "Task",
                 principalColumn: "TaskId",
                 onDelete: ReferentialAction.Cascade);
+
+            // Staff directory without credential columns (AppDbContext maps UserDirectoryEntry to it).
+            migrationBuilder.Sql("""
+                CREATE VIEW dbo.vw_UserDirectory AS
+                SELECT u.UserId, u.FirstName + ' ' + u.Surname AS FullName, u.Email, r.RoleName, u.IsActive, u.Status
+                FROM dbo.[User] u JOIN dbo.[Role] r ON r.RoleId = u.RoleId
+                """);
+
+            // Row-level security: a request only ever sees its own user's notifications, whatever the
+            // query says. SessionContextInterceptor sets SESSION_CONTEXT('UserId') per connection; with
+            // none set (login, background jobs, migrations) the predicate lets the row through.
+            migrationBuilder.Sql("CREATE SCHEMA Security");
+            migrationBuilder.Sql("""
+                CREATE FUNCTION Security.fn_OwnRowsOnly(@UserId int)
+                RETURNS TABLE WITH SCHEMABINDING AS
+                RETURN SELECT 1 AS Allowed
+                WHERE SESSION_CONTEXT(N'UserId') IS NULL OR @UserId = CAST(SESSION_CONTEXT(N'UserId') AS int)
+                """);
+            migrationBuilder.Sql("""
+                CREATE SECURITY POLICY Security.NotificationOwnerPolicy
+                ADD FILTER PREDICATE Security.fn_OwnRowsOnly(UserId) ON dbo.Notification
+                WITH (STATE = ON)
+                """);
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.Sql("DROP SECURITY POLICY Security.NotificationOwnerPolicy");
+            migrationBuilder.Sql("DROP FUNCTION Security.fn_OwnRowsOnly");
+            migrationBuilder.Sql("DROP SCHEMA Security");
+            migrationBuilder.Sql("DROP VIEW dbo.vw_UserDirectory");
+
             migrationBuilder.DropForeignKey(
                 name: "FK_Event_Attendee_Event_EventId",
                 table: "Event_Attendee");
