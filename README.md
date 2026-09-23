@@ -4,10 +4,10 @@ ASP.NET Core Web API for the Quloobul Moe'mieneen NPO platform — projects, tas
 resource requests, meetings and file storage for one organisation's staff and volunteers.
 Serves both clients in this solution: a Blazor WebAssembly web app and a .NET MAUI app.
 
-**Status: API built, clients built, not yet wired together.** The API has a DbContext,
-migrations, 10 controllers and 19 registered services. Both front ends are complete UIs
-running on their own in-memory demo data — neither calls the API yet. See
-[What's not built yet](#whats-not-built-yet).
+**Status: API built, both clients wired to it.** The API has a DbContext, migrations,
+10 controllers and 19 registered services. The web and MAUI clients both sign in against
+`AuthController`, read and write through the controllers using the `Shared` DTOs, and take
+live updates from the SignalR hub. See [What's not built yet](#whats-not-built-yet).
 
 ## Solution layout
 
@@ -143,8 +143,8 @@ State machines SM-01 (`ProjectTask`), SM-02 (`ResourceRequest`) and SM-03 (`User
 
 ## Clients
 
-Both front ends are finished UIs on **in-memory demo data**. Neither authenticates against
-`AuthController` or reads from the API; both reset on restart.
+Both front ends authenticate against `AuthController` and keep no data of their own: every
+list is fetched from the API, and a SignalR push tells them which list to refetch.
 
 ### `Frontend_Mobile` — .NET MAUI
 
@@ -156,20 +156,28 @@ screens, same palette, same role gating at each step.
 |---|---|
 | Navigation shell, role-gated flyout, unread-count bell, dark-mode toggle | `AppShell.xaml` |
 | Screens | `Pages/` — Login, Home, Tasks, CreateTask, Requests, Events, Notifications, ComingSoon |
-| Session + demo data singleton | `Data/AppState.cs` |
-| Models with their own display-formatting properties (so the XAML needs no converters) | `Models/Models.cs` |
+| Session, API calls, SignalR hub connection (the web client's `AppDataService`, ported) | `Data/AppState.cs` |
+| Read-only view models over the `Shared` DTOs, with display-formatting properties (so the XAML needs no converters) | `Models/Models.cs` |
 | Palette and styles, light/dark via `AppThemeBinding` | `Resources/Styles/` |
 
-Four things about it are deliberate, not oversights:
+Five things about it are deliberate, not oversights:
 
 - **Icons are Unicode glyphs, not Material Icons.** MAUI doesn't bundle an icon font and
   adding one wasn't worth the dependency. Swap a Material Icons `.ttf` into `Resources/Fonts`
   and change the `Glyph` properties in `Models.cs` for exact parity.
-- **Two of three dialogs are native prompts** — `DisplayActionSheetAsync` for "completed by"
-  and `DisplayPromptAsync` for the deny reason. New Task is a full modal page instead, because
+- **Ticking a task completes it as the signed-in user**, as on the web: the API records who.
+  The old "completed by" picker is gone. SM-01 has no To Do → Done edge, so a tick sends two
+  guarded moves (→ In Progress → Done). The deny reason is a native `DisplayPromptAsync`.
+  New Task is a full modal page instead, because
   no MAUI inline dialog fits a form that size.
-- **Models are mutable and raise `PropertyChanged`**, where the Compose port used immutable
-  data classes. XAML bindings are cheaper to feed this way and the collections stay stable.
+- **Events are API projects**, as on the web client: coordinator = owner, staff = members.
+  Projects have no date, location, budget, capacity or resource list, so those fields were
+  dropped from the form rather than kept as inputs that save nowhere.
+- **The API address is hard-coded** in `AppState.ApiBase`: `https://10.0.2.2:7272/` on the
+  Android emulator (the host's localhost), `https://localhost:7272/` elsewhere. Debug builds
+  trust the ASP.NET dev certificate (issuer `CN=localhost`); release builds trust nothing
+  extra. A physical phone or a deployed API needs that address changed. The session token is
+  kept in `SecureStorage` and resumed on the next launch while it's still valid.
 - **Login is a Shell route, not a separate root page.** Swapping the window root between a
   `ContentPage` and a `Shell` crashes Android's fragment manager
   ([dotnet/maui#21257](https://github.com/dotnet/maui/issues/21257)), so the Shell owns the
@@ -239,10 +247,9 @@ is deliberately not automated — Phase 1 side-loads the APK.
 
 Roughly in dependency order:
 
-1. **Client → API wiring.** The largest remaining gap. Both front ends run on in-memory demo
-   singletons (`AppState.cs`, `AppDataService.cs`) with a role-pick sign-in and no password.
-   Replacing those calls with `HttpClient` against the real controllers, using the `Shared`
-   DTOs, is the work that turns three separate builds into one product.
+1. **Client screens for the rest of the API.** Both clients are wired, but neither has
+   screens for files (UC-07) or reports (UC-09), and MAUI's Meetings and User Management are
+   still stubs. The MAUI app also lacks the doc's offline SQLite cache.
 2. **Object-level authz coverage.** `AccessGuard` exists and is tested, but only four services
    call it. Requests, events, users and notifications have no per-record ownership check, so
    the anti-IDOR requirement is only partly met.
