@@ -13,8 +13,9 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Controllers
     public class FilesController(FileUploadService uploads, FileManagementService files) : ApiControllerBase
     {
         [HttpGet]
-        public async Task<ActionResult<List<FileMetadataDto>>> List(int? taskId, int? meetingId, int? categoryId) =>
-            Ok(await files.ListAsync(taskId, meetingId, categoryId, UserId()));
+        public async Task<ActionResult<List<FileMetadataDto>>> List(
+            int? taskId, int? meetingId, int? categoryId, string? q, bool includeArchived = false) =>
+            Ok(await files.ListAsync(taskId, meetingId, categoryId, q, includeArchived, UserId()));
 //----------------------------------------------------------------------------------------------------------------------//
         [HttpGet("categories")]
         public async Task<ActionResult<List<FileCategoryDto>>> Categories() => Ok(await files.CategoriesAsync());
@@ -40,6 +41,27 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Controllers
         public async Task<IActionResult> Recategorise(int id, RecategoriseFileRequest req)
         {
             await files.RecategoriseAsync(id, req.CategoryId, UserId());
+            return NoContent();
+        }
+//----------------------------------------------------------------------------------------------------------------------//
+        [HttpPost("{id:int}/archive"), Authorize(Policy = Permissions.ManageFiles)]
+        public async Task<IActionResult> Archive(int id)
+        {
+            await files.SetArchivedAsync(id, true, UserId());
+            return NoContent();
+        }
+//----------------------------------------------------------------------------------------------------------------------//
+        [HttpDelete("{id:int}/archive"), Authorize(Policy = Permissions.ManageFiles)]
+        public async Task<IActionResult> Unarchive(int id)
+        {
+            await files.SetArchivedAsync(id, false, UserId());
+            return NoContent();
+        }
+//----------------------------------------------------------------------------------------------------------------------//
+        [HttpDelete("{id:int}"), Authorize(Policy = Permissions.ManageFiles)]
+        public async Task<IActionResult> Delete(int id)
+        {
+            await files.DeleteAsync(id, UserId());
             return NoContent();
         }
     }

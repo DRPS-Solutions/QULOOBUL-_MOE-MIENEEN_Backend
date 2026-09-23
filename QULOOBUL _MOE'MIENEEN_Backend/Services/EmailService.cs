@@ -28,7 +28,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
         public async Task SendAsync(Notification notification, string subject)
         {
             var key = config["Email:ResendApiKey"];
-            if (string.IsNullOrWhiteSpace(key)) return;
+            if (string.IsNullOrWhiteSpace(key) || notification.IsMuted) return;
 
             if (notification.NotificationId == 0)
                 throw new InvalidOperationException("Save the notification before emailing it: its id is the idempotency key.");

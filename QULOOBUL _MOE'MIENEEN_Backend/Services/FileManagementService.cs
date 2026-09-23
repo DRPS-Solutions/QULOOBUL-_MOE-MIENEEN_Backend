@@ -1,5 +1,6 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using QULOOBUL__MOE_MIENEEN_Backend.Data;
+using QULOOBUL__MOE_MIENEEN_Backend.Models.File;
 using QULOOBUL__MOE_MIENEEN_Shared.Files;
 
 namespace QULOOBUL__MOE_MIENEEN_Backend.Services
@@ -10,9 +11,10 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
         /// <summary>
         /// UC-07's "one place to search all documents", narrowed to the documents the caller may see.
         /// An explicit task/meeting filter is checked outright so a guessed id returns 403, not an
-        /// empty list that would confirm the record exists.
+        /// empty list that would confirm the record exists. Archived files are left out unless asked for.
         /// </summary>
-        public async Task<List<FileMetadataDto>> ListAsync(int? taskId, int? meetingId, int? categoryId, int userId)
+        public async Task<List<FileMetadataDto>> ListAsync(
+            int? taskId, int? meetingId, int? categoryId, string? search, bool includeArchived, int userId)
         {
             if (taskId is int t) await guard.EnsureTaskAsync(userId, t);
             if (meetingId is int m) await guard.EnsureMeetingAsync(userId, m);
@@ -20,12 +22,15 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             var q = db.FileUploads
                 .Where(f => (taskId == null || f.TaskId == taskId)
                          && (meetingId == null || f.MeetingId == meetingId)
-                         && (categoryId == null || f.CategoryId == categoryId));
+                         && (categoryId == null || f.CategoryId == categoryId)
+                         && (search == null || f.FileName.Contains(search))
+                         && (includeArchived || !f.IsArchived));
 
             return await guard.VisibleFiles(q, userId, await guard.IsAdminAsync(userId))
+                .OrderBy(f => f.FileName)
                 .Select(f => new FileMetadataDto(
                     f.FileId, f.FileName, f.FileType, f.CategoryId, f.Category!.CategoryName,
-                    f.UploadedBy, f.TaskId, f.MeetingId, f.PeriodMonth))
+                    f.UploadedBy, f.TaskId, f.MeetingId, f.PeriodMonth, f.IsArchived))
                 .ToListAsync();
         }
 //----------------------------------------------------------------------------------------------------------------------//
@@ -46,14 +51,41 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
         /// The ManageFiles policy on the route is the first gate; this re-checks the file itself.</summary>
         public async Task RecategoriseAsync(int fileId, int categoryId, int actorId)
         {
-            await guard.EnsureFileAsync(actorId, fileId);
-            var f = await db.FileUploads.FindAsync(fileId)
-                ?? throw new KeyNotFoundException($"File {fileId} not found.");
+            var f = await FindManagedAsync(fileId, actorId);
             if (!await db.FileCategories.AnyAsync(c => c.CategoryId == categoryId))
                 throw new InvalidOperationException($"Unknown category {categoryId}.");
             f.CategoryId = categoryId;
-            audit.Record(actorId, "file.recategorise", nameof(QULOOBUL__MOE_MIENEEN_Backend.Models.File.FileUpload), fileId);
+            audit.Record(actorId, "file.recategorise", nameof(FileUpload), fileId);
             await db.SaveChangesAsync();
+        }
+//----------------------------------------------------------------------------------------------------------------------//
+        /// <summary>UC-07 alternate flow, admin only: "archive files". Reversible; nothing is removed.</summary>
+        public async Task SetArchivedAsync(int fileId, bool archived, int actorId)
+        {
+            var f = await FindManagedAsync(fileId, actorId);
+            f.IsArchived = archived;
+            audit.Record(actorId, archived ? "file.archive" : "file.unarchive", nameof(FileUpload), fileId);
+            await db.SaveChangesAsync();
+        }
+//----------------------------------------------------------------------------------------------------------------------//
+        /// <summary>
+        /// Admin only. Deletes the row, then the blob: if the blob delete fails the file is merely
+        /// orphaned in private storage (and soft-deleted there after 30 days), never a row pointing at nothing.
+        /// </summary>
+        public async Task DeleteAsync(int fileId, int actorId)
+        {
+            var f = await FindManagedAsync(fileId, actorId);
+            db.FileUploads.Remove(f);
+            audit.Record(actorId, "file.delete", nameof(FileUpload), fileId);
+            await db.SaveChangesAsync();
+            await uploads.DeleteBlobAsync(f);
+        }
+//----------------------------------------------------------------------------------------------------------------------//
+        private async Task<FileUpload> FindManagedAsync(int fileId, int actorId)
+        {
+            await guard.EnsureFileAsync(actorId, fileId);
+            return await db.FileUploads.FindAsync(fileId)
+                ?? throw new KeyNotFoundException($"File {fileId} not found.");
         }
     }
 }

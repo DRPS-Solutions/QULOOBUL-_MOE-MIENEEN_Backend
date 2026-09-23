@@ -92,9 +92,13 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
         {
             var file = await db.FileUploads.FindAsync(fileId)
                 ?? throw new KeyNotFoundException($"File {fileId} not found.");
-            var blobName = file.FilePath.Split('/', 2)[^1];
-            return await blob.CreateReadSasAsync(Container, blobName);
+            return await blob.CreateReadSasAsync(Container, BlobName(file));
         }
+//----------------------------------------------------------------------------------------------------------------------//
+        /// <summary>Removes the blob; the caller deletes the row. The container's soft delete is the undo.</summary>
+        public Task DeleteBlobAsync(FileUpload file) => blob.DeleteAsync(Container, BlobName(file));
+
+        private static string BlobName(FileUpload file) => file.FilePath.Split('/', 2)[^1];
     }
 }
 //---------------------------DDDDDDDDDDDoooooooooooooo END OF FILE DDDDDDDDDDDoooooooooooooo---------------------------//
