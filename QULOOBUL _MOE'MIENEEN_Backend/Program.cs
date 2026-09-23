@@ -14,6 +14,19 @@ using System.Text;
 using System.Threading.RateLimiting;
 using static QULOOBUL__MOE_MIENEEN_Shared.Classes.Common;
 
+// Local-only: lift KEY=VALUE lines from .env into the environment before the builder snapshots it,
+// so ConnectionStrings__Default etc. override appsettings.json. Real env vars (CI, App Service) win.
+if (File.Exists(".env"))
+    foreach (var line in File.ReadAllLines(".env"))
+    {
+        var t = line.Trim();
+        var eq = t.IndexOf('=');
+        if (t.Length == 0 || t[0] == '#' || eq < 1) continue;
+        var key = t[..eq].Trim();
+        if (Environment.GetEnvironmentVariable(key) is null)
+            Environment.SetEnvironmentVariable(key, t[(eq + 1)..].Trim().Trim('"'));
+    }
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
