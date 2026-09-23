@@ -17,7 +17,7 @@
     <DialogContent>
         <MudTextField T="string"
                        @bind-Value="title"
-                       Label="Task title"
+                       Label="Task title" Required="true" RequiredError="Give the task a title."
                        Variant="Variant.Outlined"
                        MaxLength="200"
                        Class="mb-3"
@@ -32,10 +32,10 @@
                        Class="mb-3" />
 
         <div class="d-flex gap-3 mb-3">
-            <MudDatePicker @bind-Date="date" Label="Date" Variant="Variant.Outlined" />
+            <MudDatePicker @bind-Date="date" Label="Date" Variant="Variant.Outlined" Required="true" RequiredError="Choose a date." />
             @if (!isAllDay)
             {
-                <MudTimePicker @bind-Time="time" Label="Time" Variant="Variant.Outlined" />
+                <MudTimePicker @bind-Time="time" Label="Time" Variant="Variant.Outlined" Required="true" RequiredError="Choose a time, or tick All day." />
             }
         </div>
 
@@ -47,7 +47,7 @@
             <MudSelectItem T="string" Value="@("High")">High</MudSelectItem>
         </MudSelect>
 
-        <MudSelect T="int?" Label="Assignee" Variant="Variant.Outlined" @bind-Value="assigneeId"
+        <MudSelect T="int?" Label="Assignee" Variant="Variant.Outlined" Required="true" RequiredError="Choose who the task is for." @bind-Value="assigneeId"
                    ToStringFunc="@(id => AppData.UserName(id))" Class="mb-3">
             @foreach (var user in AppData.AssignableUsers)
             {
@@ -67,7 +67,7 @@
         {
             @if (AppData.EventProjects.Any())
             {
-                <MudSelect T="int?" Label="Linked event" Variant="Variant.Outlined" @bind-Value="projectId"
+                <MudSelect T="int?" Label="Linked event" Variant="Variant.Outlined" Required="true" RequiredError="Choose the event this task belongs to." @bind-Value="projectId"
                            ToStringFunc="@(id => AppData.ProjectName(id))">
                     @foreach (var project in AppData.EventProjects)
                     {

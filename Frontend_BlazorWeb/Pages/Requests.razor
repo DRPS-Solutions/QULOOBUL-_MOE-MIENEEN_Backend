@@ -230,9 +230,9 @@
                         New Request
                     </div>
 
-                    <MudTextField T="string" @bind-Value="newRequest.Title" Label="What do you need?" Variant="Variant.Outlined" Class="mb-3" />
+                    <MudTextField T="string" @bind-Value="newRequest.Title" Label="What do you need?" Required="true" RequiredError="Say what you need." Variant="Variant.Outlined" Class="mb-3" />
 
-                    <MudSelect T="int?" Label="Category" Variant="Variant.Outlined" @bind-Value="newRequest.CategoryId"
+                    <MudSelect T="int?" Label="Category" Variant="Variant.Outlined" Required="true" RequiredError="Choose a category." @bind-Value="newRequest.CategoryId"
                                ToStringFunc="@(id => categories.FirstOrDefault(c => c.CategoryId == id)?.CategoryName)" Class="mb-3">
                         @foreach (var category in categories)
                         {
@@ -252,7 +252,7 @@
 
                     @if (newRequest.LinkType == "Event")
                     {
-                        <MudSelect T="int?" Label="Which event?" Variant="Variant.Outlined" @bind-Value="newRequest.LinkedId"
+                        <MudSelect T="int?" Label="Which event?" Variant="Variant.Outlined" Required="true" RequiredError="Choose the event, or set Link to None." @bind-Value="newRequest.LinkedId"
                                    ToStringFunc="@(id => AppData.ProjectName(id))" Class="mb-3">
                             @foreach (var project in AppData.EventProjects)
                             {
@@ -262,7 +262,7 @@
                     }
                     else if (newRequest.LinkType == "Task")
                     {
-                        <MudSelect T="int?" Label="Which task? (next two weeks)" Variant="Variant.Outlined" @bind-Value="newRequest.LinkedId"
+                        <MudSelect T="int?" Label="Which task? (next two weeks)" Variant="Variant.Outlined" Required="true" RequiredError="Choose the task, or set Link to None." @bind-Value="newRequest.LinkedId"
                                    ToStringFunc="@(id => AppData.Tasks.FirstOrDefault(t => t.TaskId == id)?.Title)" Class="mb-3">
                             @foreach (var task in AppData.Tasks)
                             {

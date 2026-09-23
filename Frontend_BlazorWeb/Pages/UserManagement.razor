@@ -1,5 +1,6 @@
 @page "/users"
 @using MudBlazor
+@using System.ComponentModel.DataAnnotations
 @implements IDisposable
 @inject AppDataService AppData
 
@@ -439,14 +440,14 @@
 
                 <MudGrid Justify="Justify.Center">
                     <MudItem xs="12" md="6">
-                        <MudTextField T="string" @bind-Value="newUser.FirstName" Label="First Name" Variant="Variant.Outlined" MaxLength="100" Immediate="true" Class="mb-3" />
-                        <MudTextField T="string" @bind-Value="newUser.Surname" Label="Surname" Variant="Variant.Outlined" MaxLength="100" Immediate="true" Class="mb-3" />
-                        <MudTextField T="string" @bind-Value="newUser.Email" Label="Email Address" InputType="InputType.Email" Variant="Variant.Outlined" MaxLength="256" Immediate="true" Class="mb-3" />
-                        <MudTextField T="string" @bind-Value="newUser.CellNo" Label="Cell Number" InputType="InputType.Telephone" Variant="Variant.Outlined" MaxLength="20" Immediate="true" Class="mb-3" />
+                        <MudTextField T="string" @bind-Value="newUser.FirstName" Label="First Name" Required="true" RequiredError="Enter a first name." Variant="Variant.Outlined" MaxLength="100" Immediate="true" Class="mb-3" />
+                        <MudTextField T="string" @bind-Value="newUser.Surname" Label="Surname" Required="true" RequiredError="Enter a surname." Variant="Variant.Outlined" MaxLength="100" Immediate="true" Class="mb-3" />
+                        <MudTextField T="string" @bind-Value="newUser.Email" Label="Email Address" Required="true" RequiredError="Enter an email address." Validation="@EmailRule" InputType="InputType.Email" Variant="Variant.Outlined" MaxLength="256" Immediate="true" Class="mb-3" />
+                        <MudTextField T="string" @bind-Value="newUser.CellNo" Label="Cell Number" Required="true" RequiredError="Enter a cell number." Validation="@PhoneRule" InputType="InputType.Telephone" Variant="Variant.Outlined" MaxLength="20" Immediate="true" Class="mb-3" />
 
                         @* The role decides which pages the account can see (see
                            AppDataService.CanSee*) and what it may do in the API. *@
-                        <MudSelect T="int?" Label="System Role" Variant="Variant.Outlined" @bind-Value="newUser.RoleId"
+                        <MudSelect T="int?" Label="System Role" Variant="Variant.Outlined" Required="true" RequiredError="Choose a role." @bind-Value="newUser.RoleId"
                                    ToStringFunc="@(id => roles.FirstOrDefault(r => r.RoleId == id)?.RoleName)" Class="mb-3">
                             @foreach (var role in roles)
                             {
@@ -488,9 +489,13 @@
         !saving &&
         !string.IsNullOrWhiteSpace(newUser.FirstName) &&
         !string.IsNullOrWhiteSpace(newUser.Surname) &&
-        !string.IsNullOrWhiteSpace(newUser.Email) &&
-        !string.IsNullOrWhiteSpace(newUser.CellNo) &&
+        EmailRule.IsValid(newUser.Email.Trim()) && !string.IsNullOrWhiteSpace(newUser.Email) &&
+        PhoneRule.IsValid(newUser.CellNo.Trim()) && !string.IsNullOrWhiteSpace(newUser.CellNo) &&
         newUser.RoleId.HasValue;
+
+    // The same rules CreateUserRequest applies server-side, so the message shows before Save.
+    private static readonly EmailAddressAttribute EmailRule = new() { ErrorMessage = "Enter a valid email address, e.g. name@example.com." };
+    private static readonly PhoneAttribute PhoneRule = new() { ErrorMessage = "Enter a valid phone number, e.g. 082 123 4567." };
 
     private IEnumerable<UserSummaryDto> FilteredEmployees =>
         AppData.Users

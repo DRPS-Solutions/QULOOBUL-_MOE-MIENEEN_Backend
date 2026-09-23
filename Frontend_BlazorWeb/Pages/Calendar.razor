@@ -44,10 +44,10 @@
                     @if (creating)
                     {
                         <MudText Typo="Typo.subtitle1" Style="font-weight:600;" Class="mb-3">New event</MudText>
-                        <MudTextField T="string" @bind-Value="newTitle" Label="Title" Variant="Variant.Outlined" MaxLength="200" Immediate="true" Class="mb-3" />
+                        <MudTextField T="string" @bind-Value="newTitle" Label="Title" Variant="Variant.Outlined" Required="true" RequiredError="Give the event a title." MaxLength="200" Immediate="true" Class="mb-3" />
                         <div class="d-flex gap-3 mb-3">
-                            <MudDatePicker @bind-Date="newDate" Label="Date" Variant="Variant.Outlined" />
-                            <MudTimePicker @bind-Time="newTime" Label="Time" Variant="Variant.Outlined" />
+                            <MudDatePicker @bind-Date="newDate" Label="Date" Variant="Variant.Outlined" Required="true" RequiredError="Choose a date." />
+                            <MudTimePicker @bind-Time="newTime" Label="Time" Variant="Variant.Outlined" Required="true" RequiredError="Choose a time." />
                         </div>
                         <MudTextField T="string" @bind-Value="newLocation" Label="Location" Variant="Variant.Outlined" MaxLength="200" Class="mb-3" />
                         <div class="d-flex gap-2">
