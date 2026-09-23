@@ -1,13 +1,27 @@
 # QULOOBUL _MOE'MIENEEN_Backend
 
-
 ASP.NET Core Web API for the Quloobul Moe'mieneen NPO platform — projects, tasks,
 resource requests, meetings and file storage for one organisation's staff and volunteers.
-Serves both clients: a Blazor web app and a .NET MAUI Android app.
+Serves both clients in this solution: a Blazor WebAssembly web app and a .NET MAUI app.
 
-**Status: scaffolding + data model.** The entity classes are written. Controllers, the
-DbContext and the service bodies are not. See [What's not built yet](#whats-not-built-yet)
-before you assume an endpoint exists.
+**Status: API built, both clients wired to it.** The API has a DbContext, migrations,
+10 controllers and 19 registered services. The web and MAUI clients both sign in against
+`AuthController`, read and write through the controllers using the `Shared` DTOs, and take
+live updates from the SignalR hub. See [What's not built yet](#whats-not-built-yet).
+
+## Solution layout
+
+| Project | What it is |
+|---|---|
+| `QULOOBUL _MOE'MIENEEN_Backend/` | The Web API. Controllers → services → EF Core. |
+| `QULOOBUL _MOE'MIENEEN_Shared/` | DTOs both clients and the API compile against. `net10.0`. |
+| `Frontend_BlazorWeb/` | Blazor **WebAssembly** SPA. Not Blazor Server — see note below. |
+| `Frontend_Mobile/` | .NET MAUI app (Android / iOS / MacCatalyst / Windows). |
+| `Backend.Tests/` | xUnit tests for the service rules and state machines. |
+
+`Frontend_BlazorWeb` is WASM on purpose, not by accident: the API's CORS origins match the
+WASM template's ports, and `NotificationHub` reads its JWT from the query string, which is
+the client-side SignalR pattern. Don't "fix" it to Server.
 
 ## Stack
 
@@ -15,6 +29,8 @@ before you assume an endpoint exists.
 |---|---|
 | Runtime | .NET 10 (`net10.0`), nullable + implicit usings on |
 | Data | EF Core 10, SQL Server provider |
+| Auth | JWT bearer + 4 permission-claim policies |
+| Realtime | SignalR `NotificationHub` at `/hubs/notifications`, groups `user-{id}` |
 | Files | Azure Blob Storage — Azurite for local development |
 | API docs | OpenAPI (`Microsoft.AspNetCore.OpenApi`), dev environment only |
 | Container | Linux, `mcr.microsoft.com/dotnet/aspnet:10.0` |
@@ -22,13 +38,37 @@ before you assume an endpoint exists.
 
 ## Running it
 
+The project name contains a space and an apostrophe — quote every path you pass to `dotnet`.
+
 ```bash
 dotnet run --project "QULOOBUL _MOE'MIENEEN_Backend/QULOOBUL _MOE'MIENEEN_Backend.csproj"
 ```
 
-`http://localhost:5012`, or `https://localhost:7272` on the `https` profile. OpenAPI is
-mapped at `/openapi/v1.json` in Development only. The project name contains a space and
-an apostrophe — quote every path you pass to `dotnet`.
+`http://localhost:5012`, or `https://localhost:7272` on the `https` profile. OpenAPI is at
+`/openapi/v1.json` in Development only; `/health` is anonymous and always mapped.
+
+The database is LocalDB by default (`ConnectionStrings:Default` in `appsettings.json`).
+Apply migrations before the first run:
+
+```bash
+dotnet ef database update --project "QULOOBUL _MOE'MIENEEN_Backend/QULOOBUL _MOE'MIENEEN_Backend.csproj"
+```
+
+`DbSeeder` runs via `UseSeeding` after the migration, so the first run comes up populated.
+
+Clients:
+
+```bash
+dotnet run --project Frontend_BlazorWeb/Frontend_BlazorWeb.csproj
+```
+
+```bash
+dotnet build Frontend_Mobile/Frontend_Mobile.csproj -f net10.0-android
+```
+
+The MAUI project needs the **.NET Multi-platform App UI development** workload. Configured
+targets: `net10.0-android` (minSdk 21), `net10.0-ios` (15), `net10.0-maccatalyst`,
+`net10.0-windows10.0.19041.0`.
 
 Build the whole solution:
 
@@ -40,9 +80,9 @@ CI builds with `-warnaserror`, so a warning locally is a red build remotely.
 
 ## Data model
 
-24 entities under `Models/`, one file each, grouped by bounded context. Table names are
-set explicitly with `[Table]` to match the ERD (`Task`, `Task_Assignment`, `File_Upload`…),
-so the C# names and the SQL names differ on purpose.
+25 entities under `Models/`, one file each, grouped by bounded context, and 25 matching
+`DbSet`s on `AppDbContext`. Table names are set explicitly with `[Table]` to match the ERD
+(`Task`, `Task_Assignment`, `File_Upload`…), so the C# names and the SQL names differ on purpose.
 
 | Folder | Entities |
 |---|---|
@@ -66,11 +106,105 @@ Five modelling decisions carry business rules and shouldn't be "tidied away":
 - **`ProjectMember`** — project-scoped visibility. A user allocated to one project sees
   only that project; this is the table the authorisation check reads.
 
+All FKs are `Restrict` on delete, with unique pairs and a `CK_FileUpload_OneContext` check
+constraint. Two migrations: `InitialCreate` and `AddTaskDescriptionAndRequestDetail`.
+
+## API
+
+10 controllers, all delegating to a service — no logic in the controller, per the architecture
+doc's layering: `Api.Controller` → `Api.Services` → `Api.DataAccess`.
+
+`Auth`, `Tasks`, `Projects`, `Requests`, `Meetings`, `Notifications`, `Users`, `Files`,
+`Events`, `Reports`, plus `ApiControllerBase`.
+
 ## Services
 
-`Services/` holds five empty classes marking the seams: `AuditService`,
-`BlobStorageService`, `FileUploadService`, `RequestReviewService`, `TaskAssignmentService`.
-Names and namespaces only — no implementations, and none are registered in DI.
+19 services under `Services/`, all registered in `Program.cs`. One use-case handler per use
+case; the `DbContext` is the unit of work, one `SaveChanges` per operation.
+
+| Group | Services |
+|---|---|
+| Use cases | `TaskService`, `TaskAssignmentService`, `ProjectService`, `RequestReviewService`, `MeetingMinutesService`, `EventService`, `UserService`, `StaffOverviewService`, `ReportingService` |
+| Auth & access | `AuthService`, `AccessGuard` |
+| Files | `FileUploadService`, `FileManagementService`, `BlobStorageService` |
+| Notifications | `NotificationService`, `NotificationQueryService`, `EmailService` |
+| Cross-cutting | `AuditService`, `MaintenanceJobs` |
+
+`MaintenanceJobs` is the one `IHostedService`: SM-02's 48-hour escalation, SM-01's deadline
+reminders, and `Task_Schedule`'s recurring-task generation — the transitions driven by a clock
+rather than a user action.
+
+`AccessGuard` is the object-level authorisation check (the anti-IDOR requirement). It is
+currently called from `TaskService`, `ProjectService`, `MeetingMinutesService` and
+`FileManagementService` only — see the gaps below.
+
+State machines SM-01 (`ProjectTask`), SM-02 (`ResourceRequest`) and SM-03 (`User`) live in
+`Data/Lifecycle.cs` as guarded transition tables, checked server-side.
+
+## Clients
+
+Both front ends authenticate against `AuthController` and keep no data of their own: every
+list is fetched from the API, and a SignalR push tells them which list to refetch.
+
+### `Frontend_Mobile` — .NET MAUI
+
+Ported from the standalone MAUI app at `C:\3rdYear\XBCAD\Mobile`, which was itself a port of
+the Kotlin/Compose Android prototype, itself a port of the Blazor/MudBlazor original. Same
+screens, same palette, same role gating at each step.
+
+| Piece | Where |
+|---|---|
+| Navigation shell, role-gated flyout, unread-count bell, dark-mode toggle | `AppShell.xaml` |
+| Screens | `Pages/` — Login, Home, Tasks, CreateTask, Requests, Events, Notifications, ComingSoon |
+| Session, API calls, SignalR hub connection (the web client's `AppDataService`, ported) | `Data/AppState.cs` |
+| Read-only view models over the `Shared` DTOs, with display-formatting properties (so the XAML needs no converters) | `Models/Models.cs` |
+| Palette and styles, light/dark via `AppThemeBinding` | `Resources/Styles/` |
+
+Five things about it are deliberate, not oversights:
+
+- **Icons are Unicode glyphs, not Material Icons.** MAUI doesn't bundle an icon font and
+  adding one wasn't worth the dependency. Swap a Material Icons `.ttf` into `Resources/Fonts`
+  and change the `Glyph` properties in `Models.cs` for exact parity.
+- **Ticking a task completes it as the signed-in user**, as on the web: the API records who.
+  The old "completed by" picker is gone. SM-01 has no To Do → Done edge, so a tick sends two
+  guarded moves (→ In Progress → Done). The deny reason is a native `DisplayPromptAsync`.
+  New Task is a full modal page instead, because
+  no MAUI inline dialog fits a form that size.
+- **Events are API projects**, as on the web client: coordinator = owner, staff = members.
+  Projects have no date, location, budget, capacity or resource list, so those fields were
+  dropped from the form rather than kept as inputs that save nowhere.
+- **The API address is hard-coded** in `AppState.ApiBase`: `https://10.0.2.2:7272/` on the
+  Android emulator (the host's localhost), `https://localhost:7272/` elsewhere. Debug builds
+  trust the ASP.NET dev certificate (issuer `CN=localhost`); release builds trust nothing
+  extra. A physical phone or a deployed API needs that address changed. The session token is
+  kept in `SecureStorage` and resumed on the next launch while it's still valid.
+- **Login is a Shell route, not a separate root page.** Swapping the window root between a
+  `ContentPage` and a `Shell` crashes Android's fragment manager
+  ([dotnet/maui#21257](https://github.com/dotnet/maui/issues/21257)), so the Shell owns the
+  whole session and navigates between `//login` and `//home`.
+
+Meetings and User Management are still "Coming soon" stubs behind the right role gating.
+
+Verified building clean (0 warnings, 0 errors) on `net10.0-android` and
+`net10.0-windows10.0.19041.0`; the Windows build launches and reaches the login screen.
+
+> **Android gotcha:** changing `<ApplicationId>` leaves the old package's R classes in `obj`,
+> and the mismatched resource IDs surface as runtime crashes pointing nowhere near the cause
+> ([dotnet/maui#31703](https://github.com/dotnet/maui/issues/31703)). Clear `bin`/`obj` and
+> reinstall fresh after any ID change.
+
+### `Frontend_BlazorWeb` — Blazor WebAssembly
+
+Ported from the Blazor Server + MudBlazor prototype; the `@rendermode InteractiveServer`
+directives were stripped, since they're meaningless in standalone WASM. `AppDataService.cs`
+is the in-memory data layer, carried over from the prototype.
+
+Two accepted consequences of the Server→WASM move, known and temporary:
+
+- A singleton is now per browser tab, not shared server-wide, so the prototype's shared-demo-
+  data behaviour across tabs no longer holds.
+- The seeded demo users' plaintext passwords ship inside the WASM bundle. Harmless for fake
+  data; would not be fine if real credentials ever landed in that file.
 
 ## CI/CD
 
@@ -83,17 +217,21 @@ Four workflows in `.github/workflows/`:
 | `cd-production.yml` | push to `main` / `master` | build → deploy to prod staging slot → migrations → smoke test → **manual-approval swap** |
 | `cd-mobile.yml` | changes under `src/Npo.Mobile/**` | Android Release build → signed APK artifact |
 
-Two gates are inactive and say so in the log rather than failing:
+The test gate is live: `ci.yml` runs `dotnet test` against `Backend.Tests/Backend.Tests.csproj`
+with `-warnaserror` and collects coverage.
 
-- **Tests** — every workflow greps for `Microsoft.NET.Test.Sdk` and warns-and-passes when
-  no test project exists. There isn't one yet, so the test gate currently proves nothing.
-- **Deploy jobs** — skipped while `vars.AZURE_WEBAPP_NAME` / `AZURE_WEBAPP_NAME_PROD` are
-  unset, so builds are green before Azure is provisioned.
+**`cd-mobile.yml` is dormant and currently cannot fire.** Its path filter and `MOBILE_PROJECT`
+still point at `src/Npo.Mobile/Npo.Mobile.csproj`, a layout this repo never adopted. The MAUI
+app lives at `Frontend_Mobile/Frontend_Mobile.csproj`. Its `SHARED_TESTS` path
+(`tests/Npo.Shared.Tests/`) doesn't exist either. Repoint all three before expecting an APK.
 
-Production deploys to a slot and swaps only after approval, configured as required
-reviewers on the `production` GitHub environment. Roll back by running the same swap again.
-Staging migrations run against the database the live build is still using, so **every
-migration must be backward compatible**.
+Deploy jobs are skipped while `vars.AZURE_WEBAPP_NAME` / `AZURE_WEBAPP_NAME_PROD` are unset,
+so builds stay green before Azure is provisioned.
+
+Production deploys to a slot and swaps only after approval, configured as required reviewers
+on the `production` GitHub environment. Roll back by running the same swap again. Staging
+migrations run against the database the live build is still using, so **every migration must
+be backward compatible**.
 
 Required repository config before the first real deploy:
 
@@ -102,22 +240,30 @@ Required repository config before the first real deploy:
 | Variables | `AZURE_WEBAPP_NAME`, `AZURE_WEBAPP_NAME_PROD`, `AZURE_RESOURCE_GROUP`, `AZURE_STATIC_WEB_APP*` |
 | Secrets | `AZURE_CREDENTIALS`, `STAGING_DB_CONNECTION`, `PRODUCTION_DB_CONNECTION`, `AZURE_STATIC_WEB_APPS_API_TOKEN*`, `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`, `ANDROID_KEYSTORE_PASSWORD` |
 
-Mobile builds unsigned and warns when the keystore secret is absent. Play Store
-distribution is deliberately not automated — Phase 1 side-loads the APK.
+Mobile builds unsigned and warns when the keystore secret is absent. Play Store distribution
+is deliberately not automated — Phase 1 side-loads the APK.
 
 ## What's not built yet
 
 Roughly in dependency order:
 
-1. **DbContext** — EF Core packages are referenced but no `DbSet`s, no `OnModelCreating`,
-   nothing registered in `Program.cs`.
-2. **Connection string** — workflows pass `ConnectionStrings__Default`; `appsettings.json`
-   doesn't define it and nothing reads it.
-3. **Migrations** — none. Both CD workflows run `dotnet ef database update` regardless.
-4. **`/health`** — both CD workflows smoke-test it. `Program.cs` doesn't map it, so the
-   first real deploy fails at the smoke test.
-5. **Controllers** — `MapControllers()` is called; there are no controllers.
-6. **Authentication** — `UseAuthorization()` with no authentication scheme registered.
-   `User.PasswordHash` exists; nothing writes or checks it.
-7. **Service bodies** — the five stubs above.
-8. **Tests** — no test project, which is why the CI test gate is inert.
+1. **Client screens for the rest of the API.** Both clients are wired, but neither has
+   screens for files (UC-07) or reports (UC-09), and MAUI's Meetings and User Management are
+   still stubs. The MAUI app also lacks the doc's offline SQLite cache.
+2. **Object-level authz coverage.** `AccessGuard` exists and is tested, but only four services
+   call it. Requests, events, users and notifications have no per-record ownership check, so
+   the anti-IDOR requirement is only partly met.
+3. **State machine gaps** (`Data/Lifecycle.cs`). SM-02 covers the escalation path only —
+   `Escalated` is there and wired to the 48-hour job, but `Under Review` and the 30-day
+   resubmit window are not. SM-01 has the reopen transition but no `Cancelled` state and no
+   assignee guard. **SM-03 is dead code:** `UserCanMove` / `EnsureUserMove` / `UserState` have
+   no caller anywhere outside `Lifecycle.cs`, so user deactivate/reactivate is currently
+   unguarded, and `User` has no column for Locked or failure count.
+4. **Meetings and User Management on mobile** — still "Coming soon" stubs.
+5. **Mobile push** (Notification Hubs) — an NFR, absent. Email via Resend is wired in
+   `EmailService` but stays in-app-only with no API key set.
+6. **`cd-mobile.yml` paths** — see above; the workflow cannot fire as written.
+7. **Report export.** `POST /reports` builds stats and writes a `Report` row, but sets
+   `FilePath` to empty — UC-09's export-a-file-to-Blob-Storage half isn't done.
+8. **Localisation and accessibility.** Mobile UI text is inline in XAML rather than `.resx`,
+   and `SemanticProperties` are not set anywhere.

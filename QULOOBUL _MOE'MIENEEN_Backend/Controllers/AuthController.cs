@@ -16,5 +16,13 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Controllers
         /// <returns></returns>
         [HttpPost("login"), AllowAnonymous]
         public async Task<ActionResult<AuthResponse>> Login(LoginRequest req) => Ok(await auth.LoginAsync(req));
+
+        /// <summary>SM-03 setPassword: redeem the activation / reset link's token.</summary>
+        [HttpPost("set-password"), AllowAnonymous]
+        public async Task<IActionResult> SetPassword(SetPasswordRequest req)
+        {
+            await auth.SetPasswordAsync(req);
+            return NoContent();
+        }
     }
 }

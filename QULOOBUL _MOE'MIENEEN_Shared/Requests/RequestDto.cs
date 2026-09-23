@@ -33,6 +33,13 @@ namespace QULOOBUL__MOE_MIENEEN_Shared.Requests
         public string? Note { get; init; }
     }
 
+    /// <summary>SM-02 resubmit: optionally revise what is being asked for.</summary>
+    public record ResubmitRequestRequest
+    {
+        [MaxLength(1000)]
+        public string? Detail { get; init; }
+    }
+
     public record RequestStatusHistoryDto(string NewStatus, int ChangedBy, DateTime TimeCreated);
     public record RequestCategoryDto(int CategoryId, string CategoryName);
 }

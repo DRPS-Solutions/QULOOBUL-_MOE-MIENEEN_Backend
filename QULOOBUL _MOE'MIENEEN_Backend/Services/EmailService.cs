@@ -47,24 +47,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
                     .Select(u => u.Email).FirstOrDefaultAsync();
                 if (string.IsNullOrWhiteSpace(address)) return;
 
-                var client = http.CreateClient();
-                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", key);
-                var response = await client.PostAsJsonAsync(Endpoint, new
-                {
-                    from = config["Email:From"] ?? "QULOOBUL MOE'MIENEEN <noreply@quloobul.local>",
-                    to = new[] { address },
-                    subject,
-                    // The message carries user-entered text (task titles, request details), so it is
-                    // encoded rather than interpolated into the markup.
-                    html = $"<p>{System.Net.WebUtility.HtmlEncode(notification.Message)}</p>",
-                });
-
-                if (!response.IsSuccessStatusCode)
-                {
-                    log.LogWarning("Resend rejected notification {Id}: {Status}",
-                        notification.NotificationId, response.StatusCode);
-                    return;
-                }
+                if (!await PostAsync(key, address, subject, notification.Message)) return;
 
                 db.AuditLogs.Add(new AuditLog
                 {
@@ -80,6 +63,43 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             {
                 log.LogError(ex, "Emailing notification {Id} failed", notification.NotificationId);
             }
+        }
+//----------------------------------------------------------------------------------------------------------------------//
+        /// <summary>
+        /// Account mail (SM-03 activation / password reset): goes to an address, not a notification,
+        /// because the recipient cannot sign in yet. Never throws. With no API key the link is logged
+        /// instead, so a local or CI setup can still activate accounts.
+        /// </summary>
+        public async Task SendAccountEmailAsync(string address, string subject, string message)
+        {
+            var key = config["Email:ResendApiKey"];
+            if (string.IsNullOrWhiteSpace(key))
+            {
+                log.LogInformation("Email not configured; would send \"{Subject}\" to {Address}: {Message}",
+                    subject, address, message);
+                return;
+            }
+            try { await PostAsync(key, address, subject, message); }
+            catch (Exception ex) { log.LogError(ex, "Sending \"{Subject}\" failed", subject); }
+        }
+//----------------------------------------------------------------------------------------------------------------------//
+        private async Task<bool> PostAsync(string key, string address, string subject, string message)
+        {
+            var client = http.CreateClient();
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", key);
+            var response = await client.PostAsJsonAsync(Endpoint, new
+            {
+                from = config["Email:From"] ?? "QULOOBUL MOE'MIENEEN <noreply@quloobul.local>",
+                to = new[] { address },
+                subject,
+                // The message carries user-entered text (task titles, request details), so it is
+                // encoded rather than interpolated into the markup.
+                html = $"<p>{System.Net.WebUtility.HtmlEncode(message)}</p>",
+            });
+
+            if (!response.IsSuccessStatusCode)
+                log.LogWarning("Resend rejected \"{Subject}\": {Status}", subject, response.StatusCode);
+            return response.IsSuccessStatusCode;
         }
     }
 }

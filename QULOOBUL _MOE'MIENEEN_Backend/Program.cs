@@ -8,6 +8,7 @@ using QULOOBUL__MOE_MIENEEN_Backend.Hubs;
 using QULOOBUL__MOE_MIENEEN_Backend.SharedClasses.Middleware;
 using QULOOBUL__MOE_MIENEEN_Backend.Services;
 using QULOOBUL__MOE_MIENEEN_Shared;
+using System.Security.Claims;
 using System.Text;
 using static QULOOBUL__MOE_MIENEEN_Shared.Classes.Common;
 
@@ -52,7 +53,16 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                 if (!string.IsNullOrEmpty(t) && c.HttpContext.Request.Path.StartsWithSegments("/hubs"))
                     c.Token = t;
                 return Task.CompletedTask;
-            }
+            },
+            // SM-03 deactivate() "revoke sessions" (and Locked / reset): a JWT is only good while its
+            // user is still Active. One PK lookup per request, cheaper than a token blocklist.
+            OnTokenValidated = async c =>
+            {
+                var id = int.Parse(c.Principal!.FindFirstValue(ClaimTypes.NameIdentifier)!);
+                var db = c.HttpContext.RequestServices.GetRequiredService<AppDbContext>();
+                if (!await db.Users.AnyAsync(u => u.UserId == id && u.IsActive))
+                    c.Fail("This account is no longer active.");
+            },
         };
     });
 
@@ -109,3 +119,4 @@ app.MapHub<NotificationHub>("/hubs/notifications").RequireAuthorization();
 app.MapGet("/health", () => Results.Ok(new { status = "ok" })).AllowAnonymous();
 
 app.Run();
+//---------------------------DDDDDDDDDDDoooooooooooooo END OF FILE DDDDDDDDDDDoooooooooooooo---------------------------//

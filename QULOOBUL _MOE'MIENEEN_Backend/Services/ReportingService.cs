@@ -24,16 +24,16 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
                 .GroupBy(t => t.Priority)
                 .Select(g => new TaskCompletionStat(
                     g.Key,
-                    g.Count(t => t.Status == "Done"),
-                    g.Count(t => t.Status != "Done")))
+                    g.Count(t => t.Status == "Done" || t.Status == Lifecycle.TaskArchived),
+                    g.Count(t => !Lifecycle.TaskFinished.Contains(t.Status))))
                 .ToListAsync();
 
             var workload = await db.Users.Where(u => u.IsActive)
                 .Select(u => new WorkloadStat(
                     u.UserId, u.FirstName + " " + u.Surname,
                     db.TaskAssignments.Count(a => a.UserId == u.UserId),
-                    db.TaskAssignments.Count(a => a.UserId == u.UserId && a.Task!.Status == "Done"),
-                    db.TaskAssignments.Count(a => a.UserId == u.UserId && a.Task!.Status != "Done" && a.Task.Deadline < DateTime.UtcNow)))
+                    db.TaskAssignments.Count(a => a.UserId == u.UserId && (a.Task!.Status == "Done" || a.Task!.Status == Lifecycle.TaskArchived)),
+                    db.TaskAssignments.Count(a => a.UserId == u.UserId && !Lifecycle.TaskFinished.Contains(a.Task!.Status) && a.Task.Deadline < DateTime.UtcNow)))
                 .ToListAsync();
 
             var progress = await db.Projects.Select(p => new
@@ -41,7 +41,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
                 p.ProjectId,
                 p.ProjectName,
                 Total = db.Tasks.Count(t => t.ProjectId == p.ProjectId),
-                Done = db.Tasks.Count(t => t.ProjectId == p.ProjectId && t.Status == "Done"),
+                Done = db.Tasks.Count(t => t.ProjectId == p.ProjectId && (t.Status == "Done" || t.Status == Lifecycle.TaskArchived)),
             }).ToListAsync();
 
             var progressStats = progress.Select(p => new ProjectProgressStat(

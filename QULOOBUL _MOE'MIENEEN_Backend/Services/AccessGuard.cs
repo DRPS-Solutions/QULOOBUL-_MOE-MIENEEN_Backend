@@ -18,12 +18,21 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
     public class AccessGuard(AppDbContext db)
     {
         /// <summary>ManageUsers is the admin marker the seeded Admin role carries.</summary>
-        public Task<bool> IsAdminAsync(int userId) =>
+        public Task<bool> IsAdminAsync(int userId) => HasPermissionAsync(userId, Permissions.ManageUsers);
+//----------------------------------------------------------------------------------------------------------------------//
+        /// <summary>Read from the database, not the JWT, so a revoked grant takes effect immediately.</summary>
+        public Task<bool> HasPermissionAsync(int userId, string permission) =>
             (from u in db.Users
              join rp in db.RolePermissions on u.RoleId equals rp.RoleId
              join p in db.Permissions on rp.PermissionId equals p.PermissionId
-             where u.UserId == userId && u.IsActive && p.PermissionName == Permissions.ManageUsers
+             where u.UserId == userId && u.IsActive && p.PermissionName == permission
              select u.UserId).AnyAsync();
+//----------------------------------------------------------------------------------------------------------------------//
+        public async Task EnsurePermissionAsync(int userId, string permission)
+        {
+            if (!await HasPermissionAsync(userId, permission))
+                throw new UnauthorizedAccessException($"You need the {permission} permission to do that.");
+        }
 //----------------------------------------------------------------------------------------------------------------------//
         public async Task<bool> CanSeeProjectAsync(int userId, int projectId) =>
             await db.Projects.AnyAsync(p => p.ProjectId == projectId && p.OwnerId == userId)
