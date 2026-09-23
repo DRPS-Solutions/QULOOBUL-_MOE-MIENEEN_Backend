@@ -379,6 +379,35 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
                     b.ToTable("User");
                 });
 
+            modelBuilder.Entity("QULOOBUL__MOE_MIENEEN_Backend.Models.IdentityAndAccess.UserDirectoryEntry", b =>
+                {
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("FullName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("RoleName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.ToTable((string)null);
+
+                    b.ToView("vw_UserDirectory", (string)null);
+                });
+
             modelBuilder.Entity("QULOOBUL__MOE_MIENEEN_Backend.Models.NotificationsAudit.AuditLog", b =>
                 {
                     b.Property<int>("AuditId")
@@ -407,6 +436,8 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
                         .HasColumnType("int");
 
                     b.HasKey("AuditId");
+
+                    b.HasIndex("Timestamp");
 
                     b.HasIndex("UserId");
 
@@ -445,7 +476,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
 
                     b.HasIndex("TypeId");
 
-                    b.HasIndex("UserId");
+                    b.HasIndex("UserId", "IsRead");
 
                     b.ToTable("Notification");
                 });
@@ -646,9 +677,9 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
 
                     b.HasIndex("CreatedBy");
 
-                    b.HasIndex("ProjectId");
-
                     b.HasIndex("ScheduleId");
+
+                    b.HasIndex("ProjectId", "Status");
 
                     b.ToTable("Task");
                 });
@@ -884,7 +915,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
                     b.HasOne("QULOOBUL__MOE_MIENEEN_Backend.Models.Collaboration.Event", "Event")
                         .WithMany()
                         .HasForeignKey("EventId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.HasOne("QULOOBUL__MOE_MIENEEN_Backend.Models.IdentityAndAccess.User", "User")
@@ -914,7 +945,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
                     b.HasOne("QULOOBUL__MOE_MIENEEN_Backend.Models.Collaboration.Meeting", "Meeting")
                         .WithMany()
                         .HasForeignKey("MeetingId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.HasOne("QULOOBUL__MOE_MIENEEN_Backend.Models.IdentityAndAccess.User", "User")
@@ -965,12 +996,12 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
                     b.HasOne("QULOOBUL__MOE_MIENEEN_Backend.Models.Collaboration.Meeting", "Meeting")
                         .WithMany()
                         .HasForeignKey("MeetingId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.HasOne("QULOOBUL__MOE_MIENEEN_Backend.Models.Project.ProjectTask", "Task")
                         .WithMany()
                         .HasForeignKey("TaskId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.HasOne("QULOOBUL__MOE_MIENEEN_Backend.Models.IdentityAndAccess.User", "Uploader")
                         .WithMany()
@@ -1100,7 +1131,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
                     b.HasOne("QULOOBUL__MOE_MIENEEN_Backend.Models.Project.Project", "Project")
                         .WithMany()
                         .HasForeignKey("ProjectId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.HasOne("QULOOBUL__MOE_MIENEEN_Backend.Models.IdentityAndAccess.User", "User")
@@ -1197,7 +1228,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
                     b.HasOne("QULOOBUL__MOE_MIENEEN_Backend.Models.Project.ProjectTask", "Task")
                         .WithMany()
                         .HasForeignKey("TaskId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.HasOne("QULOOBUL__MOE_MIENEEN_Backend.Models.IdentityAndAccess.User", "User")
@@ -1216,7 +1247,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
                     b.HasOne("QULOOBUL__MOE_MIENEEN_Backend.Models.Project.ProjectTask", "Task")
                         .WithMany()
                         .HasForeignKey("TaskId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.HasOne("QULOOBUL__MOE_MIENEEN_Backend.Models.IdentityAndAccess.User", "User")
