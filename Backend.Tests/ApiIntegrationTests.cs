@@ -36,22 +36,19 @@ public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         ?? @"Server=(localdb)\mssqllocaldb;Trusted_Connection=True;TrustServerCertificate=True")
     { InitialCatalog = $"QM_Test_{Guid.NewGuid():N}" }.ConnectionString;
 
-    // The ' in the project folder name breaks the MSBuild expression Mvc.Testing writes into
-    // MvcTestingAppManifest.json, so point the factory at the API's content root directly.
-    static ApiFactory()
-    {
-        var dir = new DirectoryInfo(AppContext.BaseDirectory);
-        while (!File.Exists(Path.Combine(dir!.FullName, "QULOOBUL _MOE'MIENEEN_Backend", "appsettings.json"))) dir = dir.Parent;
-        Environment.SetEnvironmentVariable("ASPNETCORE_TEST_CONTENTROOT_QULOOBUL__MOE_MIENEEN_BACKEND",
-            Path.Combine(dir.FullName, "QULOOBUL _MOE'MIENEEN_Backend"));
-    }
-
     protected override void ConfigureWebHost(IWebHostBuilder b)
     {
+        // The ' in the project folder name breaks the MSBuild expression Mvc.Testing writes into
+        // MvcTestingAppManifest.json, so find the API's content root (for appsettings.json) ourselves.
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (!File.Exists(Path.Combine(dir!.FullName, "QULOOBUL _MOE'MIENEEN_Backend", "appsettings.json"))) dir = dir.Parent;
+        b.UseContentRoot(Path.Combine(dir.FullName, "QULOOBUL _MOE'MIENEEN_Backend"));
+
         b.UseSetting("ConnectionStrings:Default", ConnectionString);
         b.UseSetting("Jwt:SigningKey", "integration-test-signing-key-that-is-long-enough-for-hs256");
         b.UseSetting("Seed:AdminEmail", AdminEmail);
         b.UseSetting("Seed:AdminPassword", Password);
+        b.UseSetting("RateLimit:AuthPerMinute", "1000");   // every test signs in; one test lowers it
         // The clock-driven jobs would race the assertions; MaintenanceJobTests covers them.
         b.ConfigureServices(s => s.RemoveAll<IHostedService>());
     }
@@ -60,7 +57,7 @@ public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     {
         using var scope = Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        await db.Database.MigrateAsync();           // also runs DbSeeder via UseSeeding
+        db.Database.Migrate();                      // sync: DbSeeder is wired to UseSeeding, not UseAsyncSeeding
 
         var staff = new User
         {

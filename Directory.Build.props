@@ -1,0 +1,7 @@
+<Project>
+  <!-- Merge gate (architecture doc, "Build"): every project in the repo compiles with zero warnings,
+       locally as well as in CI, rather than relying on each workflow remembering -warnaserror. -->
+  <PropertyGroup>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+</Project>
