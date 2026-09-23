@@ -50,6 +50,10 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
 
                     b.HasIndex("OrganiserId");
 
+                    b.HasIndex("Location", "EventDate")
+                        .IsUnique()
+                        .HasFilter("[Location] <> ''");
+
                     b.ToTable("Event");
                 });
 
@@ -213,6 +217,9 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
+
+                    b.Property<bool>("IsArchived")
+                        .HasColumnType("bit");
 
                     b.Property<int?>("MeetingId")
                         .HasColumnType("int");
@@ -441,6 +448,33 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("Notification");
+                });
+
+            modelBuilder.Entity("QULOOBUL__MOE_MIENEEN_Backend.Models.NotificationsAudit.NotificationPreference", b =>
+                {
+                    b.Property<int>("PreferenceId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("PreferenceId"));
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("TypeId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("PreferenceId");
+
+                    b.HasIndex("TypeId");
+
+                    b.HasIndex("UserId", "TypeId")
+                        .IsUnique();
+
+                    b.ToTable("Notification_Preference");
                 });
 
             modelBuilder.Entity("QULOOBUL__MOE_MIENEEN_Backend.Models.NotificationsAudit.NotificationType", b =>
@@ -995,6 +1029,25 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
                 });
 
             modelBuilder.Entity("QULOOBUL__MOE_MIENEEN_Backend.Models.NotificationsAudit.Notification", b =>
+                {
+                    b.HasOne("QULOOBUL__MOE_MIENEEN_Backend.Models.NotificationsAudit.NotificationType", "Type")
+                        .WithMany()
+                        .HasForeignKey("TypeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("QULOOBUL__MOE_MIENEEN_Backend.Models.IdentityAndAccess.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Type");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("QULOOBUL__MOE_MIENEEN_Backend.Models.NotificationsAudit.NotificationPreference", b =>
                 {
                     b.HasOne("QULOOBUL__MOE_MIENEEN_Backend.Models.NotificationsAudit.NotificationType", "Type")
                         .WithMany()
