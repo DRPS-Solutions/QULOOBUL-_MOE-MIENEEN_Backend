@@ -261,11 +261,22 @@ public class AppDataService(HttpClient http, ISnackbar snackbar)
     // HTTP. A failed call shows a snackbar and returns null/false.
     // ------------------------------------------------------------------
 
-    public async Task<T?> GetAsync<T>(string url) =>
-        await Send(HttpMethod.Get, url, null) is { } res ? await res.Content.ReadFromJsonAsync<T>() : default;
+    public Task<T?> GetAsync<T>(string url) => SendAsync<T>(HttpMethod.Get, url, null);
 
-    public async Task<T?> SendAsync<T>(HttpMethod method, string url, object body) =>
-        await Send(method, url, body) is { } res ? await res.Content.ReadFromJsonAsync<T>() : default;
+    public async Task<T?> SendAsync<T>(HttpMethod method, string url, object? body)
+    {
+        if (await Send(method, url, body) is not { } res) return default;
+        try
+        {
+            return await res.Content.ReadFromJsonAsync<T>();
+        }
+        catch (Exception e) when (e is JsonException or NotSupportedException or TaskCanceledException)
+        {
+            // An empty or unexpected body (e.g. 204 No Content) - report it rather than crash the page.
+            snackbar.Add("The server sent back a response this page couldn't read.", Severity.Error);
+            return default;
+        }
+    }
 
     public async Task<bool> SendAsync(HttpMethod method, string url, object? body = null) =>
         await Send(method, url, body) is not null;
@@ -283,6 +294,11 @@ public class AppDataService(HttpClient http, ISnackbar snackbar)
         catch (HttpRequestException)
         {
             snackbar.Add($"Can't reach the server at {http.BaseAddress}.", Severity.Error);
+            return null;
+        }
+        catch (TaskCanceledException)
+        {
+            snackbar.Add("The server took too long to respond. Please try again.", Severity.Error);
             return null;
         }
         if (res.IsSuccessStatusCode) return res;

@@ -79,8 +79,17 @@ else
 
         <main>
             <article class="content px-4">
-                @* Pages read the signed-in user from AppDataService. *@
-                @Body
+                @* Pages read the signed-in user from AppDataService. A page that throws shows
+                   this message instead of taking the whole app down; navigating away resets it. *@
+                <ErrorBoundary @ref="pageErrors">
+                    <ChildContent>@Body</ChildContent>
+                    <ErrorContent>
+                        <MudAlert Severity="Severity.Error" Class="mt-6">
+                            Something went wrong on this page. Your other pages still work.
+                            <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="@(() => pageErrors?.Recover())">Try again</MudButton>
+                        </MudAlert>
+                    </ErrorContent>
+                </ErrorBoundary>
             </article>
         </main>
     </div>
@@ -136,6 +145,11 @@ else
         passwordInput = string.Empty;
         loginError = null;
     }
+
+    private ErrorBoundary? pageErrors;
+
+    // The layout gets new parameters on every navigation: clear a previous page's error.
+    protected override void OnParametersSet() => pageErrors?.Recover();
 
     // Re-render when the session ends elsewhere (e.g. an expired token).
     protected override void OnInitialized() => AppData.OnChange += StateHasChanged;
