@@ -30,7 +30,7 @@ namespace QULOOBUL__MOE_MIENEEN_Shared.Files
 
     public record FileMetadataDto(
         int FileId, string FileName, string FileType, int CategoryId, string CategoryName,
-        int UploadedBy, int? TaskId, int? MeetingId, DateTime? PeriodMonth);
+        int UploadedBy, int? TaskId, int? MeetingId, DateTime? PeriodMonth, bool IsArchived);
 
     public record FileCategoryDto(int CategoryId, string CategoryName);
     public record RecategoriseFileRequest { [Required] public int CategoryId { get; init; } }

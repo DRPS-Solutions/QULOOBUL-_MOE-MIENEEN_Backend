@@ -41,7 +41,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
         public async Task<EventDto> CreateAsync(CreateEventRequest req, int organiserId)
         {
             await EnsureLocationFreeAsync(req.Location, req.EventDate, null);
-            await EnsureUserFreeAsync(organiserId, req.EventDate, null);
+            await EnsureUserFreeAsync(db, organiserId, req.EventDate);
 
             var ev = new Event
             {
@@ -66,7 +66,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             if (await db.EventAttendees.AnyAsync(a => a.EventId == eventId && a.UserId == userId))
                 throw new InvalidOperationException("That user is already on this event.");
 
-            await EnsureUserFreeAsync(userId, ev.EventDate, eventId);
+            await EnsureUserFreeAsync(db, userId, ev.EventDate, eventId);
 
             db.EventAttendees.Add(new EventAttendee { EventId = eventId, UserId = userId, Status = Invited });
             await notify.QueueAsync(userId, "EventInvite",
@@ -111,8 +111,9 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
                 throw new InvalidOperationException($"\"{trimmed}\" is already booked at that time.");
         }
 //----------------------------------------------------------------------------------------------------------------------//
-        /// <summary>Nobody is in two places at once — checked across events and meetings alike.</summary>
-        private async Task EnsureUserFreeAsync(int userId, DateTime when, int? ignoreEventId)
+        /// <summary>Nobody is in two places at once — checked across events and meetings alike.
+        /// Static so MeetingMinutesService runs the same rule when a meeting is booked.</summary>
+        public static async Task EnsureUserFreeAsync(AppDbContext db, int userId, DateTime when, int? ignoreEventId = null)
         {
             var clashingEvent = await db.Events.AnyAsync(e => e.EventId != ignoreEventId && e.EventDate == when
                     && (e.OrganiserId == userId

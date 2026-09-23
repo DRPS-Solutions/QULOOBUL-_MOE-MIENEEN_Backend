@@ -65,6 +65,31 @@ namespace QULOOBUL__MOE_MIENEEN_Shared.Tasks
         public string Comment { get; init; } = string.Empty;
     }
 
+    /// <summary>A recurring weekly template (Task_Schedule). IsActive = false pauses it.</summary>
+    public record TaskScheduleDto(
+        int ScheduleId, string Title, string DayOfWeek, int AssignedTo, int CreatedBy, bool IsActive);
+
+    public record CreateTaskScheduleRequest
+    {
+        [Required, MaxLength(200)]
+        public string Title { get; init; } = string.Empty;
+        /// <summary>English day name, e.g. "Saturday".</summary>
+        [Required, MaxLength(10)]
+        public string DayOfWeek { get; init; } = string.Empty;
+        [Required]
+        public int AssignedTo { get; init; }
+    }
+
+    public record UpdateTaskScheduleRequest
+    {
+        [MaxLength(200)]
+        public string? Title { get; init; }
+        [MaxLength(10)]
+        public string? DayOfWeek { get; init; }
+        public int? AssignedTo { get; init; }
+        public bool? IsActive { get; init; }
+    }
+
     public record TaskCommentDto(int CommentId, int UserId, string Comment, DateTime TimeCreated);
     public record TaskStatusHistoryDto(string NewStatus, int ChangedBy, DateTime TimeCreated);
 }

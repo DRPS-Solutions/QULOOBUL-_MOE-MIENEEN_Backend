@@ -52,6 +52,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Data
         // Notifications and audit
         public DbSet<Notification> Notifications => Set<Notification>();
         public DbSet<NotificationType> NotificationTypes => Set<NotificationType>();
+        public DbSet<NotificationPreference> NotificationPreferences => Set<NotificationPreference>();
         public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 //----------------------------------------------------------------------------------------------------------------------//
 
@@ -77,6 +78,12 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Data
             b.Entity<EventAttendee>().HasIndex(x => new { x.EventId, x.UserId }).IsUnique();
             b.Entity<RolePermission>().HasIndex(x => new { x.RoleId, x.PermissionId }).IsUnique();
             b.Entity<User>().HasIndex(x => x.Email).IsUnique();
+            b.Entity<NotificationPreference>().HasIndex(x => new { x.UserId, x.TypeId }).IsUnique();
+
+            // "Booking / scheduling integrity": one event per venue per slot, held by the database as
+            // well as EventService, so two concurrent bookings cannot both slip past the service check.
+            b.Entity<Event>().HasIndex(x => new { x.Location, x.EventDate }).IsUnique()
+                .HasFilter("[Location] <> ''");
 
             // ponytail: at-most-one attachment context on FileUpload is enforced here as a
             // CHECK constraint; the service also guards it so the error is friendly.

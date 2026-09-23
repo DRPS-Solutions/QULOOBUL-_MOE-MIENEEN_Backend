@@ -29,6 +29,15 @@ namespace QULOOBUL__MOE_MIENEEN_Shared.Collaboration
         public bool IsAiDraft { get; init; }
     }
 
+    /// <summary>UC-03 alternate flow: edit (replace) or append to saved minutes. Saved as a new version.</summary>
+    public record EditMinutesRequest
+    {
+        [Required, MinLength(1)]
+        public string MinutesText { get; init; } = string.Empty;
+        /// <summary>True adds the text below the current minutes; false replaces them.</summary>
+        public bool Append { get; init; }
+    }
+
     public record EventDto(int EventId, int OrganiserId, string Title, DateTime EventDate, string Location);
 
     public record CreateEventRequest

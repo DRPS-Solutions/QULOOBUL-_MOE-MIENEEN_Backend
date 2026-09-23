@@ -15,6 +15,15 @@ namespace QULOOBUL__MOE_MIENEEN_Shared.Notifications
         public IReadOnlyList<int> NotificationIds { get; init; } = [];
     }
 
+    /// <summary>UC-08 per-type preference. A type with no saved preference is enabled.</summary>
+    public record NotificationPreferenceDto(string Type, bool Enabled);
+
+    public record UpdateNotificationPreferencesRequest
+    {
+        [Required, MinLength(1)]
+        public IReadOnlyList<NotificationPreferenceDto> Preferences { get; init; } = [];
+    }
+
     /// <summary>Admin-only manual broadcast (UC-08 alternate flow).</summary>
     public record SendNotificationRequest
     {
