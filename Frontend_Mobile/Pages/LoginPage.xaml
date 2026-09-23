@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ContentPage
+    x:Class="Frontend_Mobile.Pages.LoginPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    Shell.NavBarIsVisible="False"
+    Title="Sign in">
+
+    <!-- UC-01 sign-in against the API. The role, and so which drawer items
+         show, comes back from the server with the token. -->
+
+    <Grid>
+        <Button
+            x:Name="ThemeToggle"
+            Clicked="OnToggleTheme"
+            HorizontalOptions="End"
+            VerticalOptions="Start"
+            Margin="16"
+            Padding="10,6"
+            CornerRadius="18"
+            BackgroundColor="Transparent"
+            FontSize="18"
+            TextColor="{AppThemeBinding Light={StaticResource TextPrimary}, Dark={StaticResource TextPrimaryDark}}" />
+
+        <ScrollView>
+            <Border Style="{StaticResource Card}"
+                    Padding="28"
+                    StrokeShape="RoundRectangle 20"
+                    Margin="24"
+                    VerticalOptions="Center">
+                <VerticalStackLayout Spacing="0">
+
+                    <Image Source="logo.png"
+                           HeightRequest="72"
+                           WidthRequest="72"
+                           Aspect="AspectFit"
+                           HorizontalOptions="Center" />
+
+                    <Label Text="QULOOBUL MOE'MIENEEN"
+                           Style="{StaticResource TitleLarge}"
+                           HorizontalTextAlignment="Center"
+                           Margin="0,12,0,0" />
+
+                    <Label Text="Sign in to continue"
+                           Style="{StaticResource Muted}"
+                           FontSize="14"
+                           HorizontalTextAlignment="Center"
+                           Margin="0,4,0,20" />
+
+                    <Border Style="{StaticResource FieldBox}">
+                        <Entry x:Name="EmailEntry"
+                               Placeholder="Email"
+                               Keyboard="Email"
+                               TextChanged="OnFormChanged" />
+                    </Border>
+
+                    <Border Style="{StaticResource FieldBox}" Margin="0,12,0,0">
+                        <Entry x:Name="PasswordEntry"
+                               Placeholder="Password"
+                               IsPassword="True"
+                               TextChanged="OnFormChanged"
+                               Completed="OnLogin" />
+                    </Border>
+
+                    <Label x:Name="ErrorLabel"
+                           IsVisible="False"
+                           TextColor="{StaticResource StatusDenied}"
+                           Margin="0,8,0,0" />
+
+                    <Button x:Name="LoginButton"
+                            Text="Log In"
+                            IsEnabled="False"
+                            Clicked="OnLogin"
+                            Margin="0,20,0,0" />
+
+                </VerticalStackLayout>
+            </Border>
+        </ScrollView>
+    </Grid>
+
+</ContentPage>

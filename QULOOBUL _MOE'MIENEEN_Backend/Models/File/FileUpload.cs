@@ -21,6 +21,9 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Models.File
         /// <summary>Set for monthly reports filed by period rather than attached to a task.</summary>
         public DateTime? PeriodMonth { get; set; }
 
+        /// <summary>UC-07 admin archive: hidden from the library by default; the row and the blob stay.</summary>
+        public bool IsArchived { get; set; }
+
         [ForeignKey(nameof(CategoryId))] public FileCategory? Category { get; set; }
         [ForeignKey(nameof(UploadedBy))] public User? Uploader { get; set; }
         [ForeignKey(nameof(TaskId))] public ProjectTask? Task { get; set; }

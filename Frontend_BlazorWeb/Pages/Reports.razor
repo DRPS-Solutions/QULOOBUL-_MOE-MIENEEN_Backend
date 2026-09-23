@@ -1,0 +1,141 @@
+@page "/reports"
+@using MudBlazor
+@using QULOOBUL__MOE_MIENEEN_Shared.Reports
+@inject AppDataService AppData
+@inject IJSRuntime JS
+
+<PageTitle>Reports</PageTitle>
+
+@* UC-09: admin reporting dashboard. The API recomputes the figures on every run and logs who ran it. *@
+<div class="drps-page">
+    <MudContainer MaxWidth="MaxWidth.Large" Class="pt-6">
+
+        <div class="drps-page-header">
+            <div>
+                <MudText Typo="Typo.h6" Style="font-weight:600;">Reports &amp; Analytics</MudText>
+                <div class="drps-subtitle">Task completion, staff workload and project progress over a period.</div>
+            </div>
+        </div>
+
+        <div class="drps-panel d-flex gap-3 flex-wrap align-center">
+            <MudDatePicker @bind-Date="from" Label="From" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width:180px;" />
+            <MudDatePicker @bind-Date="to" Label="To" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width:180px;" />
+            <MudSelect T="string" @bind-Value="reportType" Label="Report" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width:220px;">
+                <MudSelectItem T="string" Value="@("TaskCompletion")">Task completion</MudSelectItem>
+                <MudSelectItem T="string" Value="@("Workload")">Staff workload</MudSelectItem>
+                <MudSelectItem T="string" Value="@("ProjectProgress")">Project progress</MudSelectItem>
+            </MudSelect>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Run" Disabled="@(busy || !Valid)">Run</MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.FileDownload"
+                       OnClick="Export" Disabled="@(busy || !Valid)">Export CSV</MudButton>
+        </div>
+
+        @if (report is null)
+        {
+            <div class="drps-panel drps-muted">Pick a period and run a report.</div>
+        }
+        else
+        {
+            <MudGrid>
+                <MudItem xs="12" md="6">
+                    <div class="drps-panel">
+                        <MudText Typo="Typo.subtitle1" Style="font-weight:600;">Completed over time</MudText>
+                        <MudChart T="double" ChartType="ChartType.Line" ChartSeries="trendSeries" ChartLabels="trendLabels" Height="260px" />
+                    </div>
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    <div class="drps-panel">
+                        <MudText Typo="Typo.subtitle1" Style="font-weight:600;">Tasks by priority</MudText>
+                        <MudChart T="double" ChartType="ChartType.StackedBar" ChartSeries="completionSeries" ChartLabels="completionLabels" Height="260px" />
+                    </div>
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    <div class="drps-panel">
+                        <MudText Typo="Typo.subtitle1" Style="font-weight:600;">Staff workload</MudText>
+                        <MudChart T="double" ChartType="ChartType.Bar" ChartSeries="workloadSeries" ChartLabels="workloadLabels" Height="260px" />
+                    </div>
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    <div class="drps-panel">
+                        <MudText Typo="Typo.subtitle1" Style="font-weight:600;">Project progress</MudText>
+                        <MudSimpleTable Dense="true" Elevation="0">
+                            <thead><tr><th>Project</th><th>Done</th><th>Total</th><th>%</th></tr></thead>
+                            <tbody>
+                                @foreach (var p in report.Progress)
+                                {
+                                    <tr>
+                                        <td>@p.ProjectName</td><td>@p.Done</td><td>@p.Total</td>
+                                        <td><MudProgressLinear Value="p.PercentComplete" Color="Color.Primary" Style="min-width:80px;" /> @p.PercentComplete%</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </MudSimpleTable>
+                    </div>
+                </MudItem>
+            </MudGrid>
+        }
+    </MudContainer>
+</div>
+
+@code {
+    private DateTime? from = DateTime.Today.AddDays(-30);
+    private DateTime? to = DateTime.Today;
+    private string reportType = "TaskCompletion";
+    private bool busy;
+    private ReportDto? report;
+
+    private List<ChartSeries<double>> trendSeries = [], completionSeries = [], workloadSeries = [];
+    private string[] trendLabels = [], completionLabels = [], workloadLabels = [];
+
+    private bool Valid => from is not null && to is not null && to >= from;
+
+    // The end date is inclusive: a report "to 23 Sep" covers all of that day.
+    private ReportRequest Request => new()
+    {
+        PeriodStart = AppDataService.Wall(from!.Value.Date),
+        PeriodEnd = AppDataService.Wall(to!.Value.Date.AddDays(1).AddTicks(-1)),
+        ReportType = reportType,
+    };
+
+    private async Task Run()
+    {
+        busy = true;
+        report = await AppData.SendAsync<ReportDto>(HttpMethod.Post, "api/reports", Request);
+        if (report is not null) BuildCharts(report);
+        busy = false;
+    }
+
+    private async Task Export()
+    {
+        busy = true;
+        if (await AppData.SendAsync<ReportExportResponse>(HttpMethod.Post, "api/reports/export", Request) is { } file)
+            await JS.InvokeVoidAsync("open", file.DownloadUrl, "_blank");
+        busy = false;
+    }
+
+    private void BuildCharts(ReportDto r)
+    {
+        // Label every bucket when there are few; otherwise every seventh, so the axis stays legible.
+        trendLabels = r.Trend.Select((p, i) => r.Trend.Count <= 10 || i % 7 == 0 ? p.BucketStart.ToString("d MMM") : "").ToArray();
+        trendSeries = [Series("Cumulative completed", r.Trend.Select(p => (double)p.CumulativeCompleted))];
+
+        completionLabels = r.Completion.Select(c => c.Bucket).ToArray();
+        completionSeries =
+        [
+            Series("Completed", r.Completion.Select(c => (double)c.Completed)),
+            Series("Outstanding", r.Completion.Select(c => (double)c.Outstanding)),
+        ];
+
+        var busiest = r.Workload.OrderByDescending(w => w.Assigned).Take(8).ToList();
+        workloadLabels = busiest.Select(w => w.FullName.Split(' ')[0]).ToArray();
+        workloadSeries =
+        [
+            Series("Assigned", busiest.Select(w => (double)w.Assigned)),
+            Series("Completed", busiest.Select(w => (double)w.Completed)),
+            Series("Overdue", busiest.Select(w => (double)w.Overdue)),
+        ];
+    }
+
+    private static ChartSeries<double> Series(string name, IEnumerable<double> values) =>
+        new() { Name = name, Data = new(values.ToArray()) };
+}

@@ -1,6 +1,37 @@
+using QULOOBUL__MOE_MIENEEN_Backend.Data;
+using QULOOBUL__MOE_MIENEEN_Backend.Models.NotificationsAudit;
+
 namespace QULOOBUL__MOE_MIENEEN_Backend.Services
 {
-    public class AuditService
+    /// <summary>
+    /// Append-only writes to Audit_Log. Nothing here updates or deletes a row
+    /// (architecture doc, "Audit_Log: an append-only record").
+    /// The row is added to the caller's Unit of Work and committed by the caller's
+    /// SaveChanges, so the audit entry lands in the same transaction as the change it records.
+    /// </summary>
+    public class AuditService(AppDbContext db)
     {
+        /// <summary>Queue an audit entry. Caller calls SaveChanges to commit it.</summary>
+        public AuditLog Record(int userId, string action, string entityType, int entityId)
+        {
+            var entry = new AuditLog
+            {
+                UserId = userId,
+                Action = action,
+                EntityType = entityType,
+                EntityId = entityId,
+                Timestamp = DateTime.UtcNow,
+            };
+            db.AuditLogs.Add(entry);
+            return entry;
+        }
+//----------------------------------------------------------------------------------------------------------------------//
+        /// <summary>Queue an audit entry and commit it now, for callers with nothing else pending.</summary>
+        public async Task RecordAndSaveAsync(int userId, string action, string entityType, int entityId)
+        {
+            Record(userId, action, entityType, entityId);
+            await db.SaveChangesAsync();
+        }
     }
 }
+//---------------------------DDDDDDDDDDDoooooooooooooo END OF FILE DDDDDDDDDDDoooooooooooooo---------------------------//

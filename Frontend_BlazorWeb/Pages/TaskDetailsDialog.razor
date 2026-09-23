@@ -1,0 +1,207 @@
+@* =====================================================================
+   TaskDetailsDialog
+   Opened by clicking on a task card/chip in Tasks.razor. Shows every
+   field of the clicked task pre-filled in the same layout as
+   CreateTaskDialog, so the user can review and edit it in place.
+   Confirming "Save changes" hands the edited values back as a
+   NewTaskResult (same carrier CreateTaskDialog uses); Tasks.razor sends
+   them to the API through AppDataService.UpdateTaskAsync. "Cancel"/
+   closing without saving returns nothing, leaving the task untouched.
+   There's no delete: the API keeps task history append-only.
+   ===================================================================== *@
+@using MudBlazor
+@inject AppDataService AppData
+
+<MudDialog Style="border-radius:16px;">
+    <TitleContent>
+        <MudText Typo="Typo.h6" Style="font-weight:600;">Task details</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudTextField T="string"
+                       @bind-Value="title"
+                       Label="Task title"
+                       Variant="Variant.Outlined"
+                       MaxLength="200"
+                       Class="mb-3"
+                       Immediate="true" />
+
+        <MudTextField T="string"
+                       @bind-Value="description"
+                       Label="Description (optional)"
+                       Variant="Variant.Outlined"
+                       MaxLength="2000"
+                       Lines="2"
+                       Class="mb-3" />
+
+        <div class="d-flex gap-3 mb-3">
+            <MudDatePicker @bind-Date="date" Label="Date" Variant="Variant.Outlined" />
+            @if (!isAllDay)
+            {
+                <MudTimePicker @bind-Time="time" Label="Time" Variant="Variant.Outlined" />
+            }
+        </div>
+
+        <MudCheckBox T="bool" @bind-Value="isAllDay" Label="All day" Color="Color.Primary" Class="mb-3" />
+
+        <MudSelect T="string" Label="Priority" Variant="Variant.Outlined" @bind-Value="priority" Class="mb-3">
+            <MudSelectItem T="string" Value="@("Low")">Low</MudSelectItem>
+            <MudSelectItem T="string" Value="@("Medium")">Medium</MudSelectItem>
+            <MudSelectItem T="string" Value="@("High")">High</MudSelectItem>
+        </MudSelect>
+
+        <MudSelect T="int?" Label="Assignee" Variant="Variant.Outlined" @bind-Value="assigneeId"
+                   ToStringFunc="@(id => AppData.UserName(id))" Class="mb-3">
+            @foreach (var user in AppData.AssignableUsers)
+            {
+                <MudSelectItem T="int?" Value="@user.UserId">@user.FullName</MudSelectItem>
+            }
+        </MudSelect>
+
+        <MudSelect T="string" Label="Task type" Variant="Variant.Outlined" @bind-Value="taskType" Class="mb-3">
+            <MudSelectItem T="string" Value="@("Daily")">Daily task</MudSelectItem>
+            <MudSelectItem T="string" Value="@("Event")">Event / project task</MudSelectItem>
+        </MudSelect>
+
+        @if (taskType == "Event")
+        {
+            @if (AppData.EventProjects.Any())
+            {
+                <MudSelect T="int?" Label="Linked event" Variant="Variant.Outlined" @bind-Value="projectId"
+                           ToStringFunc="@(id => AppData.ProjectName(id))" Class="mb-3">
+                    @foreach (var project in AppData.EventProjects)
+                    {
+                        <MudSelectItem T="int?" Value="@project.ProjectId">@project.ProjectName</MudSelectItem>
+                    }
+                </MudSelect>
+            }
+            else
+            {
+                <MudText Typo="Typo.caption" Color="Color.Error" Class="mb-3 d-block">No events planned yet - create one on the Events page first.</MudText>
+            }
+        }
+
+        @* --- Completion status, read-only here. Ticking/unticking the
+           task card handles the actual complete/reopen flow. --- *@
+        @if (Task.IsDone())
+        {
+            <MudAlert Severity="Severity.Success" Dense="true" Class="mt-1">
+                Completed@(Task.CompletedBy is null ? "" : $" by {AppData.UserName(Task.CompletedBy)}")
+            </MudAlert>
+        }
+
+        @* --- Comments (UC-04 "add details to tasks"). Posted straight away,
+           independent of "Save changes", since the API keeps them append-only. --- *@
+        <MudText Typo="Typo.subtitle2" Class="mt-4 mb-2">Comments (@comments.Count)</MudText>
+        @foreach (var c in comments)
+        {
+            <MudPaper Elevation="0" Outlined="true" Class="pa-2 mb-2">
+                <MudText Typo="Typo.caption" Style="opacity:0.7;">
+                    @AppData.UserName(c.UserId) · @AppDataService.Local(c.TimeCreated).ToString("dd MMM, HH:mm")
+                </MudText>
+                <MudText Typo="Typo.body2" Style="white-space:pre-wrap;">@c.Comment</MudText>
+            </MudPaper>
+        }
+        <div class="d-flex gap-2 align-center">
+            <MudTextField T="string" @bind-Value="newComment" Label="Add a comment" Variant="Variant.Outlined"
+                          Margin="Margin.Dense" MaxLength="2000" Immediate="true" />
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" Disabled="@(string.IsNullOrWhiteSpace(newComment) || posting)"
+                       OnClick="PostComment">Post</MudButton>
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary"
+                   Variant="Variant.Filled"
+                   Disabled="@(!CanConfirm)"
+                   OnClick="SaveChanges">
+            Save changes
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    // Auto-injected by MudDialogProvider - lets this component close
+    // or cancel itself and hand a result back to the caller.
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    // The task being viewed/edited, passed in by Tasks.razor. Its fields
+    // are copied into local form state in OnInitialized, so nothing is
+    // sent to the API until "Save changes".
+    [Parameter]
+    public TaskCardDto Task { get; set; } = default!;
+
+    // --- Form state, seeded from Task in OnInitialized ---
+    private string title = string.Empty;
+    private string description = string.Empty;
+    private DateTime? date;
+    private TimeSpan? time;
+    private bool isAllDay;
+    private string priority = "Low";
+    private int? assigneeId;
+    private string taskType = "Daily";
+    private int? projectId;
+
+    private List<TaskCommentDto> comments = [];
+    private string newComment = string.Empty;
+    private bool posting;
+
+    protected override async Task OnInitializedAsync()
+    {
+        comments = (await AppData.GetAsync<TaskDetailDto>($"api/tasks/{Task.TaskId}"))?.Comments.ToList() ?? [];
+    }
+
+    private async Task PostComment()
+    {
+        posting = true;
+        if (await AppData.SendAsync<TaskCommentDto>(HttpMethod.Post, $"api/tasks/{Task.TaskId}/comments",
+                new AddTaskCommentRequest { Comment = newComment.Trim() }) is { } added)
+        {
+            comments.Add(added);
+            newComment = string.Empty;
+        }
+        posting = false;
+    }
+
+    protected override void OnInitialized()
+    {
+        title = Task.Title;
+        description = Task.Description ?? string.Empty;
+        date = Task.Deadline.Date;
+        isAllDay = Task.IsAllDay();
+        time = isAllDay ? new TimeSpan(9, 0, 0) : Task.Deadline.TimeOfDay;
+        priority = Task.Priority;
+        assigneeId = Task.AssigneeIds.Count > 0 ? Task.AssigneeIds[0] : null;
+        taskType = AppData.EventName(Task) is null ? "Daily" : "Event";
+        projectId = taskType == "Event" ? Task.ProjectId : null;
+    }
+
+    // Same validation rule as CreateTaskDialog: a title, a date, an
+    // assignee, a time (unless all-day), and a chosen event if this is
+    // an Event-type task.
+    private bool CanConfirm =>
+        !string.IsNullOrWhiteSpace(title) &&
+        assigneeId.HasValue &&
+        date.HasValue &&
+        (isAllDay || time.HasValue) &&
+        (taskType != "Event" || projectId.HasValue);
+
+    // Closes the dialog successfully, returning the edited details as
+    // a NewTaskResult.
+    private void SaveChanges()
+    {
+        MudDialog.Close(DialogResult.Ok(new NewTaskResult
+        {
+            Title = title.Trim(),
+            Description = description.Trim(),
+            ScheduledStart = isAllDay ? date!.Value.Date : date!.Value.Date + time!.Value,
+            Priority = priority,
+            AssigneeId = assigneeId,
+            ProjectId = taskType == "Event" ? projectId : null
+        }));
+    }
+
+    // Closes the dialog as cancelled - the caller treats this as "no
+    // change" and leaves the task untouched.
+    private void Cancel() => MudDialog.Cancel();
+}

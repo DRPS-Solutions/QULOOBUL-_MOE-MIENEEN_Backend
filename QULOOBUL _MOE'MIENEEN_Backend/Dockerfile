@@ -27,4 +27,4 @@ RUN dotnet publish "./QULOOBUL _MOE'MIENEEN_Backend.csproj" -c $BUILD_CONFIGURAT
 FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
-ENTRYPOINT ["dotnet", "QULOOBUL _MOE'MIENEEN_Backend.dll"]
+ENTRYPOINT ["dotnet", "QULOOBUL__MOE_MIENEEN_Backend.dll"]

@@ -14,10 +14,24 @@ on:
 env:
   API: "QULOOBUL _MOE'MIENEEN_Backend/QULOOBUL _MOE'MIENEEN_Backend.csproj"
   WEB: "Frontend_BlazorWeb/Frontend_BlazorWeb.csproj"
+  TESTS: "Backend.Tests/Backend.Tests.csproj"
 
 jobs:
   build-test:
     runs-on: ubuntu-latest
+    # Integration tests migrate a throwaway database on this container (ApiIntegrationTests.cs).
+    services:
+      mssql:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: Y
+          MSSQL_SA_PASSWORD: Ci_Throwaway_Passw0rd
+        ports: ['1433:1433']
+        options: >-
+          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P Ci_Throwaway_Passw0rd -Q 'SELECT 1'"
+          --health-interval 10s --health-timeout 5s --health-retries 12
+    env:
+      TEST_SQL_CONNECTION: Server=localhost,1433;User Id=sa;Password=Ci_Throwaway_Passw0rd;TrustServerCertificate=True
     steps:
       - uses: actions/checkout@v4
 
@@ -36,16 +50,14 @@ jobs:
           dotnet build "$WEB" -c Release --no-restore -warnaserror
 
       - name: Test
-        run: |
-          if ! grep -rq 'Microsoft.NET.Test.Sdk' --include='*.csproj' .; then
-            echo "::warning::No test project in the repository yet - the test gate is inactive."
-            exit 0
-          fi
-          dotnet test "$API" -c Release --collect:"XPlat Code Coverage"
+        run: dotnet test "$TESTS" -c Release -warnaserror --collect:"XPlat Code Coverage" --results-directory coverage
+
+      - name: Coverage gate
+        run: bash .github/scripts/coverage-gate.sh 70
 
       - name: Upload coverage
-        if: hashFiles('**/coverage.cobertura.xml') != ''
+        if: always() && hashFiles('coverage/**/coverage.cobertura.xml') != ''
         uses: actions/upload-artifact@v4
         with:
           name: coverage
-          path: '**/coverage.cobertura.xml'
+          path: coverage/**/coverage.cobertura.xml

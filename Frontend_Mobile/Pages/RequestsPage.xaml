@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ContentPage
+    x:Class="Frontend_Mobile.Pages.RequestsPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:models="clr-namespace:Frontend_Mobile.Models"
+    Title="Resource Requests">
+
+    <!-- Requests.razor: submission form plus the full list with a status
+         filter. The API decides whose requests each role sees; reviewers (the
+         ReviewRequests permission) get Approve/Deny on ones awaiting a decision. -->
+
+    <ScrollView>
+        <VerticalStackLayout Padding="16" Spacing="16">
+
+            <Border Style="{StaticResource HeaderBanner}">
+                <VerticalStackLayout Spacing="4">
+                    <Label Text="Resource Requests" Style="{StaticResource BannerTitle}" />
+                    <Label Text="Request equipment, budget, or people — optionally tie it to an event or task."
+                           Style="{StaticResource BannerSubtitle}" />
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- New request -->
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout Spacing="12">
+                    <Label Text="New Request" Style="{StaticResource TitleMedium}" />
+
+                    <Border Style="{StaticResource FieldBox}">
+                        <Entry x:Name="TitleEntry" Placeholder="What do you need?" TextChanged="OnFormChanged" />
+                    </Border>
+
+                    <VerticalStackLayout>
+                        <Label Text="Category" Style="{StaticResource LabelSmall}" />
+                        <Border Style="{StaticResource FieldBox}">
+                            <Picker x:Name="TypePicker"
+                                    Title="Category"
+                                    SelectedIndexChanged="OnFormChanged" />
+                        </Border>
+                    </VerticalStackLayout>
+
+                    <Border Style="{StaticResource FieldBox}">
+                        <Entry x:Name="AmountEntry" Placeholder="Quantity / Amount (optional) — e.g. 2 laptops, R 5,000" />
+                    </Border>
+
+                    <VerticalStackLayout>
+                        <Label Text="Link to (optional)" Style="{StaticResource LabelSmall}" />
+                        <Border Style="{StaticResource FieldBox}">
+                            <Picker x:Name="LinkTypePicker" Title="Link to" SelectedIndexChanged="OnLinkTypeChanged" />
+                        </Border>
+                    </VerticalStackLayout>
+
+                    <!-- Second dropdown only appears once a link type is chosen. -->
+                    <VerticalStackLayout x:Name="LinkedNameSection" IsVisible="False">
+                        <Label x:Name="LinkedNameLabel" Style="{StaticResource LabelSmall}" />
+                        <Border Style="{StaticResource FieldBox}">
+                            <Picker x:Name="LinkedNamePicker" SelectedIndexChanged="OnFormChanged" />
+                        </Border>
+                    </VerticalStackLayout>
+
+                    <Border Style="{StaticResource FieldBox}">
+                        <Editor x:Name="NotesEditor"
+                                Placeholder="Justification / notes"
+                                HeightRequest="90" />
+                    </Border>
+
+                    <Button x:Name="SubmitButton" Text="Submit Request" IsEnabled="False" Clicked="OnSubmit" />
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- All requests -->
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout>
+                    <Label Text="&#x1F4E5; All Requests" Style="{StaticResource TitleMedium}" Margin="0,0,0,12" />
+
+                    <FlexLayout x:Name="FilterBar" Wrap="Wrap" Direction="Row" />
+
+                    <Label x:Name="EmptyLabel"
+                           Text="No requests here yet."
+                           Style="{StaticResource Muted}"
+                           Margin="0,24" />
+
+                    <VerticalStackLayout x:Name="RequestList" Spacing="12" Margin="0,12,0,0">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate x:DataType="models:ResourceRequest">
+                                <Border Style="{StaticResource OutlinedRow}">
+                                    <VerticalStackLayout Spacing="4">
+
+                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                            <VerticalStackLayout Spacing="2">
+                                                <Label Text="{Binding Title}" FontSize="14" FontAttributes="Bold" />
+                                                <Label Style="{StaticResource LabelSmall}">
+                                                    <Label.FormattedText>
+                                                        <FormattedString>
+                                                            <Span Text="{Binding Glyph}" />
+                                                            <Span Text=" " />
+                                                            <Span Text="{Binding TypeLabel}" />
+                                                        </FormattedString>
+                                                    </Label.FormattedText>
+                                                </Label>
+                                                <Label Style="{StaticResource LabelSmall}">
+                                                    <Label.FormattedText>
+                                                        <FormattedString>
+                                                            <Span Text="&#x1F464; " />
+                                                            <Span Text="{Binding RequestedLabel}" />
+                                                        </FormattedString>
+                                                    </Label.FormattedText>
+                                                </Label>
+                                            </VerticalStackLayout>
+
+                                            <Border Grid.Column="1"
+                                                    BackgroundColor="{Binding StatusBackground}"
+                                                    StrokeThickness="0"
+                                                    StrokeShape="RoundRectangle 12"
+                                                    Padding="10,4"
+                                                    VerticalOptions="Start">
+                                                <Label Text="{Binding StatusBadge}"
+                                                       TextColor="{Binding StatusForeground}"
+                                                       FontSize="10"
+                                                       FontAttributes="Bold" />
+                                            </Border>
+                                        </Grid>
+
+                                        <Label Text="{Binding Notes}"
+                                               IsVisible="{Binding HasNotes}"
+                                               FontSize="12"
+                                               Margin="0,4,0,0" />
+
+                                        <!-- Who reviewed it, and when - shown to everyone. -->
+                                        <Label Text="{Binding ReviewLabel}"
+                                               IsVisible="{Binding ShowReview}"
+                                               Style="{StaticResource LabelSmall}"
+                                               Margin="0,4,0,0" />
+
+                                        <HorizontalStackLayout IsVisible="{Binding ShowAdminActions}"
+                                                               Spacing="8"
+                                                               Margin="0,8,0,0">
+                                            <Button Text="Approve"
+                                                    Clicked="OnApprove"
+                                                    BackgroundColor="{StaticResource StatusApproved}"
+                                                    FontSize="12"
+                                                    Padding="14,8"
+                                                    MinimumHeightRequest="36" />
+                                            <Button Text="Deny"
+                                                    Clicked="OnDeny"
+                                                    Style="{StaticResource OutlineButton}"
+                                                    TextColor="{StaticResource StatusDenied}"
+                                                    FontSize="12"
+                                                    Padding="14,8"
+                                                    MinimumHeightRequest="36" />
+                                        </HorizontalStackLayout>
+
+                                    </VerticalStackLayout>
+                                </Border>
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </VerticalStackLayout>
+                </VerticalStackLayout>
+            </Border>
+
+        </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>

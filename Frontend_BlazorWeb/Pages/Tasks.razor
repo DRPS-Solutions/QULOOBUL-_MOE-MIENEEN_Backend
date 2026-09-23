@@ -1,0 +1,753 @@
+@page "/tasks"
+@using MudBlazor
+@implements IDisposable
+@inject IDialogService DialogService
+@inject AppDataService AppData
+
+<PageTitle>Daily Tasks</PageTitle>
+
+@* =====================================================================
+   STYLE BLOCK
+   Scoped under the .drps-schedule wrapper so these rules only affect
+   this page and don't leak into MudBlazor's global theme. Colors are
+   defined once as CSS variables, pulled from the DRPS Solutions logo
+   (navy -> blue gradient), then reused everywhere below.
+   ===================================================================== *@
+<style>
+    /* Page wrapper: defines the DRPS color palette as CSS variables and
+       sets the light page background. */
+    .drps-schedule {
+        --drps-navy-900: #12271F;   /* darkest navy, used in gradients/headings */
+        --drps-navy-800: #1C3D32;   /* slightly lighter navy, task title text */
+        --drps-blue-600: #2F5C4C;   /* mid blue, gradient end for header */
+        --drps-blue-500: #3C7A63;   /* primary accent blue, task card border */
+        --drps-blue-400: #6FA98C;   /* lighter blue, gradient start / highlights */
+        --drps-bg: #F5F3EC;         /* overall page background */
+        --drps-surface: #FFFFFF;    /* card/panel background */
+        --drps-text-muted: #75806F; /* secondary/muted text color */
+        --drps-tint-blue: #EAF2ED;  /* low-priority task card/chip tint */
+        --drps-tint-amber: #F6EBD3; /* medium-priority task card/chip tint */
+        --drps-tint-red: #FCEEF0;   /* high-priority task card/chip tint */
+        --drps-border-soft: #E7E4D8; /* hour-row and card hairlines */
+        --drps-empty: #B7B2A0;      /* empty-state / placeholder text */
+        --drps-shadow: rgba(11, 22, 38, 0.06); /* card drop shadow */
+        background: var(--drps-bg);
+        min-height: 100%;
+        padding-bottom: 2rem;
+    }
+
+    /* Header banner: the navy-to-blue gradient block that holds the
+       month label and the week day-picker strip. */
+    .drps-header {
+        background: linear-gradient(135deg, var(--drps-navy-900) 0%, var(--drps-blue-600) 100%);
+        border-radius: 16px;
+        padding: 20px 24px;
+        color: white;
+        margin-bottom: 20px;
+    }
+
+    /* Row containing the "previous week" arrow, month/year label,
+       and "next week" arrow. */
+    .drps-week-nav {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 8px;
+    }
+
+    /* Container for the 7 day cells (Mon-Sun). Capped width + centered
+       so the circles don't stretch too far apart on a wide screen. */
+    .drps-day-strip {
+        display: flex;
+        justify-content: center;
+        gap: 6px;
+        max-width: 640px;
+        margin: 0 auto;
+    }
+
+    /* A single tappable day cell: weekday letters above a day-of-month
+       number. Layout only here; selected/today states are below. */
+    .drps-day-cell {
+        flex: 1;
+        max-width: 84px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        padding: 8px 0;
+        border-radius: 12px;
+        cursor: pointer;
+        transition: background 0.15s ease;
+        color: rgba(255,255,255,0.85);
+    }
+
+    /* Subtle hover highlight so day cells feel clickable. */
+    .drps-day-cell:hover {
+        background: rgba(255,255,255,0.08);
+    }
+
+    /* Small weekday label, e.g. "MON". */
+    .drps-day-cell .drps-day-label {
+        font-size: 0.7rem;
+        letter-spacing: 0.05em;
+        opacity: 0.75;
+    }
+
+    /* The circular badge holding the day-of-month number. */
+    .drps-day-cell .drps-day-number {
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        font-weight: 600;
+        font-size: 0.95rem;
+    }
+
+    /* Currently-selected day: filled with the blue gradient so it
+       stands out, like the selected date in iOS Calendar. */
+    .drps-day-cell.selected .drps-day-number {
+        background: linear-gradient(135deg, var(--drps-blue-400) 0%, var(--drps-blue-500) 100%);
+        color: white;
+        box-shadow: 0 2px 8px rgba(42, 92, 209, 0.5);
+    }
+
+    /* Today's date, when it isn't the selected one: just an outline
+       ring so you can still spot "today" at a glance. */
+    .drps-day-cell.today:not(.selected) .drps-day-number {
+        border: 1.5px solid var(--drps-blue-400);
+    }
+
+    /* Small dot shown under a day's number when that day has at least
+       one task scheduled, so busy days are visible without clicking
+       into each one (mirrors iOS Calendar's event dots). */
+    .drps-day-dot {
+        width: 4px;
+        height: 4px;
+        border-radius: 50%;
+        background: var(--drps-blue-400);
+        margin-top: -2px;
+    }
+
+    .drps-day-cell.selected .drps-day-dot {
+        background: white;
+    }
+
+    /* White card that holds the full hour-by-hour timeline. */
+    .drps-timeline {
+        background: var(--drps-surface);
+        border-radius: 16px;
+        box-shadow: 0 2px 10px var(--drps-shadow);
+        position: relative; /* anchors the absolutely-positioned "now" line */
+        overflow: hidden;
+    }
+
+    /* One row per hour of the day. */
+    .drps-hour-row {
+        display: flex;
+        min-height: 64px;
+        border-top: 1px solid var(--drps-border-soft);
+    }
+
+    /* No top border on the very first hour row (avoids a double line
+       with the timeline card's own edge). */
+    .drps-hour-row:first-child {
+        border-top: none;
+    }
+
+    /* Left-hand time label column, e.g. "9 AM". */
+    .drps-hour-label {
+        width: 64px;
+        flex-shrink: 0;
+        text-align: right;
+        padding: 6px 12px 0 0;
+        font-size: 0.72rem;
+        color: var(--drps-text-muted);
+    }
+
+    /* Right-hand area of each hour row where task cards for that hour
+       are placed. Wraps so multiple tasks in the same hour sit side
+       by side instead of stretching full width. */
+    .drps-hour-body {
+        flex: 1;
+        border-left: 1px solid var(--drps-border-soft);
+        padding: 6px 12px;
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-content: flex-start;
+        gap: 8px;
+    }
+
+    /* A single scheduled task "chip" shown inside an hour row. Border
+       color defaults to the standard blue accent, but is overridden per
+       priority level below (High/Medium/Low). */
+    .drps-task-card {
+        border-radius: 8px;
+        padding: 8px 14px;
+        background: var(--drps-tint-blue);
+        border-left: 4px solid var(--drps-blue-500);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        width: 280px;      /* fixed width so cards line up neatly when wrapping */
+        flex-shrink: 0;
+        cursor: pointer;   /* clickable - opens TaskDetailsDialog */
+        transition: box-shadow 0.15s ease, transform 0.15s ease;
+    }
+
+    .drps-task-card:hover {
+        box-shadow: 0 4px 12px var(--drps-shadow);
+        transform: translateY(-1px);
+    }
+
+    /* All-day chips are clickable too, same as hourly task cards. */
+    .drps-allday-chip {
+        cursor: pointer;
+        transition: box-shadow 0.15s ease;
+    }
+
+    .drps-allday-chip:hover {
+        box-shadow: 0 4px 12px var(--drps-shadow);
+    }
+
+    /* Priority accent colors: red for urgent/high, amber for medium,
+       and the standard DRPS blue for low - so urgency reads at a
+       glance without needing to read the text. */
+    .drps-task-card.priority-high {
+        border-left-color: #E0435C;
+        background: var(--drps-tint-red);
+    }
+
+    .drps-task-card.priority-medium {
+        border-left-color: #B9862E;
+        background: var(--drps-tint-amber);
+    }
+
+    .drps-task-card.priority-low {
+        border-left-color: var(--drps-blue-500);
+        background: var(--drps-tint-blue);
+    }
+
+    /* Faded look once a task is marked complete. */
+    .drps-task-card.done {
+        opacity: 0.55;
+    }
+
+    /* Strike-through the title specifically when done. */
+    .drps-task-card.done .drps-task-title {
+        text-decoration: line-through;
+    }
+
+    /* Task title text styling. */
+    .drps-task-title {
+        font-size: 0.85rem;
+        font-weight: 500;
+        color: var(--drps-navy-800);
+    }
+
+    /* Small muted line under the title showing time + category. */
+    .drps-task-time {
+        font-size: 0.7rem;
+        color: var(--drps-text-muted);
+    }
+
+    /* Horizontal red line marking the current time, only shown when
+       viewing today (see NowLineStyle in the code block below for the
+       positioning math). */
+    .drps-now-line {
+        position: absolute;
+        left: 64px;   /* starts after the hour-label column */
+        right: 0;
+        height: 2px;
+        background: #E0435C;
+        z-index: 2;
+    }
+
+    /* Small circular dot on the left end of the "now" line, like the
+       iOS Calendar current-time indicator. */
+    .drps-now-line::before {
+        content: "";
+        position: absolute;
+        left: -5px;
+        top: -4px;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #E0435C;
+    }
+
+    /* Hour rows with no tasks: dim placeholder styling so the eye
+       skips past empty hours quickly. */
+    .drps-empty-row .drps-hour-body {
+        color: var(--drps-empty);
+        font-size: 0.75rem;
+        justify-content: center;
+    }
+
+    /* Small key explaining what the priority accent colors mean,
+       shown above the timeline. */
+    .drps-legend {
+        display: flex;
+        gap: 16px;
+        margin-bottom: 12px;
+    }
+
+    .drps-legend-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.72rem;
+        color: var(--drps-text-muted);
+    }
+
+    .drps-legend-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+    }
+
+    /* Bar above the hourly timeline for tasks that aren't tied to a
+       specific hour (e.g. "due by end of day"), similar to the
+       all-day row at the top of an iOS Calendar day view. */
+    .drps-allday-bar {
+        background: var(--drps-surface);
+        border-radius: 12px;
+        padding: 12px 16px;
+        margin-bottom: 12px;
+        box-shadow: 0 2px 10px var(--drps-shadow);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    /* "ALL DAY" label to the left of the chips. */
+    .drps-allday-label {
+        font-size: 0.7rem;
+        color: var(--drps-text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-right: 4px;
+    }
+
+    /* Pill-shaped chip for a single all-day task. Priority color
+       classes below reuse the same red/amber/blue accents as the
+       hourly task cards. */
+    .drps-allday-chip {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 6px 10px 6px 12px;
+        border-radius: 10px;
+        border-left: 3px solid var(--drps-blue-500);
+        background: var(--drps-tint-blue);
+        font-size: 0.78rem;
+        color: var(--drps-navy-800);
+    }
+
+    .drps-allday-chip.priority-high {
+        border-left-color: #E0435C;
+        background: var(--drps-tint-red);
+    }
+
+    .drps-allday-chip.priority-medium {
+        border-left-color: #B9862E;
+        background: var(--drps-tint-amber);
+    }
+
+    .drps-allday-chip.priority-low {
+        border-left-color: var(--drps-blue-500);
+        background: var(--drps-tint-blue);
+    }
+
+    .drps-allday-chip.done {
+        opacity: 0.55;
+    }
+
+    .drps-allday-chip.done .drps-allday-title {
+        text-decoration: line-through;
+    }
+
+    /* Line showing who completed a task (or which event it's linked to). */
+    .drps-task-completed-by {
+        font-size: 0.68rem;
+        color: var(--drps-blue-500);
+        margin-top: 2px;
+        font-style: italic;
+    }
+
+    /* Dialog subtitle: reused by DenyRequestDialog.razor (shown via
+       IDialogService/MudDialogProvider) to style the name it displays. */
+    .drps-modal-task-name {
+        font-size: 0.85rem;
+        color: var(--drps-text-muted);
+        margin-bottom: 16px;
+    }
+
+    /* --- Dark mode overrides --- */
+    .page.dark-mode .drps-schedule {
+        --drps-bg: #0B1B21;
+        --drps-surface: #1E362B;
+        --drps-text-muted: #93A69A;
+        --drps-navy-800: #E9F0EA;
+        --drps-tint-blue: rgba(60, 122, 99, 0.16);
+        --drps-tint-amber: rgba(185, 134, 46, 0.18);
+        --drps-tint-red: rgba(224, 67, 92, 0.16);
+        --drps-border-soft: #2E4A3B;
+        --drps-empty: #4E5F52;
+        --drps-shadow: rgba(0, 0, 0, 0.35);
+    }
+</style>
+
+@* =====================================================================
+   MARKUP
+   Structure, top to bottom:
+     1. Header banner (week nav + day-of-week strip)
+     2. Selected date heading + completion summary + "New Task" button
+     3. Timeline card (hour rows with tasks, plus the "now" line)
+   Tasks can be created here via the "New Task" button, which opens
+   CreateTaskDialog. The new task is added directly to the selected
+   day's timeline (or its "All day" bar).
+   ===================================================================== *@
+<div class="drps-schedule">
+    <MudContainer MaxWidth="MaxWidth.Large" Class="pt-6">
+
+        @* --- Header banner: month label + week day-picker --- *@
+        <div class="drps-header">
+
+            @* Prev/next week arrows either side of the current month/year *@
+            <div class="drps-week-nav">
+                <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" Color="Color.Inherit" Size="Size.Small" OnClick="PrevWeek" />
+                <MudText Typo="Typo.subtitle1" Style="font-weight:600;">@weekStart.ToString("MMMM yyyy")</MudText>
+                <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" Color="Color.Inherit" Size="Size.Small" OnClick="NextWeek" />
+            </div>
+
+            @* One cell per day of the currently displayed week. Clicking
+               a cell selects that day (SelectDay) without changing which
+               week is being shown. *@
+            <div class="drps-day-strip">
+                @foreach (var day in WeekDays)
+                {
+                    // Build the CSS class for this cell: always "drps-day-cell",
+                    // plus "selected" if it's the active date, plus "today" if
+                    // it's the real current date (both can apply at once).
+                    var cssClass = "drps-day-cell" + (day.Date == selectedDate.Date ? " selected" : "") + (day.Date == DateTime.Today ? " today" : "");
+                    <div class="@cssClass" @onclick="() => SelectDay(day)">
+                        <span class="drps-day-label">@day.ToString("ddd").ToUpper()</span>
+                        <span class="drps-day-number">@day.Day</span>
+                        @* Dot only renders if this day has at least one task. *@
+                        @if (DayHasTasks(day))
+                        {
+                            <span class="drps-day-dot"></span>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+
+        @* --- Selected date heading + "New Task" button --- *@
+        <div class="d-flex align-center justify-space-between mb-1">
+            <MudText Typo="Typo.h6" Style="color:var(--drps-navy-800); font-weight:600;">
+                @selectedDate.ToString("dddd, d MMMM")
+            </MudText>
+
+            @* Opens CreateTaskDialog; the new task is added to the
+               selected day by default (see OnCreateTask below). *@
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Add"
+                       Size="Size.Small"
+                       OnClick="OnCreateTask">
+                New Task
+            </MudButton>
+        </div>
+
+        @* --- Completion summary for the selected day --- *@
+        <MudText Typo="Typo.body2" Class="mb-3" Style="color:#75806F;">
+            @(TasksForSelectedDay.Count() == 0 ? "No tasks scheduled" : $"{TasksForSelectedDay.Count(t => t.IsDone())} of {TasksForSelectedDay.Count()} completed")
+        </MudText>
+
+        @* --- Legend explaining the priority accent colors --- *@
+        <div class="drps-legend">
+            <div class="drps-legend-item"><span class="drps-legend-dot" style="background:#E0435C;"></span>High</div>
+            <div class="drps-legend-item"><span class="drps-legend-dot" style="background:#B9862E;"></span>Medium</div>
+            <div class="drps-legend-item"><span class="drps-legend-dot" style="background:#3C7A63;"></span>Low</div>
+        </div>
+
+        @* --- All-day tasks: things not tied to a specific hour --- *@
+        @if (AllDayTasksForSelectedDay.Any())
+        {
+            <div class="drps-allday-bar">
+                <span class="drps-allday-label">All day</span>
+                @foreach (var task in AllDayTasksForSelectedDay)
+                {
+                    <div class="drps-allday-chip priority-@task.Priority.ToLower() @(task.IsDone() ? "done" : "")"
+                         @onclick="() => OnOpenTaskDetails(task)">
+                        <div>
+                            <span class="drps-allday-title">@task.Title</span>
+                            @if (AppData.EventName(task) is { } eventName)
+                            {
+                                <div class="drps-task-completed-by">Linked: @eventName</div>
+                            }
+                            @if (task.IsDone() && task.CompletedBy is not null)
+                            {
+                                <div class="drps-task-completed-by">Completed by @AppData.UserName(task.CompletedBy)</div>
+                            }
+                        </div>
+                        @* Same completion flow as the hourly cards. stopPropagation
+                           keeps a checkbox click from also opening the details
+                           dialog underneath it. *@
+                        <div @onclick:stopPropagation="true">
+                            <MudCheckBox T="bool"
+                                         Value="task.IsDone()"
+                                         ValueChanged="@((bool done) => AppData.SetTaskDoneAsync(task, done))"
+                                         Color="Color.Primary"
+                                         Size="Size.Small" />
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+
+        @* --- Timeline: one row per hour, tasks placed in their hour --- *@
+        <div class="drps-timeline">
+
+            @* Current-time indicator line, only rendered when the
+               selected day is actually today. *@
+            @if (selectedDate.Date == DateTime.Today)
+            {
+                <div class="drps-now-line" style="@NowLineStyle"></div>
+            }
+
+            @* Walk through every displayed hour (see DisplayHours) and
+               render its row, whether or not it has tasks. *@
+            @foreach (var hour in DisplayHours)
+            {
+                // Tasks for the selected day that start within this hour.
+                var hourTasks = TimedTasksForSelectedDay.Where(t => t.Deadline.Hour == hour).ToList();
+                <div class="drps-hour-row @(hourTasks.Count == 0 ? "drps-empty-row" : "")">
+
+                    @* Time label for this row, e.g. "9 AM" *@
+                    <div class="drps-hour-label">@FormatHour(hour)</div>
+
+                    <div class="drps-hour-body">
+                        @if (hourTasks.Count == 0)
+                        {
+                            @* Nothing scheduled this hour - render an empty
+                               placeholder so the row still takes up space. *@
+                            <span>&nbsp;</span>
+                        }
+                        else
+                        {
+                            @* One card per task scheduled in this hour. *@
+                            @foreach (var task in hourTasks)
+                            {
+                                var assignees = AppData.AssigneeNames(task);
+                                <div class="drps-task-card priority-@task.Priority.ToLower() @(task.IsDone() ? "done" : "")"
+                                     @onclick="() => OnOpenTaskDetails(task)">
+                                    <div>
+                                        <div class="drps-task-title">@task.Title</div>
+                                        <div class="drps-task-time">
+                                            @task.Deadline.ToString("h:mm tt")
+                                            @(assignees.Length == 0 ? "" : $" \u00b7 {assignees}")
+                                        </div>
+                                        @if (AppData.EventName(task) is { } eventName)
+                                        {
+                                            <div class="drps-task-completed-by">Linked: @eventName</div>
+                                        }
+                                        @if (task.IsDone() && task.CompletedBy is not null)
+                                        {
+                                            <div class="drps-task-completed-by">Completed by @AppData.UserName(task.CompletedBy)</div>
+                                        }
+                                    </div>
+                                    @* Ticking completes the task as the signed-in user;
+                                       unticking reopens it. stopPropagation keeps a
+                                       checkbox click from also opening the details
+                                       dialog underneath it. *@
+                                    <div @onclick:stopPropagation="true">
+                                        <MudCheckBox T="bool"
+                                                     Value="task.IsDone()"
+                                                     ValueChanged="@((bool done) => AppData.SetTaskDoneAsync(task, done))"
+                                                     Color="Color.Primary"
+                                                     Size="Size.Small" />
+                                    </div>
+                                </div>
+                            }
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+
+    </MudContainer>
+</div>
+
+@* =====================================================================
+   CODE-BEHIND
+   State and the small pieces of logic that drive the markup above
+   (which day/week is showing and loaded from the API, which hours to
+   display, where the "now" line sits, and the day/week navigation
+   handlers).
+   ===================================================================== *@
+@code {
+    // The day currently selected and shown in the timeline below.
+    private DateTime selectedDate = DateTime.Today;
+
+    // The Monday that starts the week currently shown in the day strip.
+    // Navigating weeks moves this without necessarily changing selectedDate.
+    private DateTime weekStart = StartOfWeek(DateTime.Today);
+
+    // Range of hours shown in the timeline (6 AM to 8 PM).
+    private const int startHour = 6;
+    private const int endHour = 20;
+
+    // The list of hour numbers to render as rows, e.g. 6, 7, 8 ... 20.
+    private IEnumerable<int> DisplayHours => Enumerable.Range(startHour, endHour - startHour + 1);
+
+    // The 7 dates (Mon-Sun) for the currently displayed week, derived
+    // from weekStart.
+    private IEnumerable<DateTime> WeekDays => Enumerable.Range(0, 7).Select(i => weekStart.AddDays(i));
+
+    // AppData.Tasks holds the displayed week, loaded from the API (see
+    // LoadWeek); Home.razor reads the same list for today.
+    private IReadOnlyList<TaskCardDto> tasks => AppData.Tasks;
+
+    // True if the given date has at least one scheduled task - drives
+    // the small dot indicator in the day strip above.
+    private bool DayHasTasks(DateTime day) => tasks.Any(t => t.Deadline.Date == day.Date);
+
+    private static readonly DialogOptions DialogOptions =
+        new() { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true, CloseOnEscapeKey = true };
+
+    // --- Task creation, via IDialogService/MudDialogProvider ---
+    // Fired by the "New Task" button next to the date heading. The API
+    // creates the task, assigns it, and notifies the assignee.
+    private async Task OnCreateTask()
+    {
+        var dialog = await DialogService.ShowAsync<CreateTaskDialog>("New task", DialogOptions);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false, Data: NewTaskResult newTask } && await AppData.CreateTaskAsync(newTask))
+        {
+            // Jump to the day the task landed on.
+            await ShowDay(newTask.ScheduledStart);
+        }
+    }
+
+    // --- Task details/edit popup, via IDialogService/MudDialogProvider ---
+    // Fired by clicking anywhere on a task card/chip (but not its
+    // checkbox - see stopPropagation on that wrapper). There's no
+    // delete: task history is append-only in the API.
+    private async Task OnOpenTaskDetails(TaskCardDto task)
+    {
+        var parameters = new DialogParameters<TaskDetailsDialog>
+        {
+            { x => x.Task, task }
+        };
+        var dialog = await DialogService.ShowAsync<TaskDetailsDialog>("Task details", parameters, DialogOptions);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false, Data: NewTaskResult edited } && await AppData.UpdateTaskAsync(task, edited))
+        {
+            await ShowDay(edited.ScheduledStart);
+        }
+    }
+
+    // All tasks belonging to the selected date (both all-day and
+    // timed), sorted by time. Used for the completion summary.
+    private IEnumerable<TaskCardDto> TasksForSelectedDay =>
+        tasks.Where(t => t.Deadline.Date == selectedDate.Date)
+             .OrderBy(t => t.Deadline);
+
+    // Selected day's tasks that aren't tied to a specific hour -
+    // rendered in the "All day" bar above the timeline.
+    private IEnumerable<TaskCardDto> AllDayTasksForSelectedDay =>
+        TasksForSelectedDay.Where(t => t.IsAllDay());
+
+    // Selected day's tasks that do have a specific hour - these are
+    // the ones placed into the hourly timeline rows.
+    private IEnumerable<TaskCardDto> TimedTasksForSelectedDay =>
+        TasksForSelectedDay.Where(t => !t.IsAllDay());
+
+    // Computes the inline "top" CSS position (in pixels) for the red
+    // "now" line, based on the real current time and the 64px height
+    // used for each hour row. Clamped so the line never renders above
+    // or below the visible hour range.
+    private string NowLineStyle
+    {
+        get
+        {
+            var now = DateTime.Now;
+            var clampedHour = Math.Clamp(now.Hour + now.Minute / 60.0, startHour, endHour + 1);
+            var top = (clampedHour - startHour) * 64;
+            return $"top:{top.ToString(System.Globalization.CultureInfo.InvariantCulture)}px;";
+        }
+    }
+
+    // Returns the Monday that starts the week containing the given date
+    // (Monday-start week, rather than the .NET default Sunday-start).
+    private static DateTime StartOfWeek(DateTime date)
+    {
+        var diff = ((int)date.DayOfWeek + 6) % 7; // Monday-start week
+        return date.Date.AddDays(-diff);
+    }
+
+    // Formats an hour number (0-23) as a short label like "9 AM".
+    private static string FormatHour(int hour)
+    {
+        var dt = DateTime.Today.AddHours(hour);
+        return dt.ToString("h tt");
+    }
+
+    // Fired when a day cell in the strip is clicked - just changes which
+    // date's tasks the timeline displays.
+    private void SelectDay(DateTime day) => selectedDate = day;
+
+    // Week arrows move the selected day with the week, since only the
+    // displayed week's tasks are loaded.
+    private Task PrevWeek() => ShowDay(selectedDate.AddDays(-7));
+
+    private Task NextWeek() => ShowDay(selectedDate.AddDays(7));
+
+    // Selects a day, loading its week if that's not the one on screen.
+    private async Task ShowDay(DateTime day)
+    {
+        selectedDate = day.Date;
+        var start = StartOfWeek(day);
+        if (start == weekStart) return;
+        weekStart = start;
+        await LoadWeek();
+    }
+
+    private Task LoadWeek() => AppData.LoadTasksAsync(weekStart, weekStart.AddDays(7));
+
+    // tasks?task=12 (a notification's link, UC-08 step 3): jump to the task's week and open it.
+    [SupplyParameterFromQuery(Name = "task")] public int? DeepLinkTaskId { get; set; }
+    private int? openedDeepLink;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (DeepLinkTaskId is not { } id || id == openedDeepLink) return;
+        openedDeepLink = id;
+        if (await AppData.GetAsync<TaskDetailDto>($"api/tasks/{id}") is not { } detail) return;
+        await ShowDay(detail.Deadline);
+        if (AppData.Tasks.FirstOrDefault(t => t.TaskId == id) is { } card) _ = OnOpenTaskDetails(card);
+    }
+
+    // Re-render when the task list refreshes - our own changes, or a
+    // SignalR push after someone else's - so the timeline never goes stale.
+    protected override async Task OnInitializedAsync()
+    {
+        AppData.OnChange += StateHasChanged;
+        await LoadWeek();
+    }
+
+    public void Dispose()
+    {
+        AppData.OnChange -= StateHasChanged;
+    }
+}

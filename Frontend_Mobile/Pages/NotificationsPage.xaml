@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ContentPage
+    x:Class="Frontend_Mobile.Pages.NotificationsPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:models="clr-namespace:Frontend_Mobile.Models"
+    Title="Notifications">
+
+    <!-- Notifications.razor. Tapping an item marks it read and, with no
+         per-item deep links in the prototype, opens the page that owns that
+         kind of data - same as the original's OpenNotification. -->
+
+    <ScrollView>
+        <VerticalStackLayout Padding="16" Spacing="16">
+
+            <Border Style="{StaticResource HeaderBanner}">
+                <VerticalStackLayout Spacing="4">
+                    <Label Text="Notifications" Style="{StaticResource BannerTitle}" />
+                    <Label x:Name="SubtitleLabel" Style="{StaticResource BannerSubtitle}" />
+                    <HorizontalStackLayout Spacing="8" Margin="0,8,0,0">
+                        <Button x:Name="MarkAllButton"
+                                Text="Mark all as read"
+                                Clicked="OnMarkAllRead"
+                                BackgroundColor="Transparent"
+                                TextColor="{StaticResource White}"
+                                FontSize="12"
+                                Padding="8,6"
+                                MinimumHeightRequest="34" />
+                    </HorizontalStackLayout>
+                </VerticalStackLayout>
+            </Border>
+
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout>
+
+                    <FlexLayout x:Name="FilterBar" Wrap="Wrap" Direction="Row" />
+
+                    <Label x:Name="EmptyLabel" Style="{StaticResource Muted}" Margin="0,30" />
+
+                    <VerticalStackLayout x:Name="NotificationList" Spacing="10" Margin="0,12,0,0">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate x:DataType="models:NotificationItem">
+                                <Border Style="{StaticResource OutlinedRow}"
+                                        BackgroundColor="{Binding RowBackground}">
+                                    <Border.GestureRecognizers>
+                                        <TapGestureRecognizer Tapped="OnNotificationTapped" />
+                                    </Border.GestureRecognizers>
+
+                                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+
+                                        <Border WidthRequest="38"
+                                                HeightRequest="38"
+                                                BackgroundColor="{Binding IconBackground}"
+                                                StrokeThickness="0"
+                                                StrokeShape="RoundRectangle 10"
+                                                VerticalOptions="Start">
+                                            <Label Text="{Binding Glyph}"
+                                                   FontSize="16"
+                                                   HorizontalOptions="Center"
+                                                   VerticalOptions="Center" />
+                                        </Border>
+
+                                        <VerticalStackLayout Grid.Column="1" Spacing="2">
+                                            <Label Text="{Binding Title}" FontSize="14" FontAttributes="Bold" />
+                                            <Label Text="{Binding Message}" Style="{StaticResource Muted}" />
+                                            <Label Text="{Binding TypeLabel}"
+                                                   Style="{StaticResource LabelSmall}"
+                                                   Margin="0,6,0,0" />
+                                        </VerticalStackLayout>
+
+                                        <Border Grid.Column="2"
+                                                IsVisible="{Binding ShowUnreadDot}"
+                                                WidthRequest="8"
+                                                HeightRequest="8"
+                                                BackgroundColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"
+                                                StrokeThickness="0"
+                                                StrokeShape="RoundRectangle 4"
+                                                VerticalOptions="Start"
+                                                Margin="0,6,0,0" />
+
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </VerticalStackLayout>
+
+                </VerticalStackLayout>
+            </Border>
+
+        </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>

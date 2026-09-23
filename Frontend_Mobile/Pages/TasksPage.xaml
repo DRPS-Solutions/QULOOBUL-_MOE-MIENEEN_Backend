@@ -1,0 +1,214 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ContentPage
+    x:Class="Frontend_Mobile.Pages.TasksPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:models="clr-namespace:Frontend_Mobile.Models"
+    xmlns:pages="clr-namespace:Frontend_Mobile.Pages"
+    Title="Daily Tasks">
+
+    <!-- Tasks.razor's day/week schedule timeline. -->
+
+    <ScrollView>
+        <VerticalStackLayout Padding="16" Spacing="12">
+
+            <!-- Week strip -->
+            <Border Style="{StaticResource HeaderBanner}" Padding="16">
+                <VerticalStackLayout Spacing="4">
+                    <Grid ColumnDefinitions="Auto,*,Auto">
+                        <Button Text="&#x2039;"
+                                Clicked="OnPreviousWeek"
+                                BackgroundColor="Transparent"
+                                TextColor="{StaticResource White}"
+                                FontSize="24"
+                                WidthRequest="44"
+                                Padding="0" />
+                        <Label x:Name="MonthLabel"
+                               Grid.Column="1"
+                               Style="{StaticResource BannerTitle}"
+                               HorizontalTextAlignment="Center"
+                               VerticalOptions="Center" />
+                        <Button Grid.Column="2"
+                                Text="&#x203A;"
+                                Clicked="OnNextWeek"
+                                BackgroundColor="Transparent"
+                                TextColor="{StaticResource White}"
+                                FontSize="24"
+                                WidthRequest="44"
+                                Padding="0" />
+                    </Grid>
+
+                    <FlexLayout x:Name="DayStrip"
+                                JustifyContent="SpaceBetween"
+                                Wrap="NoWrap">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate x:DataType="pages:DayCell">
+                                <VerticalStackLayout Padding="2,8" Spacing="4" HorizontalOptions="Center">
+                                    <VerticalStackLayout.GestureRecognizers>
+                                        <TapGestureRecognizer Tapped="OnDaySelected" />
+                                    </VerticalStackLayout.GestureRecognizers>
+
+                                    <Label Text="{Binding DayOfWeek}"
+                                           TextColor="#BFFFFFFF"
+                                           FontSize="10"
+                                           HorizontalTextAlignment="Center" />
+
+                                    <Border WidthRequest="32"
+                                            HeightRequest="32"
+                                            BackgroundColor="{Binding CircleColor}"
+                                            Stroke="{Binding RingColor}"
+                                            StrokeThickness="1.5"
+                                            StrokeShape="RoundRectangle 16"
+                                            Padding="0">
+                                        <Label Text="{Binding DayNumber}"
+                                               TextColor="{StaticResource White}"
+                                               FontSize="14"
+                                               FontAttributes="Bold"
+                                               HorizontalOptions="Center"
+                                               VerticalOptions="Center" />
+                                    </Border>
+
+                                    <Border WidthRequest="4"
+                                            HeightRequest="4"
+                                            IsVisible="{Binding HasTasks}"
+                                            BackgroundColor="{Binding DotColor}"
+                                            StrokeThickness="0"
+                                            StrokeShape="RoundRectangle 2"
+                                            HorizontalOptions="Center" />
+                                </VerticalStackLayout>
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </FlexLayout>
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Selected day + New Task -->
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                <Label x:Name="SelectedDayLabel"
+                       Style="{StaticResource TitleMedium}"
+                       VerticalOptions="Center" />
+                <Button Grid.Column="1" Text="+ New Task" Clicked="OnNewTask" />
+            </Grid>
+
+            <Label x:Name="SummaryLabel" Style="{StaticResource Muted}" />
+
+            <!-- Priority legend -->
+            <HorizontalStackLayout Spacing="16">
+                <HorizontalStackLayout Spacing="6">
+                    <Border WidthRequest="8" HeightRequest="8" BackgroundColor="{StaticResource PriorityHigh}"
+                            StrokeThickness="0" StrokeShape="RoundRectangle 4" VerticalOptions="Center" />
+                    <Label Text="High" Style="{StaticResource LabelSmall}" />
+                </HorizontalStackLayout>
+                <HorizontalStackLayout Spacing="6">
+                    <Border WidthRequest="8" HeightRequest="8" BackgroundColor="{StaticResource PriorityMedium}"
+                            StrokeThickness="0" StrokeShape="RoundRectangle 4" VerticalOptions="Center" />
+                    <Label Text="Medium" Style="{StaticResource LabelSmall}" />
+                </HorizontalStackLayout>
+                <HorizontalStackLayout Spacing="6">
+                    <Border WidthRequest="8" HeightRequest="8" BackgroundColor="{StaticResource PriorityLow}"
+                            StrokeThickness="0" StrokeShape="RoundRectangle 4" VerticalOptions="Center" />
+                    <Label Text="Low" Style="{StaticResource LabelSmall}" />
+                </HorizontalStackLayout>
+            </HorizontalStackLayout>
+
+            <!-- All-day bar -->
+            <Border x:Name="AllDayBar" Style="{StaticResource Card}" Padding="12">
+                <VerticalStackLayout Spacing="6">
+                    <Label Text="ALL DAY" Style="{StaticResource LabelSmall}" />
+                    <VerticalStackLayout x:Name="AllDayList" Spacing="6">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate x:DataType="models:TaskItem">
+                                <Border BackgroundColor="{Binding TintColor}"
+                                        StrokeThickness="0"
+                                        StrokeShape="RoundRectangle 10"
+                                        Padding="8">
+                                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+                                        <Label Text="{Binding Glyph}" FontSize="14" VerticalOptions="Center" />
+                                        <VerticalStackLayout Grid.Column="1" VerticalOptions="Center">
+                                            <Label Text="{Binding Title}"
+                                                   FontSize="12"
+                                                   TextColor="{StaticResource TextPrimary}"
+                                                   TextDecorations="{Binding Decorations}" />
+                                            <Label Text="{Binding CompletedByLabel}"
+                                                   IsVisible="{Binding ShowCompletedBy}"
+                                                   FontSize="10"
+                                                   TextColor="{StaticResource Primary}" />
+                                        </VerticalStackLayout>
+                                        <CheckBox Grid.Column="2"
+                                                  IsChecked="{Binding IsDone, Mode=OneWay}"
+                                                  CheckedChanged="OnTaskToggled"
+                                                  VerticalOptions="Center" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </VerticalStackLayout>
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Hourly timeline -->
+            <Border Style="{StaticResource Card}" Padding="0">
+                <VerticalStackLayout x:Name="Timeline">
+                    <BindableLayout.ItemTemplate>
+                        <DataTemplate x:DataType="pages:HourRow">
+                            <Grid ColumnDefinitions="56,*"
+                                  Padding="8"
+                                  MinimumHeightRequest="44">
+                                <BoxView HeightRequest="0.5"
+                                         Color="{AppThemeBinding Light={StaticResource BorderSoft}, Dark={StaticResource BorderSoftDark}}"
+                                         VerticalOptions="Start"
+                                         Grid.ColumnSpan="2" />
+
+                                <Label Text="{Binding Label}"
+                                       Style="{StaticResource LabelSmall}"
+                                       VerticalOptions="Start"
+                                       Margin="0,6,0,0" />
+
+                                <VerticalStackLayout Grid.Column="1" Spacing="6"
+                                                     BindableLayout.ItemsSource="{Binding Tasks}">
+                                    <BindableLayout.ItemTemplate>
+                                        <DataTemplate x:DataType="models:TaskItem">
+                                            <Border BackgroundColor="{Binding TintColor}"
+                                                    StrokeThickness="0"
+                                                    StrokeShape="RoundRectangle 8"
+                                                    Padding="10">
+                                                <Grid ColumnDefinitions="*,Auto">
+                                                    <VerticalStackLayout>
+                                                        <Label Text="{Binding Title}"
+                                                               FontSize="12"
+                                                               FontAttributes="Bold"
+                                                               TextColor="{StaticResource TextPrimary}"
+                                                               TextDecorations="{Binding Decorations}" />
+                                                        <Label FontSize="10" TextColor="{StaticResource TextMuted}">
+                                                            <Label.FormattedText>
+                                                                <FormattedString>
+                                                                    <Span Text="{Binding Glyph}" />
+                                                                    <Span Text=" " />
+                                                                    <Span Text="{Binding MetaLabel}" />
+                                                                </FormattedString>
+                                                            </Label.FormattedText>
+                                                        </Label>
+                                                        <Label Text="{Binding CompletedByLabel}"
+                                                               IsVisible="{Binding ShowCompletedBy}"
+                                                               FontSize="10"
+                                                               TextColor="{StaticResource Primary}" />
+                                                    </VerticalStackLayout>
+                                                    <CheckBox Grid.Column="1"
+                                                              IsChecked="{Binding IsDone, Mode=OneWay}"
+                                                              CheckedChanged="OnTaskToggled"
+                                                              VerticalOptions="Center" />
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </BindableLayout.ItemTemplate>
+                                </VerticalStackLayout>
+                            </Grid>
+                        </DataTemplate>
+                    </BindableLayout.ItemTemplate>
+                </VerticalStackLayout>
+            </Border>
+
+        </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>

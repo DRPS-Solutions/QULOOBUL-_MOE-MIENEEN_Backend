@@ -1,39 +1,205 @@
-﻿<div class="top-row ps-3 navbar navbar-dark">
-    <div class="container-fluid">
-        <a class="navbar-brand" href="">Frontend_BlazorWeb</a>
-        <button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
-            <span class="navbar-toggler-icon"></span>
-        </button>
+﻿@using MudBlazor
+@implements IDisposable
+@inject NavigationManager Navigation
+@inject AppDataService AppData
+
+<div class="nav-container @(IsVerticalNav ? "nav-vertical" : "")">
+    <div class="navbar navbar-dark">
+        <div class="container-fluid d-flex align-items-center">
+            <a class="navbar-brand d-flex align-items-center" href="">
+                <img src="images/logos/QULOOBUL MOE'MIENEEN Logo.png" class="app-logo" alt="Company Logo" style="height: 35px;" />
+                <span class="ms-2 brand-text">QULOOBUL MOE'MIENEEN</span>
+            </a>
+
+            <input type="checkbox" title="Navigation menu" class="navbar-toggler" />
+        </div>
+    </div>
+
+    <div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
+        <nav class="nav drps-horizontal-nav flex-column">
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+                    <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Home
+                </NavLink>
+            </div>
+
+            @if (CanSeeTasks)
+            {
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="tasks">
+                        <span class="bi bi-check2-square-nav-menu" aria-hidden="true"></span> Daily Tasks
+                    </NavLink>
+                </div>
+            }
+
+            @* Approve/Deny is gated separately inside Requests.razor
+               itself, off the cascaded CurrentRole, not here - this
+               only controls whether the page/tab is visible at all. *@
+            @if (CanSeeRequests)
+            {
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="requests">
+                        <span class="bi bi-inbox-fill-nav-menu" aria-hidden="true"></span> Resource Requests
+                    </NavLink>
+                </div>
+            }
+
+            @if (CanSeeMeetings)
+            {
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="meetings">
+                        <span class="bi bi-people-fill-nav-menu" aria-hidden="true"></span> Meetings
+                    </NavLink>
+                </div>
+            }
+
+            @if (CanSeeUserManagement)
+            {
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="users">
+                        <span class="bi bi-person-gear-nav-menu" aria-hidden="true"></span> User Management
+                    </NavLink>
+                </div>
+            }
+
+            @if (CanSeeEvents)
+            {
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="events">
+                        <span class="bi bi-calendar-event-fill-nav-menu" aria-hidden="true"></span> Event Planning
+                    </NavLink>
+                </div>
+            }
+
+            @* Everyone: invitees answer RSVPs here, and every role shares files (UC-07). *@
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="calendar">
+                    <span class="bi bi-calendar-event-fill-nav-menu" aria-hidden="true"></span> Calendar
+                </NavLink>
+            </div>
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="files">
+                    <span class="bi bi-inbox-fill-nav-menu" aria-hidden="true"></span> Files
+                </NavLink>
+            </div>
+
+            @if (AppData.HasPermission(Permissions.GenerateReports))
+            {
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="reports">
+                        <span class="bi bi-check2-square-nav-menu" aria-hidden="true"></span> Reports
+                    </NavLink>
+                </div>
+            }
+        </nav>
+    </div>
+
+    <!--
+        Grouped end-of-navbar controls. Kept out of the brand row on
+        purpose so the logo/name never has to compete with them for
+        space in the narrow 260px vertical sidebar. CSS repositions
+        this block per layout: overlaid near the hamburger on mobile,
+        flush right on the desktop horizontal bar, and pinned to the
+        bottom of the sidebar in vertical mode.
+    -->
+    <div class="nav-end">
+        <!--
+            Notification bell - unlike the two MudMenus below, this is a
+            plain nav link (not a dropdown): clicking it takes the user
+            straight to the /notifications page. The badge count comes
+            from AppDataService and updates live via OnChange whenever
+            the API pushes a new notification over SignalR.
+        -->
+        <MudBadge Content="@UnreadCount"
+                  Color="Color.Error"
+                  Overlap="true"
+                  Visible="@(UnreadCount > 0)"
+                  Class="mx-1">
+            <MudIconButton Icon="@Icons.Material.Filled.Notifications"
+                            Color="Color.Inherit"
+                            Size="Size.Small"
+                            title="Notifications"
+                            OnClick="@(() => Navigation.NavigateTo("notifications"))" />
+        </MudBadge>
+
+        <MudMenu Icon="@Icons.Material.Filled.Settings"
+                  Color="Color.Inherit"
+                  Size="Size.Small"
+                  title="Settings"
+                  AnchorOrigin="Origin.BottomRight"
+                  TransformOrigin="Origin.TopRight">
+            <MudMenuItem OnClick="@(() => OnToggleDarkMode.InvokeAsync())">
+                <div class="d-flex align-items-center">
+                    <MudIcon Icon="@(IsDarkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)" Class="me-2" Size="Size.Small" />
+                    <span>@(IsDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode")</span>
+                </div>
+            </MudMenuItem>
+            <MudMenuItem OnClick="@(() => OnToggleNavOrientation.InvokeAsync())">
+                <div class="d-flex align-items-center">
+                    <MudIcon Icon="@(IsVerticalNav ? Icons.Material.Filled.ViewAgenda : Icons.Material.Filled.ViewSidebar)" Class="me-2" Size="Size.Small" />
+                    <span>@(IsVerticalNav ? "Switch to Horizontal Nav" : "Switch to Vertical Nav")</span>
+                </div>
+            </MudMenuItem>
+        </MudMenu>
+
+        <!--
+            Profile control, backed by the signed-in user in
+            AppDataService. NavMenu itself is only rendered once
+            someone is signed in, so there's no "not signed in" branch.
+        -->
+        <MudMenu Icon="@Icons.Material.Filled.AccountCircle"
+                  Color="Color.Inherit"
+                  Size="Size.Small"
+                  title="Account"
+                  AnchorOrigin="Origin.BottomRight"
+                  TransformOrigin="Origin.TopRight">
+            <MudText Typo="Typo.subtitle2" Class="px-4 pt-1 pb-2">
+                Signed in as @AppData.CurrentUser?.FullName
+            </MudText>
+            <MudText Typo="Typo.caption" Class="px-4 pb-2" Style="opacity:0.7;">
+                @AppData.Role
+            </MudText>
+            <MudDivider Class="my-1" />
+            <MudMenuItem OnClick="@(() => OnLogout.InvokeAsync())">
+                <div class="d-flex align-items-center">
+                    <MudIcon Icon="@Icons.Material.Filled.Logout" Class="me-2" Size="Size.Small" />
+                    <span>Logout</span>
+                </div>
+            </MudMenuItem>
+        </MudMenu>
     </div>
 </div>
 
-<div class="@NavMenuCssClass nav-scrollable" @onclick="ToggleNavMenu">
-    <nav class="nav flex-column">
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Home
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="counter">
-                <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Counter
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="weather">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Weather
-            </NavLink>
-        </div>
-    </nav>
-</div>
-
 @code {
-    private bool collapseNavMenu = true;
+    // Cascaded down from MainLayout, which owns both settings so they
+    // persist across page navigation (a per-page component would reset
+    // on every route change).
+    [Parameter] public bool IsDarkMode { get; set; }
+    [Parameter] public bool IsVerticalNav { get; set; }
+    [Parameter] public EventCallback OnToggleDarkMode { get; set; }
+    [Parameter] public EventCallback OnToggleNavOrientation { get; set; }
 
-    private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
+    [Parameter] public EventCallback OnLogout { get; set; }
 
-    private void ToggleNavMenu()
+    // Tab visibility comes from MainLayout as plain booleans (it reads
+    // them off AppDataService, where the role matrix lives).
+    [Parameter] public bool CanSeeTasks { get; set; }
+    [Parameter] public bool CanSeeRequests { get; set; }
+    [Parameter] public bool CanSeeMeetings { get; set; }
+    [Parameter] public bool CanSeeUserManagement { get; set; }
+    [Parameter] public bool CanSeeEvents { get; set; }
+
+    private int UnreadCount => AppData.UnreadCount;
+
+    // Re-render whenever notifications change (e.g. a SignalR push) so
+    // the badge count on the bell never goes stale.
+    protected override void OnInitialized()
     {
-        collapseNavMenu = !collapseNavMenu;
+        AppData.OnChange += StateHasChanged;
+    }
+
+    public void Dispose()
+    {
+        AppData.OnChange -= StateHasChanged;
     }
 }

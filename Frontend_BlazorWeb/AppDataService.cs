@@ -1,0 +1,334 @@
+// AppDataService.cs
+//
+// The web client's data layer. It signs in against the API, keeps the
+// signed-in user plus the lists several pages share (staff directory,
+// projects, the tasks of the date window on screen, resource requests,
+// notifications), and listens on the API's SignalR hub so those lists
+// refresh when something changes server-side. Every HTTP call goes
+// through GetAsync/SendAsync, so failures look the same on every page
+// (a snackbar) and an expired token signs the user out.
+//
+// Scoped - in Blazor WebAssembly that means one instance per browser
+// tab. Pages subscribe to OnChange and call StateHasChanged.
+//
+// No namespace declared here on purpose - same convention as
+// NewTaskResult.cs - so every page sees this without an extra @using.
+
+using System.Net;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using System.Text.Json;
+using Microsoft.AspNetCore.SignalR.Client;
+using MudBlazor;
+using QULOOBUL__MOE_MIENEEN_Shared.Auth;
+using QULOOBUL__MOE_MIENEEN_Shared.Directory;
+using QULOOBUL__MOE_MIENEEN_Shared.Notifications;
+using QULOOBUL__MOE_MIENEEN_Shared.Requests;
+using QULOOBUL__MOE_MIENEEN_Shared.Tasks;
+using static QULOOBUL__MOE_MIENEEN_Shared.Classes.Common;
+
+public class AppDataService(HttpClient http, ISnackbar snackbar)
+{
+    public event Action? OnChange;
+    private void Changed() => OnChange?.Invoke();
+
+    public AuthResponse? CurrentUser { get; private set; }
+    public IReadOnlyList<UserSummaryDto> Users { get; private set; } = [];
+    public IReadOnlyList<ProjectSummaryDto> Projects { get; private set; } = [];
+    public IReadOnlyList<TaskCardDto> Tasks { get; private set; } = [];
+    public IReadOnlyList<ResourceRequestDto> Requests { get; private set; } = [];
+    public IReadOnlyList<NotificationDto> Notifications { get; private set; } = [];
+
+    private HubConnection? hub;
+
+    // Tasks holds one date window at a time: whichever page is showing tasks asked for it.
+    private string? taskWindowUrl;
+
+    // ------------------------------------------------------------------
+    // Session
+    // ------------------------------------------------------------------
+
+    /// <summary>Signs in (UC-01). Returns null on success, otherwise the message for the login form.</summary>
+    public async Task<string?> LoginAsync(string email, string password)
+    {
+        HttpResponseMessage res;
+        try
+        {
+            res = await http.PostAsJsonAsync("api/auth/login",
+                new LoginRequest { Email = email.Trim(), Password = password });
+        }
+        catch (HttpRequestException)
+        {
+            return $"Can't reach the server at {http.BaseAddress}.";
+        }
+        if (!res.IsSuccessStatusCode) return await ErrorMessage(res);
+
+        var auth = (await res.Content.ReadFromJsonAsync<AuthResponse>())!;
+        http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth.Token);
+        // Load names/projects before the shell renders, so nothing shows as "User #3" first.
+        await Task.WhenAll(RefreshUsersAsync(), RefreshProjectsAsync(), RefreshNotificationsAsync());
+        CurrentUser = auth;
+        await ConnectHubAsync();
+        Changed();
+        return null;
+    }
+
+    public async Task LogoutAsync()
+    {
+        CurrentUser = null;
+        http.DefaultRequestHeaders.Authorization = null;
+        Users = [];
+        Projects = [];
+        Tasks = [];
+        Requests = [];
+        Notifications = [];
+        taskWindowUrl = null;
+        if (hub is not null)
+        {
+            await hub.DisposeAsync();
+            hub = null;
+        }
+        Changed();
+    }
+
+    public string? Role => CurrentUser?.Role;
+
+    public bool HasPermission(string permission) => CurrentUser?.Permissions.Contains(permission) == true;
+
+    // Page visibility, per the spec's screen/role matrix. Home and
+    // Notifications are open to everyone; roles not listed here (Staff,
+    // Imaamat) get only those two.
+    public bool CanSeeTasks => Role is Roles.FacilityManager or Roles.SecondaryAdmin or Roles.Admin;
+    public bool CanSeeRequests => CanSeeTasks;
+    public bool CanSeeMeetings => Role is Roles.SecondaryAdmin or Roles.Admin;
+    public bool CanSeeEvents => CanSeeMeetings;
+    public bool CanSeeUserManagement => Role is Roles.Admin;
+
+    // ------------------------------------------------------------------
+    // Shared lists and lookups
+    // ------------------------------------------------------------------
+
+    public Task RefreshUsersAsync() => Refresh<UserSummaryDto>("api/users", l => Users = l);
+    public Task RefreshProjectsAsync() => Refresh<ProjectSummaryDto>("api/projects", l => Projects = l);
+    public Task RefreshRequestsAsync() => Refresh<ResourceRequestDto>("api/requests", l => Requests = l);
+    public Task RefreshNotificationsAsync() => Refresh<NotificationDto>("api/notifications", l => Notifications = l);
+
+    public Task RefreshTasksAsync() =>
+        taskWindowUrl is null ? Task.CompletedTask : Refresh<TaskCardDto>(taskWindowUrl, l => Tasks = l);
+
+    /// <summary>Loads the tasks due in [from, to) into <see cref="Tasks"/>.</summary>
+    public Task LoadTasksAsync(DateTime from, DateTime to)
+    {
+        taskWindowUrl = $"api/tasks?from={from:s}&to={to:s}";
+        return RefreshTasksAsync();
+    }
+
+    private async Task Refresh<T>(string url, Action<List<T>> apply)
+    {
+        if (await GetAsync<List<T>>(url) is { } list)
+        {
+            apply(list);
+            Changed();
+        }
+    }
+
+    public string UserName(int? id) =>
+        id is null ? "" : Users.FirstOrDefault(u => u.UserId == id)?.FullName ?? $"User #{id}";
+
+    public string AssigneeNames(TaskCardDto task) => string.Join(", ", task.AssigneeIds.Select(id => UserName(id)));
+
+    // Admins aren't line staff, and the API refuses deactivated assignees.
+    public IEnumerable<UserSummaryDto> AssignableUsers =>
+        Users.Where(u => u.IsActive && u.Role != Roles.Admin).OrderBy(u => u.FullName);
+
+    public int? DailyProjectId => Projects.FirstOrDefault(p => p.ProjectName == DailyTasksProject)?.ProjectId;
+
+    // The UI's "events" are every project except the seeded daily-tasks one.
+    public IEnumerable<ProjectSummaryDto> EventProjects =>
+        Projects.Where(p => p.ProjectName != DailyTasksProject);
+
+    public string? ProjectName(int? id) => Projects.FirstOrDefault(p => p.ProjectId == id)?.ProjectName;
+
+    /// <summary>The event a task is linked to, or null for a daily task.</summary>
+    public string? EventName(TaskCardDto task) => task.ProjectId == DailyProjectId ? null : ProjectName(task.ProjectId);
+
+    public int UnreadCount => Notifications.Count(n => !n.IsRead);
+
+    public async Task MarkReadAsync(IReadOnlyList<int> ids)
+    {
+        if (ids.Count > 0 && await SendAsync(HttpMethod.Post, "api/notifications/read",
+                new MarkReadRequest { NotificationIds = ids }))
+            await RefreshNotificationsAsync();
+    }
+
+    // ------------------------------------------------------------------
+    // Tasks (Home and Daily Tasks both change them)
+    // ------------------------------------------------------------------
+
+    /// <summary>Returns true once the task exists, even if assigning it then failed (already reported).</summary>
+    public async Task<bool> CreateTaskAsync(NewTaskResult task)
+    {
+        if ((task.ProjectId ?? DailyProjectId) is not { } projectId)
+        {
+            snackbar.Add($"The server has no \"{DailyTasksProject}\" project to hold daily tasks.", Severity.Error);
+            return false;
+        }
+        var card = await SendAsync<TaskCardDto>(HttpMethod.Post, "api/tasks", new CreateTaskRequest
+        {
+            ProjectId = projectId,
+            Title = task.Title,
+            Description = task.Description,
+            Priority = task.Priority,
+            Deadline = Wall(task.ScheduledStart),
+        });
+        if (card is not null && task.AssigneeId is { } assigneeId)
+            await Assign(card.TaskId, assigneeId);
+        await RefreshTasksAsync();
+        return card is not null;
+    }
+
+    public async Task<bool> UpdateTaskAsync(TaskCardDto task, NewTaskResult edited)
+    {
+        var ok = await SendAsync(HttpMethod.Patch, $"api/tasks/{task.TaskId}", new UpdateTaskRequest
+        {
+            Title = edited.Title,
+            Description = edited.Description,
+            Priority = edited.Priority,
+            Deadline = Wall(edited.ScheduledStart),
+            ProjectId = edited.ProjectId ?? DailyProjectId,
+        });
+
+        // The UI shows one assignee, so picking another is a reassign (UC-04).
+        int? current = task.AssigneeIds.Count > 0 ? task.AssigneeIds[0] : null;
+        if (ok && edited.AssigneeId != current)
+        {
+            foreach (var old in task.AssigneeIds)
+                ok = ok && await SendAsync(HttpMethod.Delete, $"api/tasks/{task.TaskId}/assignments/{old}");
+            if (ok && edited.AssigneeId is { } assigneeId)
+                ok = await Assign(task.TaskId, assigneeId);
+        }
+        await RefreshTasksAsync();
+        return ok;
+    }
+
+    /// <summary>Ticking a task completes it as the signed-in user; unticking reopens it.
+    /// The API enforces SM-01 (e.g. an unassigned "To Do" task can't jump to Done).</summary>
+    public async Task SetTaskDoneAsync(TaskCardDto task, bool done)
+    {
+        await SendAsync(HttpMethod.Post, $"api/tasks/{task.TaskId}/move",
+            new MoveTaskRequest { NewStatus = done ? "Done" : "In Progress" });
+        await RefreshTasksAsync();
+    }
+
+    private Task<bool> Assign(int taskId, int userId) =>
+        SendAsync(HttpMethod.Post, $"api/tasks/{taskId}/assignments", new AssignTaskRequest { AssigneeId = userId });
+
+    // ------------------------------------------------------------------
+    // Live updates: the SignalR Observer from the architecture doc. The
+    // server says what changed; refetching that list keeps one data path.
+    // ------------------------------------------------------------------
+
+    private async Task ConnectHubAsync()
+    {
+        hub = new HubConnectionBuilder()
+            .WithUrl(new Uri(http.BaseAddress!, "hubs/notifications"),
+                o => o.AccessTokenProvider = () => Task.FromResult(CurrentUser?.Token))
+            .WithAutomaticReconnect()
+            .Build();
+
+        On("boardChanged", RefreshTasksAsync);
+        On("taskAssigned", RefreshNotificationsAsync);
+        On("projectAssigned", RefreshNotificationsAsync, RefreshProjectsAsync);
+        On("requestSubmitted", RefreshNotificationsAsync, RefreshRequestsAsync);
+        On("requestReviewed", RefreshNotificationsAsync, RefreshRequestsAsync);
+        On("notification", RefreshNotificationsAsync);
+
+        try
+        {
+            await hub.StartAsync();
+        }
+        catch (Exception)
+        {
+            snackbar.Add("Live updates are unavailable; other people's changes appear after a refresh.",
+                Severity.Warning);
+        }
+    }
+
+    private void On(string eventName, params Func<Task>[] refreshes) =>
+        hub!.On<JsonElement>(eventName, _ => Task.WhenAll(refreshes.Select(refresh => refresh())));
+
+    // ------------------------------------------------------------------
+    // HTTP. A failed call shows a snackbar and returns null/false.
+    // ------------------------------------------------------------------
+
+    public async Task<T?> GetAsync<T>(string url) =>
+        await Send(HttpMethod.Get, url, null) is { } res ? await res.Content.ReadFromJsonAsync<T>() : default;
+
+    public async Task<T?> SendAsync<T>(HttpMethod method, string url, object body) =>
+        await Send(method, url, body) is { } res ? await res.Content.ReadFromJsonAsync<T>() : default;
+
+    public async Task<bool> SendAsync(HttpMethod method, string url, object? body = null) =>
+        await Send(method, url, body) is not null;
+
+    private async Task<HttpResponseMessage?> Send(HttpMethod method, string url, object? body)
+    {
+        HttpResponseMessage res;
+        try
+        {
+            res = await http.SendAsync(new HttpRequestMessage(method, url)
+            {
+                Content = body is null ? null : JsonContent.Create(body),
+            });
+        }
+        catch (HttpRequestException)
+        {
+            snackbar.Add($"Can't reach the server at {http.BaseAddress}.", Severity.Error);
+            return null;
+        }
+        if (res.IsSuccessStatusCode) return res;
+
+        if (res.StatusCode != HttpStatusCode.Unauthorized)
+        {
+            snackbar.Add(await ErrorMessage(res), Severity.Error);
+        }
+        else if (CurrentUser is not null)
+        {
+            await LogoutAsync();
+            snackbar.Add("Your session has expired. Please sign in again.", Severity.Warning);
+        }
+        return null;
+    }
+
+    // The API's own errors are ErrorResponse { message }; model validation failures are ProblemDetails.
+    private static async Task<string> ErrorMessage(HttpResponseMessage res)
+    {
+        try
+        {
+            var json = await res.Content.ReadFromJsonAsync<JsonElement>();
+            if (json.TryGetProperty("message", out var message)) return message.GetString()!;
+            if (json.TryGetProperty("errors", out var errors))
+                return errors.EnumerateObject().SelectMany(e => e.Value.EnumerateArray()).First().GetString()!;
+        }
+        catch (Exception e) when (e is JsonException or NotSupportedException or InvalidOperationException)
+        {
+            // No JSON body (e.g. a bare 403); fall through to the status line.
+        }
+        return $"The server returned {(int)res.StatusCode} {res.ReasonPhrase}.";
+    }
+
+    // Deadlines and meeting dates are wall-clock times: send them without a UTC offset.
+    public static DateTime Wall(DateTime value) => DateTime.SpecifyKind(value, DateTimeKind.Unspecified);
+
+    // Times the server stamps itself (submitted, reviewed) are UTC.
+    public static DateTime Local(DateTime utc) => DateTime.SpecifyKind(utc, DateTimeKind.Utc).ToLocalTime();
+}
+
+public static class TaskCardExtensions
+{
+    public static bool IsDone(this TaskCardDto task) =>
+        string.Equals(task.Status, "Done", StringComparison.OrdinalIgnoreCase);
+
+    // ponytail: the ERD has no all-day flag, so a deadline at exactly midnight
+    // means "any time that day". Add a column if midnight deadlines become real.
+    public static bool IsAllDay(this TaskCardDto task) => task.Deadline.TimeOfDay == TimeSpan.Zero;
+}

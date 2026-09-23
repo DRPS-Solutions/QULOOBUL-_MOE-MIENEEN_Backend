@@ -1,0 +1,531 @@
+@page "/events"
+@using MudBlazor
+@implements IDisposable
+@inject AppDataService AppData
+
+<PageTitle>Event Planning</PageTitle>
+
+@* =====================================================================
+   STYLE BLOCK
+   Reuses the standard DRPS navy/blue palette and card conventions,
+   scoped under .drps-events. Roster + detail layout, so existing events
+   can be selected, viewed, and edited in place - see MARKUP below.
+   ===================================================================== *@
+<style>
+    .drps-events {
+        --drps-navy-900: #12271F;
+        --drps-navy-800: #1C3D32;
+        --drps-blue-600: #2F5C4C;
+        --drps-blue-500: #3C7A63;
+        --drps-blue-400: #6FA98C;
+        --drps-bg: #F5F3EC;
+        --drps-surface: #FFFFFF;
+        --drps-text-muted: #75806F;
+        --drps-tint-blue: #EAF2ED;
+        --drps-border-soft: #E7E4D8;
+        --drps-hover: #F2EFE4;
+        --drps-empty: #B7B2A0;
+        --drps-shadow: rgba(11, 22, 38, 0.06);
+        background: var(--drps-bg);
+        min-height: 100%;
+        padding-bottom: 2rem;
+    }
+
+    .drps-events-header {
+        background: linear-gradient(135deg, var(--drps-navy-900) 0%, var(--drps-blue-600) 100%);
+        border-radius: 16px;
+        padding: 20px 24px;
+        color: white;
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .drps-card {
+        background: var(--drps-surface);
+        border-radius: 16px;
+        padding: 24px;
+        box-shadow: 0 2px 10px var(--drps-shadow);
+        height: 100%;
+    }
+
+    .drps-card-title {
+        font-weight: 600;
+        color: var(--drps-navy-800);
+        margin-bottom: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+    }
+
+    .drps-card-title .drps-card-title-text {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    /* --- Left column: event roster --- */
+    .drps-roster {
+        padding: 8px 0;
+        max-height: 620px;
+        overflow-y: auto;
+    }
+
+    .drps-roster-item {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        padding: 12px 16px;
+        cursor: pointer;
+        border-left: 3px solid transparent;
+        border-radius: 8px;
+        transition: background 0.15s ease;
+    }
+
+    .drps-roster-item:hover {
+        background: var(--drps-hover);
+    }
+
+    .drps-roster-item.selected {
+        background: var(--drps-tint-blue);
+        border-left-color: var(--drps-blue-500);
+    }
+
+    .drps-roster-title {
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: var(--drps-navy-800);
+    }
+
+    .drps-roster-meta {
+        font-size: 0.76rem;
+        color: var(--drps-text-muted);
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+
+    /* --- Right column: detail / edit / create panel --- */
+    .drps-empty-detail {
+        color: var(--drps-empty);
+        font-size: 0.9rem;
+        text-align: center;
+        padding: 60px 20px;
+    }
+
+    .drps-detail-title {
+        font-size: 1.15rem;
+        font-weight: 700;
+        color: var(--drps-navy-800);
+    }
+
+    .drps-detail-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px;
+        margin-top: 6px;
+        margin-bottom: 18px;
+        font-size: 0.82rem;
+        color: var(--drps-text-muted);
+    }
+
+    .drps-detail-meta span {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+
+    .drps-section-label {
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--drps-text-muted);
+        margin: 18px 0 8px;
+    }
+
+    .drps-section-label:first-of-type {
+        margin-top: 0;
+    }
+
+    .drps-description-text {
+        font-size: 0.88rem;
+        color: var(--drps-navy-800);
+        line-height: 1.5;
+        white-space: pre-line;
+    }
+
+    /* --- Chips: assigned staff (view mode) --- */
+    .drps-tag-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .drps-tag {
+        display: inline-flex;
+        align-items: center;
+        background: var(--drps-tint-blue);
+        color: var(--drps-blue-500);
+        border-radius: 999px;
+        padding: 4px 12px;
+        font-size: 0.78rem;
+        font-weight: 600;
+    }
+
+    .drps-tag-empty {
+        color: var(--drps-empty);
+        font-size: 0.82rem;
+    }
+
+    /* --- Staff checkbox grid (create/edit form) --- */
+    .drps-staff-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+        gap: 2px 8px;
+        background: var(--drps-bg);
+        border-radius: 10px;
+        padding: 8px 12px;
+    }
+
+    .drps-form-actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 8px;
+    }
+
+    .drps-event-empty {
+        color: var(--drps-empty);
+        font-size: 0.85rem;
+        text-align: center;
+        padding: 30px 0;
+    }
+
+    /* --- Dark mode overrides --- */
+    .page.dark-mode .drps-events {
+        --drps-bg: #0B1B21;
+        --drps-surface: #1E362B;
+        --drps-text-muted: #93A69A;
+        --drps-navy-800: #E9F0EA;
+        --drps-tint-blue: rgba(60, 122, 99, 0.16);
+        --drps-border-soft: #2E4A3B;
+        --drps-hover: #1E3327;
+        --drps-empty: #4E5F52;
+        --drps-shadow: rgba(0, 0, 0, 0.35);
+    }
+</style>
+
+@* =====================================================================
+   MARKUP
+   Events are API projects (every project except the seeded "Daily
+   Tasks" one): members are the staff helping, and tasks in the
+   project are its linked tasks.
+   Left column: scrollable roster of all events - click one to view it,
+   or use the "+ New" button to start a blank one.
+   Right column: three mutually-exclusive states -
+     1. form is set -> the shared create/edit form
+     2. selected is set -> read-only detail view
+     3. neither -> an empty-state prompt
+   ===================================================================== *@
+<div class="drps-events">
+    <MudContainer MaxWidth="MaxWidth.Large" Class="pt-6">
+
+        @* Header *@
+        <div class="drps-events-header">
+            <MudText Typo="Typo.h6" Style="font-weight:600;">Event & Project Planning</MudText>
+        </div>
+
+        <MudGrid>
+            @* --- Left Column: Event Roster --- *@
+            <MudItem xs="12" md="5">
+                <div class="drps-card">
+                    <div class="drps-card-title">
+                        <div class="drps-card-title-text">
+                            <MudIcon Icon="@Icons.Material.Filled.Event" Size="Size.Small" />
+                            All Events
+                        </div>
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Primary"
+                                   Size="Size.Small"
+                                   StartIcon="@Icons.Material.Filled.Add"
+                                   OnClick="StartCreate">
+                            New
+                        </MudButton>
+                    </div>
+
+                    @if (!AppData.EventProjects.Any())
+                    {
+                        <div class="drps-event-empty">No events planned yet.</div>
+                    }
+                    else
+                    {
+                        <div class="drps-roster">
+                            @foreach (var project in AppData.EventProjects)
+                            {
+                                var cssClass = "drps-roster-item" + (form is null && selected?.ProjectId == project.ProjectId ? " selected" : "");
+                                <div class="@cssClass" @onclick="() => SelectProject(project.ProjectId)">
+                                    <div class="drps-roster-title">@project.ProjectName</div>
+                                    <div class="drps-roster-meta">
+                                        <MudIcon Icon="@Icons.Material.Filled.Groups" Size="Size.Small" />
+                                        @project.MemberCount staff &middot; @project.OpenTaskCount open @(project.OpenTaskCount == 1 ? "task" : "tasks")
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            </MudItem>
+
+            @* --- Right Column: Detail / Edit / Create Panel --- *@
+            <MudItem xs="12" md="7">
+                <div class="drps-card">
+                    @if (form is not null)
+                    {
+                        @* ---------- Shared create/edit form ---------- *@
+                        <div class="drps-card-title">
+                            <div class="drps-card-title-text">
+                                <MudIcon Icon="@(form.ProjectId is null ? Icons.Material.Filled.AddBox : Icons.Material.Filled.Edit)" Size="Size.Small" />
+                                @(form.ProjectId is null ? "Create New Event" : "Edit Event")
+                            </div>
+                        </div>
+
+                        <MudTextField T="string" @bind-Value="form.Name" Label="Event Title" Variant="Variant.Outlined" MaxLength="200" Class="mb-3" />
+                        <MudTextField T="string" @bind-Value="form.Description" Label="Description" Variant="Variant.Outlined" Lines="3" Class="mb-3" />
+
+                        <MudSelect T="int?" Label="Lead Coordinator" Variant="Variant.Outlined" @bind-Value="form.CoordinatorId"
+                                   ToStringFunc="@(id => AppData.UserName(id))" HelperText="Defaults to you" Class="mb-3">
+                            @foreach (var user in AppData.AssignableUsers)
+                            {
+                                <MudSelectItem T="int?" Value="@user.UserId">@user.FullName</MudSelectItem>
+                            }
+                        </MudSelect>
+
+                        <div class="drps-section-label">Staff Helping</div>
+                        <div class="drps-staff-grid mb-4">
+                            @foreach (var user in AppData.AssignableUsers)
+                            {
+                                <MudCheckBox T="bool"
+                                             Value="@form.StaffIds.Contains(user.UserId)"
+                                             ValueChanged="@((bool v) => ToggleStaff(user.UserId, v))"
+                                             Label="@user.FullName"
+                                             Color="Color.Primary"
+                                             Dense="true" />
+                            }
+                        </div>
+
+                        <div class="drps-form-actions">
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@(!CanSave)" OnClick="SaveProject">
+                                @(saving ? "Saving..." : form.ProjectId is null ? "Schedule Event" : "Save Changes")
+                            </MudButton>
+                            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="CancelForm">
+                                Cancel
+                            </MudButton>
+                        </div>
+                    }
+                    else if (selected is not null)
+                    {
+                        @* ---------- Read-only detail view ---------- *@
+                        var project = selected;
+                        <div class="drps-card-title">
+                            <div class="drps-detail-title">@project.ProjectName</div>
+                            <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small" StartIcon="@Icons.Material.Filled.Edit" OnClick="StartEdit">
+                                Edit
+                            </MudButton>
+                        </div>
+
+                        <div class="drps-detail-meta">
+                            <span><MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Small" /> Lead: @AppData.UserName(project.OwnerId)</span>
+                            <span><MudIcon Icon="@Icons.Material.Filled.Flag" Size="Size.Small" /> @project.Status</span>
+                        </div>
+
+                        @if (!string.IsNullOrWhiteSpace(project.Description))
+                        {
+                            <div class="drps-section-label">Description</div>
+                            <div class="drps-description-text">@project.Description</div>
+                        }
+
+                        <div class="drps-section-label">Staff Helping (@members.Count)</div>
+                        @if (members.Any())
+                        {
+                            <div class="drps-tag-row">
+                                @foreach (var member in members)
+                                {
+                                    <div class="drps-tag">@member.FullName</div>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="drps-tag-empty">No staff assigned yet.</div>
+                        }
+
+                        <div class="drps-section-label">Linked Tasks (@linkedTasks.Count)</div>
+                        @if (linkedTasks.Any())
+                        {
+                            <div class="drps-roster">
+                                @foreach (var linkedTask in linkedTasks)
+                                {
+                                    var assignees = AppData.AssigneeNames(linkedTask);
+                                    <div class="drps-roster-item">
+                                        <div class="drps-roster-title">
+                                            @linkedTask.Title
+                                            @if (linkedTask.IsDone())
+                                            {
+                                                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Small" Color="Color.Success" Style="vertical-align:middle; margin-left:4px;" />
+                                            }
+                                        </div>
+                                        <div class="drps-roster-meta">
+                                            <MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Small" />
+                                            @(assignees.Length == 0 ? "Unassigned" : assignees)
+                                            &nbsp;·&nbsp;
+                                            @linkedTask.Deadline.ToString(linkedTask.IsAllDay() ? "dd MMM" : "dd MMM, h:mm tt")
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="drps-tag-empty">No tasks linked to this event yet.</div>
+                        }
+                    }
+                    else
+                    {
+                        @* ---------- Nothing selected ---------- *@
+                        <div class="drps-empty-detail">
+                            <MudIcon Icon="@Icons.Material.Filled.EventNote" Size="Size.Large" Style="opacity:0.5;" />
+                            <div class="mt-2">Select an event on the left to view its details,<br />or click "New" to plan one.</div>
+                        </div>
+                    }
+                </div>
+            </MudItem>
+        </MudGrid>
+
+    </MudContainer>
+</div>
+
+@code {
+    // --- Selection / mode state ---
+    // selected: the project being viewed, with its members and linked
+    // tasks, loaded from the API when a roster item is clicked.
+    // form: a working copy for the create/edit form, so Cancel can
+    // discard changes without touching anything on the server.
+    private ProjectDto? selected;
+    private IReadOnlyList<ProjectMemberDto> members = [];
+    private IReadOnlyList<TaskCardDto> linkedTasks = [];
+    private ProjectForm? form;
+    private bool saving;
+
+    private bool CanSave => form is not null && !saving && !string.IsNullOrWhiteSpace(form.Name);
+
+    // "+ New" button - opens a blank form.
+    private void StartCreate() => form = new ProjectForm();
+
+    // Clicking a roster item shows it read-only. Any in-progress
+    // create/edit is discarded, same as navigating away from a form.
+    private async Task SelectProject(int projectId)
+    {
+        form = null;
+        var project = AppData.GetAsync<ProjectDto>($"api/projects/{projectId}");
+        var staff = AppData.GetAsync<List<ProjectMemberDto>>($"api/projects/{projectId}/members");
+        var board = AppData.GetAsync<List<TaskCardDto>>($"api/projects/{projectId}/board");
+        await Task.WhenAll(project, staff, board);
+        selected = await project;
+        members = await staff ?? [];
+        linkedTasks = await board ?? [];
+    }
+
+    // "Edit" button on the detail view - copies the selected project
+    // into the form.
+    private void StartEdit()
+    {
+        if (selected is null) return;
+        form = new ProjectForm
+        {
+            ProjectId = selected.ProjectId,
+            Name = selected.ProjectName,
+            Description = selected.Description,
+            CoordinatorId = selected.OwnerId,
+            StaffIds = members.Select(m => m.UserId).ToHashSet(),
+        };
+    }
+
+    private void CancelForm() => form = null;
+
+    private void ToggleStaff(int userId, bool isChecked)
+    {
+        if (isChecked) form?.StaffIds.Add(userId);
+        else form?.StaffIds.Remove(userId);
+    }
+
+    private async Task SaveProject()
+    {
+        if (!CanSave) return;
+        var f = form!;
+        saving = true;
+
+        var description = string.IsNullOrWhiteSpace(f.Description) ? null : f.Description.Trim();
+        var project = f.ProjectId is null
+            ? await AppData.SendAsync<ProjectDto>(HttpMethod.Post, "api/projects", new CreateProjectRequest
+            {
+                ProjectName = f.Name.Trim(),
+                Description = description,
+                OwnerId = f.CoordinatorId,
+            })
+            : await AppData.SendAsync<ProjectDto>(HttpMethod.Patch, $"api/projects/{f.ProjectId}", new UpdateProjectRequest
+            {
+                ProjectName = f.Name.Trim(),
+                Description = description ?? "",
+                OwnerId = f.CoordinatorId,
+            });
+
+        if (project is not null)
+        {
+            // Staff are project memberships: add the newly ticked, remove the
+            // unticked. The API notifies each person added.
+            HashSet<int> current = f.ProjectId is null ? [] : members.Select(m => m.UserId).ToHashSet();
+            foreach (var userId in f.StaffIds.Except(current))
+                await AppData.SendAsync(HttpMethod.Post, $"api/projects/{project.ProjectId}/members",
+                    new AddProjectMemberRequest { UserId = userId });
+            foreach (var userId in current.Except(f.StaffIds))
+                await AppData.SendAsync(HttpMethod.Delete, $"api/projects/{project.ProjectId}/members/{userId}");
+
+            await AppData.RefreshProjectsAsync();
+            await SelectProject(project.ProjectId);
+        }
+        saving = false;
+    }
+
+    // The create/edit form's working copy. ProjectId is null while creating.
+    private class ProjectForm
+    {
+        public int? ProjectId { get; init; }
+        public string Name { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        public int? CoordinatorId { get; set; }
+        public HashSet<int> StaffIds { get; init; } = [];
+    }
+
+    // Re-render when the shared project list refreshes (member/open-task
+    // counts in the roster).
+    protected override async Task OnInitializedAsync()
+    {
+        AppData.OnChange += StateHasChanged;
+        await AppData.RefreshProjectsAsync();
+    }
+
+    // events?project=4 (a notification's link, UC-08 step 3) opens that project's detail.
+    [SupplyParameterFromQuery(Name = "project")] public int? DeepLinkProjectId { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (DeepLinkProjectId is { } id && selected?.ProjectId != id) await SelectProject(id);
+    }
+
+    public void Dispose()
+    {
+        AppData.OnChange -= StateHasChanged;
+    }
+}
