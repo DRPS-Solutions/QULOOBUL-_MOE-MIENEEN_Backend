@@ -12,6 +12,19 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Integration tests migrate a throwaway database on this container (ApiIntegrationTests.cs).
+    services:
+      mssql:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: Y
+          MSSQL_SA_PASSWORD: Ci_Throwaway_Passw0rd
+        ports: ['1433:1433']
+        options: >-
+          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P Ci_Throwaway_Passw0rd -Q 'SELECT 1'"
+          --health-interval 10s --health-timeout 5s --health-retries 12
+    env:
+      TEST_SQL_CONNECTION: Server=localhost,1433;User Id=sa;Password=Ci_Throwaway_Passw0rd;TrustServerCertificate=True
     steps:
       - uses: actions/checkout@v4
 
@@ -26,7 +39,10 @@ jobs:
         run: dotnet build "$PROJECT" -c Release --no-restore -warnaserror
 
       - name: Test
-        run: dotnet test "Backend.Tests/Backend.Tests.csproj" -c Release -warnaserror --collect:"XPlat Code Coverage"
+        run: dotnet test "Backend.Tests/Backend.Tests.csproj" -c Release -warnaserror --collect:"XPlat Code Coverage" --results-directory coverage
+
+      - name: Coverage gate
+        run: bash .github/scripts/coverage-gate.sh 70
 
       - name: Publish
         run: dotnet publish "$PROJECT" -c Release --no-build -o ./publish
@@ -87,10 +103,12 @@ jobs:
           dotnet tool install --global dotnet-ef
           dotnet ef database update --project "$PROJECT"
 
+      # SMOKE_EMAIL / SMOKE_PASSWORD: a low-privilege account kept for this check, not the seed admin.
       - name: Smoke test the slot
-        run: |
-          curl -fsS --retry 5 --retry-all-errors --retry-delay 10 \
-            "https://${{ vars.AZURE_WEBAPP_NAME_PROD }}-staging.azurewebsites.net/health"
+        env:
+          SMOKE_EMAIL: ${{ secrets.SMOKE_EMAIL }}
+          SMOKE_PASSWORD: ${{ secrets.SMOKE_PASSWORD }}
+        run: bash .github/scripts/smoke-test.sh "https://${{ vars.AZURE_WEBAPP_NAME_PROD }}-staging.azurewebsites.net"
 
   swap:
     needs: deploy-slot
