@@ -363,7 +363,7 @@
                                     }
                                     else
                                     {
-                                        <span><MudIcon Icon="@Icons.Material.Filled.FiberManualRecord" Size="Size.Small" Style="color:#E0435C;" />Deactivated</span>
+                                        <span><MudIcon Icon="@Icons.Material.Filled.FiberManualRecord" Size="Size.Small" Style="color:#E0435C;" />@selectedEmployee.Status</span>
                                     }
                                 </div>
                             </div>
@@ -454,9 +454,6 @@
                             }
                         </MudSelect>
 
-                        @* The account signs in with this; there's no reset flow yet, so share it securely. *@
-                        <MudTextField T="string" @bind-Value="newUser.TempPassword" Label="Temporary Password" InputType="InputType.Password"
-                                      HelperText="At least 8 characters" Variant="Variant.Outlined" MaxLength="128" Immediate="true" Class="mb-4" />
 
                         <div class="d-flex gap-2">
                             <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@(!CanSaveUser)" OnClick="SaveUser">
@@ -493,8 +490,7 @@
         !string.IsNullOrWhiteSpace(newUser.Surname) &&
         !string.IsNullOrWhiteSpace(newUser.Email) &&
         !string.IsNullOrWhiteSpace(newUser.CellNo) &&
-        newUser.RoleId.HasValue &&
-        newUser.TempPassword.Length >= 8;
+        newUser.RoleId.HasValue;
 
     private IEnumerable<UserSummaryDto> FilteredEmployees =>
         AppData.Users
@@ -505,7 +501,7 @@
             .OrderBy(e => e.FullName);
 
     private string WorkloadFor(UserSummaryDto user) =>
-        !user.IsActive ? "Deactivated"
+        !user.IsActive ? user.Status
         : overview.FirstOrDefault(r => r.UserId == user.UserId) is { } row
             ? $"{row.ActiveTasks} active · {row.OverdueTasks} overdue"
             : "";
@@ -548,7 +544,6 @@
             Email = newUser.Email.Trim(),
             CellNo = newUser.CellNo.Trim(),
             RoleId = newUser.RoleId!.Value,
-            TempPassword = newUser.TempPassword,
         });
         saving = false;
         if (created is null) return;
@@ -566,7 +561,6 @@
         public string Email { get; set; } = string.Empty;
         public string CellNo { get; set; } = string.Empty;
         public int? RoleId { get; set; }
-        public string TempPassword { get; set; } = string.Empty;
     }
 
     public void Dispose()

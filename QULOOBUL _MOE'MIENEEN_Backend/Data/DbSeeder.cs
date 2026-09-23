@@ -17,8 +17,8 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Data
         // Lower HierarchyLevel = more authority (TaskAssignmentService: assign down or sideways, never up).
         private static readonly (string Name, int Level, string[] Granted)[] RoleSeed =
         [
-            (Roles.Admin, 1, [Permissions.ManageUsers, Permissions.ReviewRequests, Permissions.GenerateReports, Permissions.ManageFiles]),
-            (Roles.SecondaryAdmin, 2, [Permissions.ReviewRequests, Permissions.GenerateReports, Permissions.ManageFiles]),
+            (Roles.Admin, 1, [Permissions.ManageUsers, Permissions.ReviewRequests, Permissions.GenerateReports, Permissions.ManageFiles, Permissions.ReopenTask]),
+            (Roles.SecondaryAdmin, 2, [Permissions.ReviewRequests, Permissions.GenerateReports, Permissions.ManageFiles, Permissions.ReopenTask]),
             (Roles.Imaamat, 2, []),
             (Roles.FacilityManager, 3, []),
             (Roles.Staff, 4, []),
@@ -27,19 +27,21 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Data
         public static void Seed(AppDbContext db, IConfiguration config)
         {
             if (!db.Roles.Any())
-            {
-                // Admin is granted every permission, so this is the full set.
-                var permissions = RoleSeed.SelectMany(r => r.Granted).Distinct()
-                    .ToDictionary(name => name, name => new Permission { PermissionName = name });
-                db.Permissions.AddRange(permissions.Values);
+                db.Roles.AddRange(RoleSeed.Select(r => new Role { RoleName = r.Name, HierarchyLevel = r.Level }));
+            db.SaveChanges();
 
-                foreach (var (name, level, granted) in RoleSeed)
-                {
-                    var role = new Role { RoleName = name, HierarchyLevel = level };
-                    db.Roles.Add(role);
-                    db.RolePermissions.AddRange(
-                        granted.Select(p => new RolePermission { Role = role, Permission = permissions[p] }));
-                }
+            // Grants are topped up rather than seeded once, so a permission added later (ReopenTask)
+            // reaches databases that were seeded before it existed.
+            var permissions = db.Permissions.ToDictionary(p => p.PermissionName);
+            foreach (var name in RoleSeed.SelectMany(r => r.Granted).Distinct().Where(n => !permissions.ContainsKey(n)))
+                db.Permissions.Add(permissions[name] = new Permission { PermissionName = name });
+            foreach (var (name, _, granted) in RoleSeed)
+            {
+                var role = db.Roles.SingleOrDefault(r => r.RoleName == name);
+                if (role is null) continue;
+                foreach (var p in granted.Where(p => !db.RolePermissions.Any(rp =>
+                             rp.RoleId == role.RoleId && rp.Permission!.PermissionName == p)))
+                    db.RolePermissions.Add(new RolePermission { Role = role, Permission = permissions[p] });
             }
 
             if (!db.RequestCategories.Any())
@@ -81,6 +83,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Data
                     Surname = "Automation",
                     Email = SystemAccountEmail,
                     IsActive = false,
+                    Status = Lifecycle.UserInactive,
                 });
                 db.SaveChanges();
             }

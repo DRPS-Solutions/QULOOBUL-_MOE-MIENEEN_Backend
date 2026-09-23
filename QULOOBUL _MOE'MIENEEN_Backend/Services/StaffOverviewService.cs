@@ -22,7 +22,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
         /// <summary>The seeded automation account is an implementation detail, not a colleague.</summary>
         public Task<List<UserSummaryDto>> StaffAsync() =>
             db.Users.Where(u => u.Email != SystemAccountEmail).Select(u => new UserSummaryDto(
-                u.UserId, u.FirstName + " " + u.Surname, u.Email, u.Role!.RoleName, u.IsActive)).ToListAsync();
+                u.UserId, u.FirstName + " " + u.Surname, u.Email, u.Role!.RoleName, u.IsActive, u.Status)).ToListAsync();
     }
 }
 //---------------------------DDDDDDDDDDDoooooooooooooo END OF FILE DDDDDDDDDDDoooooooooooooo---------------------------//
