@@ -88,11 +88,11 @@
         <ShellContent ContentTemplate="{DataTemplate pages:HomePage}" />
     </FlyoutItem>
 
-    <FlyoutItem Title="Daily Tasks" Route="tasks">
+    <FlyoutItem Title="Daily Tasks" Route="tasks" IsVisible="{Binding CanSeeTasks}">
         <ShellContent ContentTemplate="{DataTemplate pages:TasksPage}" />
     </FlyoutItem>
 
-    <FlyoutItem Title="Resource Requests" Route="requests">
+    <FlyoutItem Title="Resource Requests" Route="requests" IsVisible="{Binding CanSeeRequests}">
         <ShellContent ContentTemplate="{DataTemplate pages:RequestsPage}" />
     </FlyoutItem>
 

@@ -8,7 +8,6 @@ public sealed record NewTaskResult(
     DateTime Date,
     TimeSpan? Time,
     bool IsAllDay,
-    Category Category,
     Priority Priority);
 
 public partial class CreateTaskPage : ContentPage
@@ -18,8 +17,6 @@ public partial class CreateTaskPage : ContentPage
     public CreateTaskPage()
     {
         InitializeComponent();
-        CategoryPicker.ItemsSource = (System.Collections.IList)TaskEnums.Categories;
-        CategoryPicker.SelectedIndex = 0;
         PriorityPicker.ItemsSource = (System.Collections.IList)TaskEnums.Priorities;
         PriorityPicker.SelectedIndex = 0;
         DateField.Date = DateTime.Today;
@@ -50,7 +47,6 @@ public partial class CreateTaskPage : ContentPage
             Date: DateField.Date ?? DateTime.Today,
             Time: isAllDay ? null : TimeField.Time,
             IsAllDay: isAllDay,
-            Category: ((Option<Category>)CategoryPicker.SelectedItem).Value,
             Priority: ((Option<Priority>)PriorityPicker.SelectedItem).Value));
     }
 

@@ -38,21 +38,21 @@
 
                     <VerticalStackLayout x:Name="TaskList" Spacing="12">
                         <BindableLayout.ItemTemplate>
-                            <DataTemplate x:DataType="models:DailyTask">
+                            <DataTemplate x:DataType="models:TaskItem">
                                 <Border BackgroundColor="{Binding RowBackground}"
                                         Stroke="{Binding RowBorder}"
                                         StrokeThickness="1"
                                         StrokeShape="RoundRectangle 12"
                                         Padding="12,8">
                                     <Grid ColumnDefinitions="Auto,*" ColumnSpacing="4">
-                                        <CheckBox IsChecked="{Binding IsCompleted, Mode=OneWay}"
+                                        <CheckBox IsChecked="{Binding IsDone, Mode=OneWay}"
                                                   CheckedChanged="OnDailyTaskToggled"
                                                   VerticalOptions="Center" />
                                         <VerticalStackLayout Grid.Column="1" VerticalOptions="Center">
                                             <Label Text="{Binding Title}"
                                                    FontSize="15"
                                                    TextDecorations="{Binding Decorations}" />
-                                            <Label Text="{Binding Category}"
+                                            <Label Text="{Binding EventLabel}"
                                                    FontSize="11"
                                                    TextColor="{AppThemeBinding Light={StaticResource Secondary}, Dark={StaticResource SecondaryDark}}" />
                                             <Label Text="{Binding CompletedByLabel}"
@@ -80,7 +80,7 @@
 
                     <VerticalStackLayout x:Name="CompletedList" Spacing="10" Margin="0,10,0,0">
                         <BindableLayout.ItemTemplate>
-                            <DataTemplate x:DataType="models:DailyTask">
+                            <DataTemplate x:DataType="models:TaskItem">
                                 <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
                                     <Border WidthRequest="32"
                                             HeightRequest="32"

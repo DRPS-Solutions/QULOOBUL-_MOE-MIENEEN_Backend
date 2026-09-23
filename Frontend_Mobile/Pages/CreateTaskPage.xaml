@@ -38,13 +38,6 @@
             </HorizontalStackLayout>
 
             <VerticalStackLayout>
-                <Label Text="Category" Style="{StaticResource LabelSmall}" />
-                <Border Style="{StaticResource FieldBox}">
-                    <Picker x:Name="CategoryPicker" Title="Category" />
-                </Border>
-            </VerticalStackLayout>
-
-            <VerticalStackLayout>
                 <Label Text="Priority" Style="{StaticResource LabelSmall}" />
                 <Border Style="{StaticResource FieldBox}">
                     <Picker x:Name="PriorityPicker" Title="Priority" />

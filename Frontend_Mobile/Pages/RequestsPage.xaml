@@ -7,7 +7,8 @@
     Title="Resource Requests">
 
     <!-- Requests.razor: submission form plus the full list with a status
-         filter. Every role can submit and read; only Admin sees Approve/Deny. -->
+         filter. The API decides whose requests each role sees; reviewers (the
+         ReviewRequests permission) get Approve/Deny on ones awaiting a decision. -->
 
     <ScrollView>
         <VerticalStackLayout Padding="16" Spacing="16">
@@ -30,9 +31,11 @@
                     </Border>
 
                     <VerticalStackLayout>
-                        <Label Text="Resource Type" Style="{StaticResource LabelSmall}" />
+                        <Label Text="Category" Style="{StaticResource LabelSmall}" />
                         <Border Style="{StaticResource FieldBox}">
-                            <Picker x:Name="TypePicker" Title="Resource Type" />
+                            <Picker x:Name="TypePicker"
+                                    Title="Category"
+                                    SelectedIndexChanged="OnFormChanged" />
                         </Border>
                     </VerticalStackLayout>
 
@@ -118,25 +121,12 @@
                                             </Border>
                                         </Grid>
 
-                                        <Border IsVisible="{Binding HasLink}"
-                                                BackgroundColor="{StaticResource TintAccentBlue}"
-                                                StrokeThickness="0"
-                                                StrokeShape="RoundRectangle 6"
-                                                Padding="8,3"
-                                                HorizontalOptions="Start"
-                                                Margin="0,4,0,0">
-                                            <Label Text="{Binding LinkLabel}"
-                                                   TextColor="{StaticResource AccentBlue}"
-                                                   FontSize="10"
-                                                   FontAttributes="Bold" />
-                                        </Border>
-
                                         <Label Text="{Binding Notes}"
                                                IsVisible="{Binding HasNotes}"
                                                FontSize="12"
                                                Margin="0,4,0,0" />
 
-                                        <!-- Who reviewed it, and why if denied - shown to everyone. -->
+                                        <!-- Who reviewed it, and when - shown to everyone. -->
                                         <Label Text="{Binding ReviewLabel}"
                                                IsVisible="{Binding ShowReview}"
                                                Style="{StaticResource LabelSmall}"

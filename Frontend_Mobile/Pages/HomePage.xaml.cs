@@ -11,54 +11,50 @@ public partial class HomePage : ContentPage
     {
         InitializeComponent();
         TodayLabel.Text = DateTime.Today.ToString("dddd, dd MMMM yyyy");
-        BindableLayout.SetItemsSource(TaskList, _state.TodayTasks);
-        Refresh();
     }
 
-    protected override void OnAppearing()
+    // Home is a view over AppState.Tasks loaded for today only. The API pushes
+    // "boardChanged" after any change, so Changed re-renders while we're on screen.
+    protected override async void OnAppearing()
     {
         base.OnAppearing();
+        _state.Changed -= Refresh; // a returning modal can re-run OnAppearing
+        _state.Changed += Refresh;
         Refresh();
+        await _state.LoadTasksAsync(DateTime.Today, DateTime.Today.AddDays(1));
+    }
+
+    protected override void OnDisappearing()
+    {
+        base.OnDisappearing();
+        _state.Changed -= Refresh;
     }
 
     private void Refresh()
     {
-        var tasks = _state.TodayTasks;
-        CompletedChip.Text = $"{tasks.Count(t => t.IsCompleted)} of {tasks.Count} completed today";
+        var tasks = _state.Tasks
+            .Where(t => t.Deadline.Date == DateTime.Today)
+            .OrderBy(t => t.Deadline)
+            .Select(_state.ToItem)
+            .ToList();
 
-        var completed = tasks.Where(t => t.IsCompleted && !string.IsNullOrEmpty(t.CompletedBy)).ToList();
+        BindableLayout.SetItemsSource(TaskList, tasks);
+        CompletedChip.Text = $"{tasks.Count(t => t.IsDone)} of {tasks.Count} completed today";
+
+        var completed = tasks.Where(t => t.ShowCompletedBy).ToList();
         BindableLayout.SetItemsSource(CompletedList, completed);
         CompletedList.IsVisible = completed.Count > 0;
         NothingCompleted.IsVisible = completed.Count == 0;
     }
 
     /// <summary>
-    /// Ticking a task asks who completed it first (CompletedByDialog.razor);
-    /// backing out of that prompt leaves the task untouched, so the checkbox
-    /// is put back. Unticking clears the attribution outright.
+    /// Ticking completes the task as the signed-in user (the API records who);
+    /// unticking reopens it. The reload afterwards puts the box back if the API refused.
     /// </summary>
     private async void OnDailyTaskToggled(object? sender, CheckedChangedEventArgs e)
     {
-        if (sender is not CheckBox box || box.BindingContext is not DailyTask task) return;
-
-        // Also swallows the echo from reverting the box below.
-        if (e.Value == task.IsCompleted) return;
-
-        if (!e.Value)
-        {
-            _state.SetDailyTaskCompletion(task, false, null);
-            Refresh();
-            return;
-        }
-
-        var employee = await DisplayActionSheetAsync($"Completed by — {task.Title}", "Cancel", null, [.. _state.StaffMembers]);
-        if (string.IsNullOrEmpty(employee) || employee == "Cancel")
-        {
-            box.IsChecked = false;
-            return;
-        }
-
-        _state.SetDailyTaskCompletion(task, true, employee);
-        Refresh();
+        if (sender is not CheckBox box || box.BindingContext is not TaskItem task) return;
+        if (e.Value == task.IsDone) return;
+        await _state.SetTaskDoneAsync(task.Card, e.Value);
     }
 }

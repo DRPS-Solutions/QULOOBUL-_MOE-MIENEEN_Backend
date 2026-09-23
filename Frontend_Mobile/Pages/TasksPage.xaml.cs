@@ -48,10 +48,34 @@ public partial class TasksPage : ContentPage
         return date.Date.AddDays(-diff);
     }
 
+    // The week on screen is AppState's task window; a SignalR "boardChanged"
+    // reloads it, and Changed re-renders while we're on screen.
+    protected override async void OnAppearing()
+    {
+        base.OnAppearing();
+        _state.Changed -= Refresh; // a returning modal can re-run OnAppearing
+        _state.Changed += Refresh;
+        await LoadWeekAsync();
+    }
+
+    protected override void OnDisappearing()
+    {
+        base.OnDisappearing();
+        _state.Changed -= Refresh;
+    }
+
+    private Task LoadWeekAsync()
+    {
+        Refresh();
+        return _state.LoadTasksAsync(_weekStart, _weekStart.AddDays(7));
+    }
+
     private void Refresh()
     {
         MonthLabel.Text = _weekStart.ToString("MMMM yyyy");
         SelectedDayLabel.Text = _selectedDate.ToString("dddd, d MMMM");
+
+        var tasks = _state.Tasks.Select(_state.ToItem).ToList();
 
         BindableLayout.SetItemsSource(DayStrip, Enumerable.Range(0, 7)
             .Select(i => _weekStart.AddDays(i))
@@ -60,11 +84,11 @@ public partial class TasksPage : ContentPage
                 Date = day,
                 IsSelected = day == _selectedDate,
                 IsToday = day == DateTime.Today,
-                HasTasks = _state.Tasks.Any(t => t.ScheduledStart.Date == day)
+                HasTasks = tasks.Any(t => t.ScheduledStart.Date == day)
             })
             .ToList());
 
-        var forDay = _state.Tasks
+        var forDay = tasks
             .Where(t => t.ScheduledStart.Date == _selectedDate.Date)
             .OrderBy(t => t.ScheduledStart)
             .ToList();
@@ -87,16 +111,16 @@ public partial class TasksPage : ContentPage
             .ToList());
     }
 
-    private void OnPreviousWeek(object? sender, EventArgs e)
+    private async void OnPreviousWeek(object? sender, EventArgs e)
     {
         _weekStart = _weekStart.AddDays(-7);
-        Refresh();
+        await LoadWeekAsync();
     }
 
-    private void OnNextWeek(object? sender, EventArgs e)
+    private async void OnNextWeek(object? sender, EventArgs e)
     {
         _weekStart = _weekStart.AddDays(7);
-        Refresh();
+        await LoadWeekAsync();
     }
 
     private void OnDaySelected(object? sender, TappedEventArgs e)
@@ -106,28 +130,12 @@ public partial class TasksPage : ContentPage
         Refresh();
     }
 
-    /// <summary>Same attribute-then-complete flow as the Home checklist.</summary>
+    /// <summary>Same complete-as-me flow as the Home checklist.</summary>
     private async void OnTaskToggled(object? sender, CheckedChangedEventArgs e)
     {
         if (sender is not CheckBox box || box.BindingContext is not TaskItem task) return;
         if (e.Value == task.IsDone) return;
-
-        if (!e.Value)
-        {
-            _state.SetTaskCompletion(task, false, null);
-            Refresh();
-            return;
-        }
-
-        var employee = await DisplayActionSheetAsync($"Completed by — {task.Title}", "Cancel", null, [.. _state.StaffMembers]);
-        if (string.IsNullOrEmpty(employee) || employee == "Cancel")
-        {
-            box.IsChecked = false;
-            return;
-        }
-
-        _state.SetTaskCompletion(task, true, employee);
-        Refresh();
+        await _state.SetTaskDoneAsync(task.Card, e.Value);
     }
 
     private async void OnNewTask(object? sender, EventArgs e)
@@ -135,11 +143,15 @@ public partial class TasksPage : ContentPage
         var result = await CreateTaskPage.ShowAsync(Navigation);
         if (result is null) return;
 
-        var task = _state.AddTask(result.Title, result.Date, result.Time, result.IsAllDay, result.Category, result.Priority);
+        var start = result.IsAllDay || result.Time is null
+            ? result.Date.Date
+            : result.Date.Date.Add(result.Time.Value);
 
         // Jump to whatever day the new task landed on, same as the Compose port.
-        _selectedDate = task.ScheduledStart.Date;
+        // The week loads first, so CreateTaskAsync's refresh reloads that same window.
+        _selectedDate = start.Date;
         _weekStart = StartOfWeek(_selectedDate);
-        Refresh();
+        await LoadWeekAsync();
+        await _state.CreateTaskAsync(result.Title, start, result.Priority.ToString());
     }
 }

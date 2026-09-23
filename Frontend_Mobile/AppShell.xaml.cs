@@ -12,7 +12,7 @@ public partial class AppShell : Shell
     }
 
     /// <summary>
-    /// Called from LoginPage once a role is picked. The drawer only exists for
+    /// Called from LoginPage once the API accepts the sign-in. The drawer only exists for
     /// a signed-in session, matching MainLayout.razor showing the nav menu only
     /// when currentRole is set.
     /// </summary>
@@ -27,7 +27,7 @@ public partial class AppShell : Shell
     {
         if (Current is not AppShell shell) return;
         shell.FlyoutIsPresented = false;
-        AppState.Current.Logout();
+        await AppState.Current.LogoutAsync();
         await Current.GoToAsync("//login");
         shell.FlyoutBehavior = FlyoutBehavior.Disabled;
     }
