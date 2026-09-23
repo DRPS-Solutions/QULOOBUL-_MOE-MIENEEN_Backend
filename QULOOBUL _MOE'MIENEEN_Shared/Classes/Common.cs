@@ -42,6 +42,7 @@ namespace QULOOBUL__MOE_MIENEEN_Shared.Classes
             public const string ManageUsers = "ManageUsers";
             public const string GenerateReports = "GenerateReports";
             public const string ManageFiles = "ManageFiles";
+            public const string ReopenTask = "ReopenTask";
         }
     }
 }

@@ -5,11 +5,11 @@ using System.Text;
 
 namespace QULOOBUL__MOE_MIENEEN_Shared.Directory
 {
-    public record UserSummaryDto(int UserId, string FullName, string Email, string Role, bool IsActive);
+    public record UserSummaryDto(int UserId, string FullName, string Email, string Role, bool IsActive, string Status = "Active");
 
     public record UserDto(
         int UserId, string FirstName, string Surname, string Email, string CellNo,
-        string Role, bool IsActive);
+        string Role, bool IsActive, string Status = "Active");
 
     public record CreateUserRequest
     {
@@ -27,9 +27,6 @@ namespace QULOOBUL__MOE_MIENEEN_Shared.Directory
 
         [Required] 
         public int RoleId { get; init; }
-
-        [Required, MinLength(8), MaxLength(128)] 
-        public string TempPassword { get; init; } = string.Empty;
     }
 
     public record UpdateUserRequest

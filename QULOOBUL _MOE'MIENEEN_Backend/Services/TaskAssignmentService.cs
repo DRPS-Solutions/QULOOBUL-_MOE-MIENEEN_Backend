@@ -2,6 +2,8 @@ using Microsoft.EntityFrameworkCore;
 using QULOOBUL__MOE_MIENEEN_Backend.Data;
 using QULOOBUL__MOE_MIENEEN_Backend.Models.Project;
 using QULOOBUL__MOE_MIENEEN_Backend.Models.Task;
+using QULOOBUL__MOE_MIENEEN_Backend.Models.NotificationsAudit;
+using static QULOOBUL__MOE_MIENEEN_Shared.Classes.Common;
 
 namespace QULOOBUL__MOE_MIENEEN_Backend.Services
 {
@@ -13,7 +15,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
     /// Also owns the ProjectTask lifecycle guard (SM-01).
     /// </summary>
     public class TaskAssignmentService(
-        AppDbContext db, AuditService audit, NotificationService notify, EmailService email)
+        AppDbContext db, AuditService audit, NotificationService notify, EmailService email, AccessGuard guard)
     {
         /// <summary>
         /// Assign <paramref name="assigneeId"/> to <paramref name="taskId"/>. Tasks may be assigned
@@ -79,15 +81,82 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             await notify.BroadcastAsync("boardChanged", new { projectId = assignment.Task!.ProjectId });
         }
 //----------------------------------------------------------------------------------------------------------------------//
-        /// <summary>SM-01 guarded status change, callable directly by a task-board move.</summary>
+        /// <summary>SM-01 guarded status change, callable directly by a task-board move. The table in
+        /// Lifecycle says which moves exist; the guards that need data are checked here.</summary>
         public async Task ChangeStatusAsync(int taskId, string newStatus, int changedById)
         {
             var task = await db.Tasks.FindAsync(taskId)
                 ?? throw new KeyNotFoundException($"Task {taskId} not found.");
+            var from = string.IsNullOrEmpty(task.Status) ? Lifecycle.TaskStart : task.Status;
+
+            if (Is(newStatus, Lifecycle.TaskArchived))
+                throw new InvalidOperationException("Tasks are archived automatically when their project closes.");
+            if (Is(newStatus, Lifecycle.TaskCancelled) && !Is(from, newStatus) && !await guard.IsAdminAsync(changedById))
+                throw new UnauthorizedAccessException("Only an admin may cancel a task.");
+            if (Is(from, "Done") && Is(newStatus, "In Progress"))
+                await guard.EnsurePermissionAsync(changedById, Permissions.ReopenTask);
+            if (Is(from, Lifecycle.TaskStart) && Is(newStatus, "In Progress")
+                && !await db.TaskAssignments.AnyAsync(a => a.TaskId == taskId))
+                throw new InvalidOperationException("Assign the task to someone before starting it.");
+
             MoveStatus(task, newStatus, changedById);
+
+            // cancel(admin) / notify assignee
+            var notices = new List<Notification>();
+            if (Is(newStatus, Lifecycle.TaskCancelled) && !Is(from, newStatus))
+                foreach (var userId in await db.TaskAssignments.Where(a => a.TaskId == taskId).Select(a => a.UserId).ToListAsync())
+                    notices.Add(await notify.QueueAsync(userId, "TaskCancelled",
+                        $"Task \"{task.Title}\" was cancelled.", nameof(ProjectTask), taskId));
+
             audit.Record(changedById, "task.status", nameof(ProjectTask), taskId);
             await db.SaveChangesAsync();
+            foreach (var n in notices)
+            {
+                await notify.PushAsync(n.UserId, "taskCancelled", new { taskId });
+                await email.SendAsync(n, "A task was cancelled");
+            }
         }
+//----------------------------------------------------------------------------------------------------------------------//
+        /// <summary>SM-01 archive() [parent project is closed]: every Done task in the project.
+        /// The caller owns the guard and the SaveChanges.</summary>
+        public async Task ArchiveDoneTasksAsync(int projectId, int actorId)
+        {
+            foreach (var task in await db.Tasks.Where(t => t.ProjectId == projectId && t.Status == "Done").ToListAsync())
+                MoveStatus(task, Lifecycle.TaskArchived, actorId);
+        }
+//----------------------------------------------------------------------------------------------------------------------//
+        /// <summary>
+        /// SM-03 deactivate() "/ reassign open tasks". The leaver comes off every unfinished task; a task
+        /// left with nobody on it goes to its project owner, or to the deactivating admin when the owner
+        /// is the leaver or inactive. Queued into the caller's Unit of Work; returns the notifications
+        /// to deliver once it commits.
+        /// </summary>
+        public async Task<List<Notification>> ReassignOpenTasksAsync(int userId, int actorId)
+        {
+            var open = await db.TaskAssignments.Include(a => a.Task!).ThenInclude(t => t.Project)
+                .Where(a => a.UserId == userId && !Lifecycle.TaskFinished.Contains(a.Task!.Status))
+                .ToListAsync();
+
+            var notices = new List<Notification>();
+            foreach (var a in open)
+            {
+                db.TaskAssignments.Remove(a);
+                audit.Record(actorId, "task.unassign", nameof(TaskAssignment), a.TaskId);
+                if (await db.TaskAssignments.AnyAsync(x => x.TaskId == a.TaskId && x.UserId != userId)) continue;
+
+                var ownerId = a.Task!.Project!.OwnerId;
+                var heir = ownerId != userId && await db.Users.AnyAsync(u => u.UserId == ownerId && u.IsActive)
+                    ? ownerId : actorId;
+                db.TaskAssignments.Add(new TaskAssignment { TaskId = a.TaskId, UserId = heir });
+                audit.Record(actorId, "task.assign", nameof(TaskAssignment), a.TaskId);
+                notices.Add(await notify.QueueAsync(heir, "TaskAssigned",
+                    $"Task \"{a.Task.Title}\" was reassigned to you because its assignee was deactivated.",
+                    nameof(ProjectTask), a.TaskId));
+            }
+            return notices;
+        }
+//----------------------------------------------------------------------------------------------------------------------//
+        private static bool Is(string? a, string b) => string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
 //----------------------------------------------------------------------------------------------------------------------//
         private void MoveStatus(ProjectTask task, string newStatus, int changedById)
         {

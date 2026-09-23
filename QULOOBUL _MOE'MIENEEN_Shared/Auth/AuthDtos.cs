@@ -30,5 +30,13 @@ namespace QULOOBUL__MOE_MIENEEN_Shared.Auth
         public string Email { get; init; } = string.Empty;
     }
 
+    /// <summary>SM-03 setPassword: redeems the emailed activation or reset token.</summary>
+    public record SetPasswordRequest
+    {
+        [Required, MaxLength(100)]
+        public string Token { get; init; } = string.Empty;
+        [Required, MinLength(8), MaxLength(128)]
+        public string Password { get; init; } = string.Empty;
+    }
 
 }

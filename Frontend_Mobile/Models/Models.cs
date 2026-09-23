@@ -259,3 +259,4 @@ public sealed class NotificationItem(NotificationDto dto)
     public Color RowBackground => IsRead ? Microsoft.Maui.Graphics.Colors.Transparent : Colors.TintBlue;
     public bool ShowUnreadDot => !IsRead;
 }
+//---------------------------DDDDDDDDDDDoooooooooooooo END OF FILE DDDDDDDDDDDoooooooooooooo---------------------------//
