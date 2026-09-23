@@ -4,8 +4,8 @@ on:
   push:
     branches: [develop, dev]
 
-# Builds only the API project. The MAUI app ships via cd-mobile.yml and the
-# Blazor client is built by the Static Web Apps action from source.
+# Builds the API and the Blazor client. The MAUI app ships via cd-mobile.yml; the
+# Blazor client is published here and deployed prebuilt, so its CSP can hash the build.
 env:
   PROJECT: "QULOOBUL _MOE'MIENEEN_Backend/QULOOBUL _MOE'MIENEEN_Backend.csproj"
 
@@ -46,12 +46,19 @@ jobs:
         run: bash .github/scripts/coverage-gate.sh 70
 
       - name: Publish
-        run: dotnet publish "$PROJECT" -c Release --no-build -o ./publish
+        run: |
+          dotnet publish "$PROJECT" -c Release --no-build -o ./publish
+          dotnet publish "Frontend_BlazorWeb/Frontend_BlazorWeb.csproj" -c Release -o ./web
 
       - uses: actions/upload-artifact@v4
         with:
           name: api
           path: ./publish
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web
+          path: ./web/wwwroot
 
   deploy:
     needs: build
@@ -71,6 +78,11 @@ jobs:
           name: api
           path: ./publish
 
+      - uses: actions/download-artifact@v4
+        with:
+          name: web
+          path: ./web
+
       - uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
@@ -82,6 +94,10 @@ jobs:
           slot-name: staging
           package: ./publish
 
+      # Points the client at this API and writes its CSP (hash of the build-specific import map).
+      - name: Configure Blazor client for Static Web Apps
+        run: bash .github/scripts/web-config.sh ./web "https://${{ vars.AZURE_WEBAPP_NAME }}-staging.azurewebsites.net"
+
       - name: Deploy Blazor client to Static Web Apps
         if: ${{ vars.AZURE_STATIC_WEB_APP != '' }}
         uses: Azure/static-web-apps-deploy@v1
@@ -89,8 +105,8 @@ jobs:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           action: upload
-          app_location: src/Npo.Web
-          output_location: wwwroot
+          app_location: ./web
+          skip_app_build: true
 
       # Migrations run against the database the live build is still using,
       # so every migration must be backward compatible.
