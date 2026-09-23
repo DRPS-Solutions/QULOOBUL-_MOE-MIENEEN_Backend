@@ -24,7 +24,10 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
         {
             if (!ignorePreferences && await db.NotificationPreferences.AnyAsync(p =>
                     p.UserId == userId && p.Type!.TypeName == typeName && !p.IsEnabled))
-                return new Notification { UserId = userId, Message = message, IsMuted = true };
+                return new Notification
+                {
+                    UserId = userId, Message = message, EntityType = entityType, EntityId = entityId, IsMuted = true,
+                };
 
             // Check unsaved types first: queueing several notifications of a brand-new type in one
             // Unit of Work must not insert that type more than once.

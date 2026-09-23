@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Identity;
 using QULOOBUL__MOE_MIENEEN_Backend.Models.File;
 using QULOOBUL__MOE_MIENEEN_Backend.Models.IdentityAndAccess;
+using QULOOBUL__MOE_MIENEEN_Backend.Models.NotificationsAudit;
 using QULOOBUL__MOE_MIENEEN_Backend.Models.Project;
 using QULOOBUL__MOE_MIENEEN_Backend.Models.Request;
 using static QULOOBUL__MOE_MIENEEN_Shared.Classes.Common;
@@ -22,6 +23,12 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Data
             (Roles.Imaamat, 2, []),
             (Roles.FacilityManager, 3, []),
             (Roles.Staff, 4, []),
+        ];
+
+        private static readonly string[] NotificationTypeSeed =
+        [
+            "TaskAssigned", "TaskCancelled", "DeadlineApproaching", "ProjectAssigned", "EventInvite",
+            "RequestSubmitted", "RequestReviewed", "RequestCompleted", "RequestEscalated", "UserLocked", "Announcement",
         ];
 
         public static void Seed(AppDbContext db, IConfiguration config)
@@ -51,6 +58,11 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Data
             if (!db.FileCategories.Any())
                 db.FileCategories.AddRange(new[] { "Task Attachment", "Meeting Minutes", "Monthly Report", "Other" }
                     .Select(n => new FileCategory { CategoryName = n }));
+
+            // NotificationService creates types lazily; seeding the known ones up front lets a user
+            // switch a type off (UC-08 preferences) before it has ever fired. Topped up, like grants.
+            foreach (var name in NotificationTypeSeed.Where(n => !db.NotificationTypes.Any(t => t.TypeName == n)))
+                db.NotificationTypes.Add(new NotificationType { TypeName = name });
 
             db.SaveChanges();
 

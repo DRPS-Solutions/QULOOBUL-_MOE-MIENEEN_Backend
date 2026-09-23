@@ -25,6 +25,18 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Controllers
             await notifications.MarkReadAsync(UserId(), req.NotificationIds);
             return NoContent();
         }
+//----------------------------------------------------------------------------------------------------------------------//
+        /// <summary>The caller's per-type on/off settings (UC-08).</summary>
+        [HttpGet("preferences")]
+        public async Task<ActionResult<List<NotificationPreferenceDto>>> Preferences() =>
+            Ok(await notifications.PreferencesAsync(UserId()));
+//----------------------------------------------------------------------------------------------------------------------//
+        [HttpPut("preferences")]
+        public async Task<IActionResult> SetPreferences(UpdateNotificationPreferencesRequest req)
+        {
+            await notifications.SetPreferencesAsync(UserId(), req.Preferences);
+            return NoContent();
+        }
     }
 }
 //---------------------------DDDDDDDDDDDoooooooooooooo END OF FILE DDDDDDDDDDDoooooooooooooo---------------------------//

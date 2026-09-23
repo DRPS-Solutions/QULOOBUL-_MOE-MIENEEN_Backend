@@ -28,6 +28,13 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             return Sas(blob, BlobSasPermissions.Read, ttl);
         }
 //----------------------------------------------------------------------------------------------------------------------//
+        /// <summary>Writes a file the API itself produced (a report export), never client bytes.</summary>
+        public async Task UploadAsync(string container, string blobName, BinaryData content)
+        {
+            var blob = await GetBlobClientAsync(container, blobName);
+            await blob.UploadAsync(content, overwrite: true);
+        }
+//----------------------------------------------------------------------------------------------------------------------//
         /// <summary>
         /// Deletes a blob if it exists. This is the only way to remove a file from storage; there is no "delete SAS".
         /// </summary>
