@@ -7,7 +7,7 @@
     xmlns:sys="clr-namespace:System;assembly=netstandard"
     Title="Event Planning">
 
-    <!-- Events.razor. This is a phone layout, so the roster and the
+    <!-- Events.razor: events are the API's projects. This is a phone layout, so the roster and the
          detail/edit panel are stacked in one scrolling column rather than the
          original's two-column md=5/7 grid, but the state machine (roster
          selection vs. create vs. edit vs. empty) is unchanged. -->
@@ -34,7 +34,7 @@
 
                     <VerticalStackLayout x:Name="RosterList" Spacing="6">
                         <BindableLayout.ItemTemplate>
-                            <DataTemplate x:DataType="models:EventModel">
+                            <DataTemplate x:DataType="models:EventRow">
                                 <Border BackgroundColor="{StaticResource TintBlue}"
                                         StrokeThickness="0"
                                         StrokeShape="RoundRectangle 10"
@@ -47,22 +47,7 @@
                                                FontSize="14"
                                                FontAttributes="Bold"
                                                TextColor="{StaticResource TextPrimary}" />
-                                        <Label FontSize="11" TextColor="{StaticResource TextMuted}">
-                                            <Label.FormattedText>
-                                                <FormattedString>
-                                                    <Span Text="&#x1F4C5; " />
-                                                    <Span Text="{Binding DateTimeLabel}" />
-                                                </FormattedString>
-                                            </Label.FormattedText>
-                                        </Label>
-                                        <Label FontSize="11" TextColor="{StaticResource TextMuted}">
-                                            <Label.FormattedText>
-                                                <FormattedString>
-                                                    <Span Text="&#x1F4CD; " />
-                                                    <Span Text="{Binding LocationLabel}" />
-                                                </FormattedString>
-                                            </Label.FormattedText>
-                                        </Label>
+                                        <Label Text="{Binding Meta}" FontSize="11" TextColor="{StaticResource TextMuted}" />
                                     </VerticalStackLayout>
                                 </Border>
                             </DataTemplate>
@@ -93,8 +78,7 @@
                         </Grid>
 
                         <VerticalStackLayout Spacing="4" Margin="0,8,0,14">
-                            <Label x:Name="DetailDate" Style="{StaticResource Muted}" />
-                            <Label x:Name="DetailLocation" Style="{StaticResource Muted}" />
+                            <Label x:Name="DetailStatus" Style="{StaticResource Muted}" />
                             <Label x:Name="DetailCoordinator" Style="{StaticResource Muted}" />
                         </VerticalStackLayout>
 
@@ -102,31 +86,6 @@
                             <Label Text="DESCRIPTION" Style="{StaticResource SectionLabel}" />
                             <Label x:Name="DetailDescription" FontSize="14" />
                         </VerticalStackLayout>
-
-                        <Label Text="BUDGET &amp; CAPACITY" Style="{StaticResource SectionLabel}" />
-                        <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
-                            <Border BackgroundColor="{AppThemeBinding Light={StaticResource Background}, Dark={StaticResource BackgroundDark}}"
-                                    StrokeThickness="0" StrokeShape="RoundRectangle 12" Padding="0">
-                                <Grid ColumnDefinitions="4,*">
-                                    <BoxView Color="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}" />
-                                    <VerticalStackLayout Grid.Column="1" Padding="12">
-                                        <Label x:Name="DetailBudget" Style="{StaticResource TitleMedium}" />
-                                        <Label Text="Estimated Budget" Style="{StaticResource LabelSmall}" />
-                                    </VerticalStackLayout>
-                                </Grid>
-                            </Border>
-                            <Border Grid.Column="1"
-                                    BackgroundColor="{AppThemeBinding Light={StaticResource Background}, Dark={StaticResource BackgroundDark}}"
-                                    StrokeThickness="0" StrokeShape="RoundRectangle 12" Padding="0">
-                                <Grid ColumnDefinitions="4,*">
-                                    <BoxView Color="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}" />
-                                    <VerticalStackLayout Grid.Column="1" Padding="12">
-                                        <Label x:Name="DetailCapacity" Style="{StaticResource TitleMedium}" />
-                                        <Label Text="Estimated Capacity" Style="{StaticResource LabelSmall}" />
-                                    </VerticalStackLayout>
-                                </Grid>
-                            </Border>
-                        </Grid>
 
                         <Label x:Name="StaffSectionLabel" Style="{StaticResource SectionLabel}" />
                         <Label x:Name="NoStaffLabel" Text="No staff assigned yet." Style="{StaticResource Muted}" />
@@ -147,9 +106,9 @@
                             </BindableLayout.ItemTemplate>
                         </FlexLayout>
 
-                        <Label Text="REQUIRED RESOURCES" Style="{StaticResource SectionLabel}" />
-                        <Label x:Name="NoResourcesLabel" Text="No resources listed yet." Style="{StaticResource Muted}" />
-                        <FlexLayout x:Name="ResourceTags" Wrap="Wrap" Direction="Row">
+                        <Label Text="LINKED TASKS" Style="{StaticResource SectionLabel}" />
+                        <Label x:Name="NoTasksLabel" Text="No tasks linked yet." Style="{StaticResource Muted}" />
+                        <FlexLayout x:Name="TaskTags" Wrap="Wrap" Direction="Row">
                             <BindableLayout.ItemTemplate>
                                 <DataTemplate x:DataType="sys:String">
                                     <Border BackgroundColor="{StaticResource TintBlue}"
@@ -178,46 +137,12 @@
                         <Border Style="{StaticResource FieldBox}">
                             <Editor x:Name="DescriptionEditor" Placeholder="Description" HeightRequest="90" />
                         </Border>
-                        <Border Style="{StaticResource FieldBox}">
-                            <Entry x:Name="LocationEntry" Placeholder="Location" />
-                        </Border>
-
-                        <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
-                            <VerticalStackLayout>
-                                <Label Text="Date" Style="{StaticResource LabelSmall}" />
-                                <Border Style="{StaticResource FieldBox}">
-                                    <DatePicker x:Name="DateField" Format="dd MMM yyyy" />
-                                </Border>
-                            </VerticalStackLayout>
-                            <VerticalStackLayout Grid.Column="1">
-                                <Label Text="Time" Style="{StaticResource LabelSmall}" />
-                                <Border Style="{StaticResource FieldBox}">
-                                    <TimePicker x:Name="TimeField" Format="h:mm tt" />
-                                </Border>
-                            </VerticalStackLayout>
-                        </Grid>
-
                         <VerticalStackLayout>
                             <Label Text="Lead Coordinator" Style="{StaticResource LabelSmall}" />
                             <Border Style="{StaticResource FieldBox}">
                                 <Picker x:Name="CoordinatorPicker" Title="Lead Coordinator" />
                             </Border>
                         </VerticalStackLayout>
-
-                        <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
-                            <VerticalStackLayout>
-                                <Label Text="Estimated Budget (R)" Style="{StaticResource LabelSmall}" />
-                                <Border Style="{StaticResource FieldBox}">
-                                    <Entry x:Name="BudgetEntry" Keyboard="Numeric" />
-                                </Border>
-                            </VerticalStackLayout>
-                            <VerticalStackLayout Grid.Column="1">
-                                <Label Text="Estimated Capacity" Style="{StaticResource LabelSmall}" />
-                                <Border Style="{StaticResource FieldBox}">
-                                    <Entry x:Name="CapacityEntry" Keyboard="Numeric" />
-                                </Border>
-                            </VerticalStackLayout>
-                        </Grid>
 
                         <Label Text="STAFF HELPING" Style="{StaticResource SectionLabel}" />
                         <Border BackgroundColor="{AppThemeBinding Light={StaticResource Background}, Dark={StaticResource BackgroundDark}}"
@@ -233,46 +158,6 @@
                                 </BindableLayout.ItemTemplate>
                             </VerticalStackLayout>
                         </Border>
-
-                        <Label Text="REQUIRED RESOURCES" Style="{StaticResource SectionLabel}" />
-                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                            <Border Style="{StaticResource FieldBox}">
-                                <Entry x:Name="ResourceEntry" Placeholder="e.g. Projector, 6 folding tables" />
-                            </Border>
-                            <Button Grid.Column="1" Text="Add" Clicked="OnAddResource"
-                                    Style="{StaticResource OutlineButton}" FontSize="12" Padding="16,8" MinimumHeightRequest="40" />
-                        </Grid>
-
-                        <Label x:Name="NoFormResourcesLabel" Text="No resources added yet." Style="{StaticResource Muted}" />
-                        <FlexLayout x:Name="FormResourceTags" Wrap="Wrap" Direction="Row">
-                            <BindableLayout.ItemTemplate>
-                                <DataTemplate x:DataType="sys:String">
-                                    <Border BackgroundColor="{StaticResource TintBlue}"
-                                            StrokeThickness="0"
-                                            StrokeShape="RoundRectangle 14"
-                                            Padding="12,2,2,2"
-                                            Margin="0,0,8,8">
-                                        <HorizontalStackLayout Spacing="2">
-                                            <Label Text="{Binding .}"
-                                                   FontSize="11"
-                                                   FontAttributes="Bold"
-                                                   TextColor="{StaticResource Primary}"
-                                                   VerticalOptions="Center" />
-                                            <Button Text="&#x00D7;"
-                                                    Clicked="OnRemoveResource"
-                                                    BackgroundColor="Transparent"
-                                                    TextColor="{StaticResource TextMuted}"
-                                                    FontSize="14"
-                                                    WidthRequest="26"
-                                                    HeightRequest="26"
-                                                    MinimumHeightRequest="26"
-                                                    Padding="0"
-                                                    CornerRadius="13" />
-                                        </HorizontalStackLayout>
-                                    </Border>
-                                </DataTemplate>
-                            </BindableLayout.ItemTemplate>
-                        </FlexLayout>
 
                         <HorizontalStackLayout Spacing="10">
                             <Button x:Name="SaveButton" Clicked="OnSave" IsEnabled="False" />

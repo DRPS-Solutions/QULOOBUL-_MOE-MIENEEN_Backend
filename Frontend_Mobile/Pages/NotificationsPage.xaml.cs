@@ -6,7 +6,7 @@ namespace Frontend_Mobile.Pages;
 public partial class NotificationsPage : ContentPage
 {
     private readonly AppState _state = AppState.Current;
-    private NotificationType? _activeFilter;
+    private NotificationKind? _activeFilter;
     private bool _unreadOnly;
 
     public NotificationsPage()
@@ -15,26 +15,36 @@ public partial class NotificationsPage : ContentPage
         Refresh();
     }
 
-    protected override void OnAppearing()
+    // The API only ever returns the signed-in user's own notifications; a
+    // SignalR push reloads them and Changed re-renders while we're on screen.
+    protected override async void OnAppearing()
     {
         base.OnAppearing();
+        _state.Changed -= Refresh;
+        _state.Changed += Refresh;
         Refresh();
+        await _state.RefreshNotificationsAsync();
+    }
+
+    protected override void OnDisappearing()
+    {
+        base.OnDisappearing();
+        _state.Changed -= Refresh;
     }
 
     private void Refresh()
     {
-        var all = _state.Notifications;
+        var all = _state.Notifications.Select(n => new NotificationItem(n)).ToList();
         var unread = _state.UnreadNotificationCount;
 
-        SubtitleLabel.Text = "Resource request updates and event assignments. " +
+        SubtitleLabel.Text = "Task assignments, resource request updates and event assignments. " +
             (unread > 0 ? $"{unread} unread." : "You're all caught up.");
         MarkAllButton.IsEnabled = unread > 0;
-        ClearAllButton.IsEnabled = all.Count > 0;
 
-        BuildFilterBar();
+        BuildFilterBar(all);
 
         var filtered = all
-            .Where(n => _activeFilter is null || n.Type == _activeFilter)
+            .Where(n => _activeFilter is null || n.Kind == _activeFilter)
             .Where(n => !_unreadOnly || !n.IsRead)
             .ToList();
 
@@ -44,9 +54,8 @@ public partial class NotificationsPage : ContentPage
         EmptyLabel.Text = all.Count == 0 ? "No notifications yet." : "Nothing matches this filter.";
     }
 
-    private void BuildFilterBar()
+    private void BuildFilterBar(List<NotificationItem> all)
     {
-        var all = _state.Notifications;
         FilterBar.Children.Clear();
 
         AddChip($"All ({all.Count})", _activeFilter is null && !_unreadOnly, () =>
@@ -54,14 +63,14 @@ public partial class NotificationsPage : ContentPage
             _activeFilter = null;
             _unreadOnly = false;
         });
-        AddChip($"Resource Requests ({all.Count(n => n.Type == NotificationType.ResourceRequest)})",
-            _activeFilter == NotificationType.ResourceRequest,
-            () => _activeFilter = NotificationType.ResourceRequest);
-        AddChip($"Event Assignments ({all.Count(n => n.Type == NotificationType.EventAssignment)})",
-            _activeFilter == NotificationType.EventAssignment,
-            () => _activeFilter = NotificationType.EventAssignment);
+        AddKindChip(all, "Tasks", NotificationKind.TaskAssignment);
+        AddKindChip(all, "Resource Requests", NotificationKind.ResourceRequest);
+        AddKindChip(all, "Event Assignments", NotificationKind.EventAssignment);
         AddChip("Unread only", _unreadOnly, () => _unreadOnly = !_unreadOnly);
     }
+
+    private void AddKindChip(List<NotificationItem> all, string label, NotificationKind kind) =>
+        AddChip($"{label} ({all.Count(n => n.Kind == kind)})", _activeFilter == kind, () => _activeFilter = kind);
 
     private void AddChip(string label, bool selected, Action onTap)
     {
@@ -91,25 +100,26 @@ public partial class NotificationsPage : ContentPage
         FilterBar.Children.Add(chip);
     }
 
-    private void OnMarkAllRead(object? sender, EventArgs e)
-    {
-        _state.MarkAllNotificationsAsRead();
-        Refresh();
-    }
+    private async void OnMarkAllRead(object? sender, EventArgs e) =>
+        await _state.MarkReadAsync(_state.Notifications.Where(n => !n.IsRead).Select(n => n.NotificationId).ToList());
 
-    private void OnClearAll(object? sender, EventArgs e)
-    {
-        _state.ClearAllNotifications();
-        Refresh();
-    }
-
+    /// <summary>
+    /// Marks the notification read and opens the page that owns that kind of
+    /// item, if this role can see it (UC-08). Task notifications fall back to Home.
+    /// </summary>
     private async void OnNotificationTapped(object? sender, TappedEventArgs e)
     {
         if ((sender as Element)?.BindingContext is not NotificationItem item) return;
 
-        _state.MarkNotificationAsRead(item);
-        Refresh();
+        if (!item.IsRead) await _state.MarkReadAsync([item.Dto.NotificationId]);
 
-        await Shell.Current.GoToAsync(item.IsRequest ? "//requests" : "//events");
+        var route = item.Kind switch
+        {
+            NotificationKind.ResourceRequest when _state.CanSeeRequests => "//requests",
+            NotificationKind.EventAssignment when _state.CanSeeEvents => "//events",
+            NotificationKind.TaskAssignment => _state.CanSeeTasks ? "//tasks" : "//home",
+            _ => null
+        };
+        if (route is not null) await Shell.Current.GoToAsync(route);
     }
 }

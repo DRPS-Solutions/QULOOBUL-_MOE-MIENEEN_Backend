@@ -71,7 +71,7 @@ public sealed class AppState : Observable
     public bool CanSeeEvents => CanSeeMeetings;
     public bool CanSeeUserManagement => Role is Roles.Admin;
 
-    public bool CanReviewRequests => CurrentUser?.Permissions.Contains(Permissions.ReviewRequests) == true;
+    public bool CanReviewRequests => CurrentUser?.Permissions.Contains(QULOOBUL__MOE_MIENEEN_Shared.Classes.Common.Permissions.ReviewRequests) == true;
 
     /// <summary>Returns null on success, otherwise the message for the login form.</summary>
     public async Task<string?> LoginAsync(string email, string password)
