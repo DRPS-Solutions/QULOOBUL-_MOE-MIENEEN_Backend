@@ -106,8 +106,20 @@ Five modelling decisions carry business rules and shouldn't be "tidied away":
 - **`ProjectMember`** — project-scoped visibility. A user allocated to one project sees
   only that project; this is the table the authorisation check reads.
 
-All FKs are `Restrict` on delete, with unique pairs and a `CK_FileUpload_OneContext` check
-constraint. One migration: `InitialCreate`.
+Delete behaviour is set per relationship: `Cascade` for rows meaningless without their parent
+(task comments and assignments, project members, meeting and event attendees), `SetNull` for a
+file's task/meeting link, and `NoAction` everywhere else, including every FK to `User` and the
+history tables. Unique pairs, a `CK_FileUpload_OneContext` check constraint, and indexes on the
+task board (`ProjectId, Status`), the unread badge (`UserId, IsRead`) and `Audit_Log.Timestamp`.
+
+Database-side defence in depth (migration `SecurityAndIndexes`):
+
+- **Row-level security** on `Notification`: `SessionContextInterceptor` sets
+  `SESSION_CONTEXT('UserId')` read-only on every connection, and the policy filters to that
+  user's rows. No user (login, background jobs, migrations) means no filter.
+- **`vw_UserDirectory`**: the staff directory reads a view with no password hash or token columns.
+
+Two migrations: `InitialCreate`, `SecurityAndIndexes`.
 
 ## API
 
@@ -217,8 +229,22 @@ Four workflows in `.github/workflows/`:
 | `cd-production.yml` | push to `main` / `master` | build → deploy to prod staging slot → migrations → smoke test → **manual-approval swap** |
 | `cd-mobile.yml` | changes under `src/Npo.Mobile/**` | Android Release build → signed APK artifact |
 
-The test gate is live: `ci.yml` runs `dotnet test` against `Backend.Tests/Backend.Tests.csproj`
-with `-warnaserror` and collects coverage.
+Quality gates, in every build job:
+
+- **Zero warnings.** `Directory.Build.props` sets `TreatWarningsAsErrors` for every project,
+  so a local build fails the same way CI does.
+- **Unit and integration tests.** `ApiIntegrationTests` boots the real API with
+  `WebApplicationFactory`, migrates a throwaway SQL Server database from empty, and drops it
+  afterwards. Locally that is LocalDB; in CI a `mssql` service container, via `TEST_SQL_CONNECTION`.
+- **Coverage threshold.** `.github/scripts/coverage-gate.sh 70` fails the job below 70% line coverage.
+- **Smoke test after deploy.** `.github/scripts/smoke-test.sh` checks `/health`, signs in as
+  `SMOKE_EMAIL`, and makes one authenticated read, before any slot swap.
+
+The API sends `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'` and is rate
+limited (300 requests/min per user, 10/min per IP on the anonymous auth routes; both under
+`RateLimit:*`). The web client is published in the build job and deployed prebuilt:
+`.github/scripts/web-config.sh` points its `appsettings.json` at the API and writes
+`staticwebapp.config.json`, whose CSP allows Blazor's inline import map by hash (it changes per build).
 
 **`cd-mobile.yml` is dormant and currently cannot fire.** Its path filter and `MOBILE_PROJECT`
 still point at `src/Npo.Mobile/Npo.Mobile.csproj`, a layout this repo never adopted. The MAUI
@@ -238,7 +264,8 @@ Required repository config before the first real deploy:
 | Kind | Name |
 |---|---|
 | Variables | `AZURE_WEBAPP_NAME`, `AZURE_WEBAPP_NAME_PROD`, `AZURE_RESOURCE_GROUP`, `AZURE_STATIC_WEB_APP*` |
-| Secrets | `AZURE_CREDENTIALS`, `STAGING_DB_CONNECTION`, `PRODUCTION_DB_CONNECTION`, `AZURE_STATIC_WEB_APPS_API_TOKEN*`, `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`, `ANDROID_KEYSTORE_PASSWORD` |
+| Secrets | `AZURE_CREDENTIALS`, `STAGING_DB_CONNECTION`, `PRODUCTION_DB_CONNECTION`, `AZURE_STATIC_WEB_APPS_API_TOKEN*`, `SMOKE_EMAIL`, `SMOKE_PASSWORD` (a low-privilege account), `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`, `ANDROID_KEYSTORE_PASSWORD` |
+| Azure config | API `Cors:Origins` must list the Static Web Apps URL; the storage account's CORS must allow `PUT`/`GET` from it, since browsers upload and download files straight to Blob Storage. |
 
 Mobile builds unsigned and warns when the keystore secret is absent. Play Store distribution
 is deliberately not automated — Phase 1 side-loads the APK.
@@ -247,23 +274,12 @@ is deliberately not automated — Phase 1 side-loads the APK.
 
 Roughly in dependency order:
 
-1. **Client screens for the rest of the API.** Both clients are wired, but neither has
-   screens for files (UC-07) or reports (UC-09), and MAUI's Meetings and User Management are
-   still stubs. The MAUI app also lacks the doc's offline SQLite cache.
-2. **Object-level authz coverage.** `AccessGuard` exists and is tested, but only four services
-   call it. Requests, events, users and notifications have no per-record ownership check, so
-   the anti-IDOR requirement is only partly met.
-3. **State machine gaps** (`Data/Lifecycle.cs`). SM-02 covers the escalation path only —
-   `Escalated` is there and wired to the 48-hour job, but `Under Review` and the 30-day
-   resubmit window are not. SM-01 has the reopen transition but no `Cancelled` state and no
-   assignee guard. **SM-03 is dead code:** `UserCanMove` / `EnsureUserMove` / `UserState` have
-   no caller anywhere outside `Lifecycle.cs`, so user deactivate/reactivate is currently
-   unguarded, and `User` has no column for Locked or failure count.
-4. **Meetings and User Management on mobile** — still "Coming soon" stubs.
-5. **Mobile push** (Notification Hubs) — an NFR, absent. Email via Resend is wired in
+1. **Mobile screens for the rest of the API.** The web client now has Files (UC-07), Reports
+   (UC-09), Calendar (event attendees and RSVPs), task comments, minutes search/approval,
+   request fulfilment, admin announcements and notification deep links. MAUI has none of
+   these, its Meetings and User Management are still stubs, and it lacks the offline SQLite cache.
+2. **Mobile push** (Notification Hubs) — an NFR, absent. Email via Resend is wired in
    `EmailService` but stays in-app-only with no API key set.
-6. **`cd-mobile.yml` paths** — see above; the workflow cannot fire as written.
-7. **Report export.** `POST /reports` builds stats and writes a `Report` row, but sets
-   `FilePath` to empty — UC-09's export-a-file-to-Blob-Storage half isn't done.
-8. **Localisation and accessibility.** Mobile UI text is inline in XAML rather than `.resx`,
+3. **`cd-mobile.yml` paths** — see above; the workflow cannot fire as written.
+4. **Localisation and accessibility.** Mobile UI text is inline in XAML rather than `.resx`,
    and `SemanticProperties` are not set anywhere.
