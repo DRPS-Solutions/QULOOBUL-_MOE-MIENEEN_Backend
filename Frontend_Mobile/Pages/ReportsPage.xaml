@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ContentPage
+    x:Class="Frontend_Mobile.Pages.ReportsPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:models="clr-namespace:Frontend_Mobile.Models"
+    Title="Reports">
+
+    <!-- Reports.razor: UC-09 admin reporting dashboard. The API recomputes the
+         figures on every run and logs who ran it. MudChart has no MAUI
+         equivalent in this project, so each series is drawn as a plain
+         ProgressBar list instead of a graph - same numbers, a simpler control. -->
+
+    <ScrollView>
+        <VerticalStackLayout Padding="16" Spacing="16">
+
+            <Border Style="{StaticResource HeaderBanner}">
+                <VerticalStackLayout Spacing="4">
+                    <Label Text="Reports &amp; Analytics" Style="{StaticResource BannerTitle}" />
+                    <Label Text="Task completion, staff workload and project progress over a period."
+                           Style="{StaticResource BannerSubtitle}" />
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Filters -->
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout Spacing="12">
+
+                    <VerticalStackLayout>
+                        <Label Text="From" Style="{StaticResource LabelSmall}" />
+                        <Border Style="{StaticResource FieldBox}">
+                            <DatePicker x:Name="FromPicker" Format="d MMM yyyy" DateSelected="OnDateChanged" />
+                        </Border>
+                    </VerticalStackLayout>
+
+                    <VerticalStackLayout>
+                        <Label Text="To" Style="{StaticResource LabelSmall}" />
+                        <Border Style="{StaticResource FieldBox}">
+                            <DatePicker x:Name="ToPicker" Format="d MMM yyyy" DateSelected="OnDateChanged" />
+                        </Border>
+                    </VerticalStackLayout>
+
+                    <VerticalStackLayout>
+                        <Label Text="Report" Style="{StaticResource LabelSmall}" />
+                        <Border Style="{StaticResource FieldBox}">
+                            <Picker x:Name="ReportTypePicker" Title="Report" SelectedIndexChanged="OnFormChanged" />
+                        </Border>
+                    </VerticalStackLayout>
+
+                    <Label x:Name="ValidationLabel"
+                           Text="The end date can't be before the start date."
+                           TextColor="{StaticResource StatusDenied}"
+                           FontSize="12"
+                           IsVisible="False" />
+
+                    <Button x:Name="RunButton" Text="Run" Clicked="OnRun" />
+                    <Button x:Name="ExportButton" Text="Export CSV" Style="{StaticResource OutlineButton}" Clicked="OnExport" />
+
+                </VerticalStackLayout>
+            </Border>
+
+            <Label x:Name="EmptyLabel"
+                   Text="Pick a period and run a report."
+                   Style="{StaticResource Muted}"
+                   Margin="4,0" />
+
+            <ActivityIndicator x:Name="Busy" IsRunning="False" IsVisible="False" />
+
+            <!-- Results -->
+            <VerticalStackLayout x:Name="ResultsSection" Spacing="16" IsVisible="False">
+
+                <!-- Completed over time -->
+                <Border Style="{StaticResource Card}">
+                    <VerticalStackLayout Spacing="10">
+                        <Label Text="Completed over time" Style="{StaticResource TitleMedium}" />
+                        <Label x:Name="TrendEmptyLabel" Text="No activity in this period." Style="{StaticResource Muted}" IsVisible="False" />
+                        <VerticalStackLayout x:Name="TrendList" Spacing="10">
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate x:DataType="models:TrendRow">
+                                    <Grid ColumnDefinitions="90,*,44" ColumnSpacing="8">
+                                        <Label Text="{Binding DateLabel}" Style="{StaticResource LabelSmall}" VerticalOptions="Center" />
+                                        <ProgressBar Grid.Column="1" Progress="{Binding Fraction}" ProgressColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}" VerticalOptions="Center" />
+                                        <Label Grid.Column="2" Text="{Binding CountLabel}" Style="{StaticResource LabelSmall}" HorizontalTextAlignment="End" VerticalOptions="Center" />
+                                    </Grid>
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </VerticalStackLayout>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- Task completion -->
+                <Border Style="{StaticResource Card}">
+                    <VerticalStackLayout Spacing="10">
+                        <Label Text="Tasks by priority" Style="{StaticResource TitleMedium}" />
+                        <Label x:Name="CompletionEmptyLabel" Text="No tasks in this period." Style="{StaticResource Muted}" IsVisible="False" />
+                        <VerticalStackLayout x:Name="CompletionList" Spacing="12">
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate x:DataType="models:CompletionRow">
+                                    <VerticalStackLayout Spacing="4">
+                                        <Label Text="{Binding BucketLabel}" FontSize="13" FontAttributes="Bold" />
+                                        <ProgressBar Progress="{Binding CompletedFraction}" ProgressColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}" />
+                                        <Label Text="{Binding SummaryText}" Style="{StaticResource LabelSmall}" />
+                                    </VerticalStackLayout>
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </VerticalStackLayout>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- Staff workload -->
+                <Border Style="{StaticResource Card}">
+                    <VerticalStackLayout Spacing="10">
+                        <Label Text="Staff workload" Style="{StaticResource TitleMedium}" />
+                        <Label x:Name="WorkloadEmptyLabel" Text="Nobody has assigned tasks in this period." Style="{StaticResource Muted}" IsVisible="False" />
+                        <VerticalStackLayout x:Name="WorkloadList" Spacing="12">
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate x:DataType="models:WorkloadRow">
+                                    <VerticalStackLayout Spacing="4">
+                                        <Label Text="{Binding FullName}" FontSize="13" FontAttributes="Bold" />
+                                        <ProgressBar Progress="{Binding CompletedFraction}" ProgressColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}" />
+                                        <Label Text="{Binding SummaryText}" Style="{StaticResource LabelSmall}" TextColor="{Binding OverdueColor}" />
+                                    </VerticalStackLayout>
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </VerticalStackLayout>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- Project progress -->
+                <Border Style="{StaticResource Card}">
+                    <VerticalStackLayout Spacing="10">
+                        <Label Text="Project progress" Style="{StaticResource TitleMedium}" />
+                        <Label x:Name="ProgressEmptyLabel" Text="No projects in this period." Style="{StaticResource Muted}" IsVisible="False" />
+                        <VerticalStackLayout x:Name="ProgressList" Spacing="12">
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate x:DataType="models:ProgressRow">
+                                    <VerticalStackLayout Spacing="4">
+                                        <Label Text="{Binding ProjectName}" FontSize="13" FontAttributes="Bold" />
+                                        <ProgressBar Progress="{Binding Fraction}" ProgressColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}" />
+                                        <Label Text="{Binding SummaryText}" Style="{StaticResource LabelSmall}" />
+                                    </VerticalStackLayout>
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </VerticalStackLayout>
+                    </VerticalStackLayout>
+                </Border>
+
+            </VerticalStackLayout>
+
+        </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>

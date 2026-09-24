@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using Frontend_Mobile.Data;
 using QULOOBUL__MOE_MIENEEN_Shared.Notifications;
+using QULOOBUL__MOE_MIENEEN_Shared.Reports;
 using QULOOBUL__MOE_MIENEEN_Shared.Requests;
 using QULOOBUL__MOE_MIENEEN_Shared.Tasks;
 
@@ -215,6 +216,58 @@ public sealed class StaffPick : Observable
         get => _isSelected;
         set => Set(ref _isSelected, value);
     }
+}
+
+// ----- Reports (UC-09) -----
+
+public enum ReportType { TaskCompletion, Workload, ProjectProgress }
+
+public static class ReportEnums
+{
+    public static string Label(this ReportType t) => t switch
+    {
+        ReportType.TaskCompletion => "Task completion",
+        ReportType.Workload => "Staff workload",
+        _ => "Project progress"
+    };
+
+    public static IReadOnlyList<Option<ReportType>> Types { get; } =
+        Enum.GetValues<ReportType>().Select(t => new Option<ReportType>(t, t.Label())).ToList();
+}
+
+/// <summary>One completion bucket: a thin stacked bar of completed vs outstanding.</summary>
+public sealed record CompletionRow(TaskCompletionStat Stat)
+{
+    private int Total => Stat.Completed + Stat.Outstanding;
+    public double CompletedFraction => Total == 0 ? 0 : (double)Stat.Completed / Total;
+    public string BucketLabel => Stat.Bucket;
+    public string SummaryText => $"{Stat.Completed} done \u2022 {Stat.Outstanding} outstanding";
+}
+
+/// <summary>One person's row in the workload breakdown, busiest first.</summary>
+public sealed record WorkloadRow(WorkloadStat Stat)
+{
+    public string FullName => Stat.FullName;
+    public double CompletedFraction => Stat.Assigned == 0 ? 0 : Math.Min(1, (double)Stat.Completed / Stat.Assigned);
+    public string SummaryText => $"{Stat.Completed}/{Stat.Assigned} done"
+        + (Stat.Overdue > 0 ? $" \u2022 {Stat.Overdue} overdue" : string.Empty);
+    public Color OverdueColor => Stat.Overdue > 0 ? Colors.StatusDenied : Colors.TintGreenBorder;
+}
+
+/// <summary>One project's row: same figures the web client shows in its progress table.</summary>
+public sealed record ProgressRow(ProjectProgressStat Stat)
+{
+    public string ProjectName => Stat.ProjectName;
+    public double Fraction => Stat.PercentComplete / 100.0;
+    public string SummaryText => $"{Stat.Done}/{Stat.Total} tasks \u2022 {Stat.PercentComplete:0}%";
+}
+
+/// <summary>One point of the "completed over time" trend, as a horizontal bar sized against the period's peak.</summary>
+public sealed record TrendRow(ProgressPoint Point, int MaxCumulative)
+{
+    public double Fraction => MaxCumulative == 0 ? 0 : (double)Point.CumulativeCompleted / MaxCumulative;
+    public string DateLabel => Point.BucketStart.ToString("d MMM");
+    public string CountLabel => Point.CumulativeCompleted.ToString();
 }
 
 // ----- Notifications -----

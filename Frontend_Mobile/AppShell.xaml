@@ -116,6 +116,10 @@
         <ShellContent ContentTemplate="{DataTemplate pages:EventsPage}" />
     </FlyoutItem>
 
+    <FlyoutItem Title="Reports" Route="reports" IsVisible="{Binding CanSeeReports}">
+        <ShellContent ContentTemplate="{DataTemplate pages:ReportsPage}" />
+    </FlyoutItem>
+
     <!-- Reached from the bell in the title bar, not listed in the drawer -
          same as the Android port. -->
     <ShellContent Title="Notifications"

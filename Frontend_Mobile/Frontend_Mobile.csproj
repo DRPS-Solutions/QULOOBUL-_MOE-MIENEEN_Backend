@@ -74,4 +74,10 @@
 	  <ProjectReference Include="..\QULOOBUL _MOE'MIENEEN_Shared\QULOOBUL _MOE'MIENEEN_Shared.csproj" />
 	</ItemGroup>
 
+	<ItemGroup>
+	  <MauiXaml Update="Pages\ReportsPage.xaml">
+	    <Generator>MSBuild:Compile</Generator>
+	  </MauiXaml>
+	</ItemGroup>
+
 </Project>
