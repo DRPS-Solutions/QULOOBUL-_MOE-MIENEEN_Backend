@@ -66,6 +66,7 @@ public partial class NotificationsPage : ContentPage
         AddKindChip(all, "Tasks", NotificationKind.TaskAssignment);
         AddKindChip(all, "Resource Requests", NotificationKind.ResourceRequest);
         AddKindChip(all, "Event Assignments", NotificationKind.EventAssignment);
+        AddKindChip(all, "Calendar", NotificationKind.CalendarEvent);
         AddChip("Unread only", _unreadOnly, () => _unreadOnly = !_unreadOnly);
     }
 
@@ -117,6 +118,7 @@ public partial class NotificationsPage : ContentPage
         {
             NotificationKind.ResourceRequest when _state.CanSeeRequests => "//requests",
             NotificationKind.EventAssignment when _state.CanSeeEvents => "//events",
+            NotificationKind.CalendarEvent => item.Dto.EntityId is { } eventId ? $"//calendar?event={eventId}" : "//calendar",
             NotificationKind.TaskAssignment => _state.CanSeeTasks ? "//tasks" : "//home",
             _ => null
         };

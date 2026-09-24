@@ -12,6 +12,7 @@ using QULOOBUL__MOE_MIENEEN_Shared.Reports;
 using QULOOBUL__MOE_MIENEEN_Shared.Requests;
 using QULOOBUL__MOE_MIENEEN_Shared.Tasks;
 using static QULOOBUL__MOE_MIENEEN_Shared.Classes.Common;
+using Permissions = QULOOBUL__MOE_MIENEEN_Shared.Classes.Common.Permissions;
 
 namespace Frontend_Mobile.Data;
 

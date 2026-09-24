@@ -120,6 +120,12 @@
         <ShellContent ContentTemplate="{DataTemplate pages:ReportsPage}" />
     </FlyoutItem>
 
+    <!-- Calendar.razor: open to every role - anyone can be invited to an event and must be
+         able to answer, so unlike the other entries there's no IsVisible gate. -->
+    <FlyoutItem Title="Calendar" Route="calendar">
+        <ShellContent ContentTemplate="{DataTemplate pages:CalendarPage}" />
+    </FlyoutItem>
+
     <!-- Reached from the bell in the title bar, not listed in the drawer -
          same as the Android port. -->
     <ShellContent Title="Notifications"
