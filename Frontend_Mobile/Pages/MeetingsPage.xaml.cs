@@ -4,7 +4,7 @@ using System.Text;
 using QULOOBUL__MOE_MIENEEN_Shared.Collaboration;
 using Frontend_Mobile.Data;
 using Frontend_Mobile.Models;
-using static QULOOBUL__MOE_MIENEEN_Shared.Classes.Common;
+using QULOOBUL__MOE_MIENEEN_Shared.Classes;
 
 namespace Frontend_Mobile.Pages
 {
@@ -50,7 +50,14 @@ namespace Frontend_Mobile.Pages
             OpenFrom(meetingRow.MeetingDto);
         }
 
-        private void OpenFrom(MeetingDto meeting) => OpenFrom(new MeetingForm
+        private void OnSearchTapped(object? sender, TappedEventArgs e)
+        {
+            if ((sender as Element)?.BindingContext is not MinutesSearch minutesSearch) return;
+            if (_meetings.FirstOrDefault(meeting => meeting.MeetingId == minutesSearch.MeetingMinutesDto.MeetingId) 
+                is { } meeting) OpenFrom(meeting);
+        }
+
+        private void OpenFrom(MeetingDto meeting) => Open(new MeetingForm
         {
             MeetingId = meeting.MeetingId,
             Title = meeting.Title,
@@ -155,8 +162,8 @@ namespace Frontend_Mobile.Pages
             var searchResults = hits.Select(hit => new MinutesSearch(hit, _meetings
                 .FirstOrDefault(meeting => meeting.MeetingId == hit.MeetingId)?.Title)).ToList();
 
-            BindableLayout.SetItemSource(SearchResultsList, searchResults);
-            SearchEmtpyLabel.IsVisible = searchResults.Count == 0;
+            BindableLayout.SetItemsSource(SearchResultsList, searchResults);
+            SearchEmptyLabel.IsVisible = searchResults.Count == 0;
         }
 
         private sealed class MeetingForm

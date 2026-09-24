@@ -97,11 +97,7 @@
     </FlyoutItem>
 
     <FlyoutItem Title="Meetings" Route="meetings" IsVisible="{Binding CanSeeMeetings}">
-        <ShellContent>
-            <ShellContent.Content>
-                <pages:ComingSoonPage FeatureName="Meetings" />
-            </ShellContent.Content>
-        </ShellContent>
+        <ShellContent ContentTemplate="{DataTemplate pages:MeetingsPage}" />
     </FlyoutItem>
 
     <FlyoutItem Title="User Management" Route="users" IsVisible="{Binding CanSeeUserManagement}">

@@ -52,7 +52,7 @@
 
                 <Border Style="{StaticResource Card}">
                     <VerticalStackLayout Spacing="8">
-                        <Grid ColumnDefinitions="*.Auto">
+                        <Grid ColumnDefinitions="*,Auto">
                             <Label Text="All Meetings" Style="{StaticResource TitleMedium}" />
                             <Button Grid.Column="1" Text="+ New" Clicked="OnNewMeeting" />
                         </Grid>
@@ -65,7 +65,7 @@
                                         <Border.GestureRecognizers>
                                             <TapGestureRecognizer Tapped="OnMeetingTapped" />
                                         </Border.GestureRecognizers>
-                                        <Grid ColumnDefinitions="*.Auto">
+                                        <Grid ColumnDefinitions="*,Auto">
                                             <VerticalStackLayout>
                                                 <Label Text="{Binding MeetingTitle}" FontAttributes="Bold" FontSize="13" />
                                                 <Label Text="{Binding MeetingDateLabel}" Style="{StaticResource LabelSmall}" />
