@@ -103,7 +103,7 @@ namespace Frontend_Mobile.Pages
             var canApprove = _active.Minutes is not null
                 && _active.MinutesText == _originalMinutes
                 && (_active.OrganiserId == _state.CurrentUser?.UserId
-                    || _state.CurrentUser?.Permissions.Contains(Permissions.ManageUsers) == true);
+                    || _state.CurrentUser?.Permissions.Contains(Common.Permissions.ManageUsers) == true);
             ApproveButton.IsVisible = canApprove;
 
             ApprovedLabel.IsVisible = _active.Minutes?.ApprovedBy is not null;
