@@ -1,3 +1,4 @@
+using Azure.Monitor.OpenTelemetry.AspNetCore;
 using Azure.Storage.Blobs;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -39,7 +40,13 @@ builder.Services.AddDbContext<AppDbContext>((sp, o) => o
     .AddInterceptors(new SessionContextInterceptor(sp.GetRequiredService<IHttpContextAccessor>()))
     .UseSeeding((db, _) => DbSeeder.Seed((AppDbContext)db, builder.Configuration)));
 
-builder.Services.AddSignalR();
+// Azure SignalR Service is the backplane in Azure (infra/main.bicep sets the connection string);
+// locally and in tests there is none, so the hub runs in-process.
+var signalR = builder.Services.AddSignalR();
+if (builder.Configuration["Azure:SignalR:ConnectionString"] is not null) signalR.AddAzureSignalR();
+// Application Insights: traces, dependencies and exceptions, only where App Service provides the key.
+if (builder.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"] is not null)
+    builder.Services.AddOpenTelemetry().UseAzureMonitor();
 builder.Services.AddHttpClient();     // EmailService talks to the Resend REST API
 
 // UC-07 needs this: BlobStorageService cannot resolve without it. Locally it points at Azurite
@@ -140,7 +147,10 @@ builder.Services.AddScoped<TaskScheduleService>();
 
 // SM-02's 48-hour escalation, SM-01's deadline reminders, and Task_Schedule's recurring-task
 // generation: the transitions the doc drives from a clock rather than from a user action.
-builder.Services.AddHostedService<MaintenanceJobs>();
+// Off in the staging slot (a slot-sticky Jobs__Enabled=false): it shares the production database,
+// and after a swap it runs the previous build, which must not sweep a migrated schema.
+if (builder.Configuration.GetValue("Jobs:Enabled", true))
+    builder.Services.AddHostedService<MaintenanceJobs>();
 
 var app = builder.Build();
 
