@@ -31,7 +31,7 @@
                             <MudSelectItem T="int?" Value="@c.CategoryId">@c.CategoryName</MudSelectItem>
                         }
                     </MudSelect>
-                    <InputFile OnChange="@(e => picked = e.File)" class="mb-3" />
+                    <InputFile OnChange="OnFilePicked" class="mb-3" />
                     <div class="drps-muted mb-3">Up to @(MaxBytes / (1024 * 1024)) MB. Office documents, PDFs, text and images.</div>
                     <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" OnClick="Upload"
                                Disabled="@uploading">
@@ -149,6 +149,21 @@
                   + (filterCategory is { } c ? $"&categoryId={c}" : "");
         files = await AppData.GetAsync<List<FileMetadataDto>>(url) ?? [];
         loading = false;
+    }
+
+    private void OnFilePicked(InputFileChangeEventArgs e)
+    {
+        try
+        {
+            // e.File throws when the change event carries no file (picker cancelled) or more than one.
+            picked = e.File;
+        }
+        catch (Exception ex)
+        {
+            picked = null;
+            Console.Error.WriteLine(ex);
+            Snackbar.Add("Couldn't read the selected file. Please choose it again.", Severity.Warning);
+        }
     }
 
     private async Task Upload()
