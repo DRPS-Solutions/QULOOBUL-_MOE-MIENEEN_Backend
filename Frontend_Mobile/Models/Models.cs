@@ -4,6 +4,7 @@ using Frontend_Mobile.Data;
 using QULOOBUL__MOE_MIENEEN_Shared.Notifications;
 using QULOOBUL__MOE_MIENEEN_Shared.Requests;
 using QULOOBUL__MOE_MIENEEN_Shared.Tasks;
+using QULOOBUL__MOE_MIENEEN_Shared.Collaboration;
 
 namespace Frontend_Mobile.Models;
 
@@ -122,6 +123,26 @@ public sealed class TaskItem(TaskCardDto card, string? eventName, string? comple
             : string.Concat(CompletedBy.Trim()
                 .Split(' ', StringSplitOptions.RemoveEmptyEntries)
                 .Select(part => char.ToUpperInvariant(part[0])));
+}
+
+/// <summary>One row as MettingsPage list shows it</summary>
+public sealed class MeetingRow(MeetingDto meetingDto, string nameOfOrganiser)
+{
+    public MeetingDto MeetingDto => meetingDto;
+    public string MeetingTitle => meetingDto.Title;
+    public string MeetingDateLabel => meetingDto.MeetingDate.ToString("dd MM yyyy");
+    public string MeetingOrganiser => nameOfOrganiser;
+    public string MeetingMinutesStatus => meetingDto.Minutes is null ? "Not Recorded" : 
+        meetingDto.Minutes.ApprovedBy is null ? "Awaiting Approval" : "Approved";
+}
+
+/// <summary>One search hit with the meeting title resolved from the loaded list</summary>
+public sealed class MinutesSearch(MeetingMinutesDto meetingMinutesDto, string? titleOfMeeting)
+{
+    public MeetingMinutesDto MeetingMinutesDto => meetingMinutesDto;
+    public string MeetingTitle => titleOfMeeting ?? $"Meeting #{meetingMinutesDto.MeetingId}";
+    public string SnippetOfMeetingMinutes => meetingMinutesDto.MinutesText.Length <= 120 ? meetingMinutesDto.MinutesText : 
+        meetingMinutesDto.MinutesText[..120] + "...";
 }
 
 // ----- Resource requests (SM-02 statuses) -----
