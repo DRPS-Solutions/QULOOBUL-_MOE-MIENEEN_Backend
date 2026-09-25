@@ -6,10 +6,11 @@
     xmlns:models="clr-namespace:Frontend_Mobile.Models"
     Title="Reports">
 
-    <!-- Reports.razor: UC-09 admin reporting dashboard. The API recomputes the
-         figures on every run and logs who ran it. MudChart has no MAUI
-         equivalent in this project, so each series is drawn as a plain
-         ProgressBar list instead of a graph - same numbers, a simpler control. -->
+    <!-- Reports.razor: UC-09 admin reporting dashboard. The API recomputes the figures on
+         every run and logs who ran it. Trend/completion/workload are drawn with
+         Microsoft.Maui.Graphics (GraphicsView + IDrawable, see Controls/ChartDrawables.cs) -
+         this project's closest equivalent to MudChart, since no charting package is
+         referenced. Project progress stays a plain list, same as the web page's table. -->
 
     <ScrollView>
         <VerticalStackLayout Padding="16" Spacing="16">
@@ -74,17 +75,11 @@
                     <VerticalStackLayout Spacing="10">
                         <Label Text="Completed over time" Style="{StaticResource TitleMedium}" />
                         <Label x:Name="TrendEmptyLabel" Text="No activity in this period." Style="{StaticResource Muted}" IsVisible="False" />
-                        <VerticalStackLayout x:Name="TrendList" Spacing="10">
-                            <BindableLayout.ItemTemplate>
-                                <DataTemplate x:DataType="models:TrendRow">
-                                    <Grid ColumnDefinitions="90,*,44" ColumnSpacing="8">
-                                        <Label Text="{Binding DateLabel}" Style="{StaticResource LabelSmall}" VerticalOptions="Center" />
-                                        <ProgressBar Grid.Column="1" Progress="{Binding Fraction}" ProgressColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}" VerticalOptions="Center" />
-                                        <Label Grid.Column="2" Text="{Binding CountLabel}" Style="{StaticResource LabelSmall}" HorizontalTextAlignment="End" VerticalOptions="Center" />
-                                    </Grid>
-                                </DataTemplate>
-                            </BindableLayout.ItemTemplate>
-                        </VerticalStackLayout>
+                        <GraphicsView x:Name="TrendChart" HeightRequest="200" />
+                        <HorizontalStackLayout Spacing="6">
+                            <BoxView WidthRequest="10" HeightRequest="10" CornerRadius="5" Color="{StaticResource AccentBlue}" />
+                            <Label Text="Cumulative completed" Style="{StaticResource LabelSmall}" />
+                        </HorizontalStackLayout>
                     </VerticalStackLayout>
                 </Border>
 
@@ -93,17 +88,17 @@
                     <VerticalStackLayout Spacing="10">
                         <Label Text="Tasks by priority" Style="{StaticResource TitleMedium}" />
                         <Label x:Name="CompletionEmptyLabel" Text="No tasks in this period." Style="{StaticResource Muted}" IsVisible="False" />
-                        <VerticalStackLayout x:Name="CompletionList" Spacing="12">
-                            <BindableLayout.ItemTemplate>
-                                <DataTemplate x:DataType="models:CompletionRow">
-                                    <VerticalStackLayout Spacing="4">
-                                        <Label Text="{Binding BucketLabel}" FontSize="13" FontAttributes="Bold" />
-                                        <ProgressBar Progress="{Binding CompletedFraction}" ProgressColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}" />
-                                        <Label Text="{Binding SummaryText}" Style="{StaticResource LabelSmall}" />
-                                    </VerticalStackLayout>
-                                </DataTemplate>
-                            </BindableLayout.ItemTemplate>
-                        </VerticalStackLayout>
+                        <GraphicsView x:Name="CompletionChart" HeightRequest="200" />
+                        <HorizontalStackLayout Spacing="16">
+                            <HorizontalStackLayout Spacing="6">
+                                <BoxView WidthRequest="10" HeightRequest="10" CornerRadius="5" Color="{StaticResource StatusApproved}" />
+                                <Label Text="Completed" Style="{StaticResource LabelSmall}" />
+                            </HorizontalStackLayout>
+                            <HorizontalStackLayout Spacing="6">
+                                <BoxView WidthRequest="10" HeightRequest="10" CornerRadius="5" Color="{StaticResource StatusPending}" />
+                                <Label Text="Outstanding" Style="{StaticResource LabelSmall}" />
+                            </HorizontalStackLayout>
+                        </HorizontalStackLayout>
                     </VerticalStackLayout>
                 </Border>
 
@@ -112,17 +107,21 @@
                     <VerticalStackLayout Spacing="10">
                         <Label Text="Staff workload" Style="{StaticResource TitleMedium}" />
                         <Label x:Name="WorkloadEmptyLabel" Text="Nobody has assigned tasks in this period." Style="{StaticResource Muted}" IsVisible="False" />
-                        <VerticalStackLayout x:Name="WorkloadList" Spacing="12">
-                            <BindableLayout.ItemTemplate>
-                                <DataTemplate x:DataType="models:WorkloadRow">
-                                    <VerticalStackLayout Spacing="4">
-                                        <Label Text="{Binding FullName}" FontSize="13" FontAttributes="Bold" />
-                                        <ProgressBar Progress="{Binding CompletedFraction}" ProgressColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}" />
-                                        <Label Text="{Binding SummaryText}" Style="{StaticResource LabelSmall}" TextColor="{Binding OverdueColor}" />
-                                    </VerticalStackLayout>
-                                </DataTemplate>
-                            </BindableLayout.ItemTemplate>
-                        </VerticalStackLayout>
+                        <GraphicsView x:Name="WorkloadChart" HeightRequest="200" />
+                        <HorizontalStackLayout Spacing="12">
+                            <HorizontalStackLayout Spacing="6">
+                                <BoxView WidthRequest="10" HeightRequest="10" CornerRadius="5" Color="{StaticResource AccentBlue}" />
+                                <Label Text="Assigned" Style="{StaticResource LabelSmall}" />
+                            </HorizontalStackLayout>
+                            <HorizontalStackLayout Spacing="6">
+                                <BoxView WidthRequest="10" HeightRequest="10" CornerRadius="5" Color="{StaticResource StatusApproved}" />
+                                <Label Text="Completed" Style="{StaticResource LabelSmall}" />
+                            </HorizontalStackLayout>
+                            <HorizontalStackLayout Spacing="6">
+                                <BoxView WidthRequest="10" HeightRequest="10" CornerRadius="5" Color="{StaticResource StatusDenied}" />
+                                <Label Text="Overdue" Style="{StaticResource LabelSmall}" />
+                            </HorizontalStackLayout>
+                        </HorizontalStackLayout>
                     </VerticalStackLayout>
                 </Border>
 

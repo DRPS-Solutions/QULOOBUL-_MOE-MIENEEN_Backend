@@ -1,6 +1,11 @@
+using Frontend_Mobile.Controls;
 using Frontend_Mobile.Data;
 using Frontend_Mobile.Models;
 using QULOOBUL__MOE_MIENEEN_Shared.Reports;
+// Frontend_Mobile.Models.Colors and Microsoft.Maui.Graphics.Colors (a project-wide global
+// using) share a name - same ambiguity as the Permissions fix elsewhere. Alias instead of
+// hitting the same compile error here once real color references show up below.
+using AppColors = Frontend_Mobile.Models.Colors;
 
 namespace Frontend_Mobile.Pages;
 
@@ -86,43 +91,53 @@ public partial class ReportsPage : ContentPage
         EmptyLabel.IsVisible = false;
         ResultsSection.IsVisible = true;
 
-        // Trend: thin to a legible number of points, always keeping the first and last.
-        var trendPoints = Thin(r.Trend, 12);
-        var maxCumulative = r.Trend.Count == 0 ? 0 : r.Trend.Max(p => p.CumulativeCompleted);
-        var trendRows = trendPoints.Select(p => new TrendRow(p, maxCumulative)).ToList();
-        BindableLayout.SetItemsSource(TrendList, trendRows);
-        TrendList.IsVisible = trendRows.Count > 0;
-        TrendEmptyLabel.IsVisible = trendRows.Count == 0;
+        // Full resolution, not thinned: the line itself stays accurate, LineChartDrawable
+        // only thins which x-axis labels it prints, so nothing is lost by passing it all.
+        var trendLabels = r.Trend.Select(p => p.BucketStart.ToString("d MMM")).ToList();
+        var trendValues = r.Trend.Select(p => (double)p.CumulativeCompleted).ToList();
+        TrendChart.Drawable = new LineChartDrawable
+        {
+            Labels = trendLabels,
+            Values = trendValues,
+            LineColor = AppColors.AccentBlue,
+        };
+        TrendChart.Invalidate();
+        TrendChart.IsVisible = r.Trend.Count > 0;
+        TrendEmptyLabel.IsVisible = r.Trend.Count == 0;
 
-        var completionRows = r.Completion.Select(c => new CompletionRow(c)).ToList();
-        BindableLayout.SetItemsSource(CompletionList, completionRows);
-        CompletionList.IsVisible = completionRows.Count > 0;
-        CompletionEmptyLabel.IsVisible = completionRows.Count == 0;
+        CompletionChart.Drawable = new StackedBarChartDrawable
+        {
+            Categories = r.Completion.Select(c => c.Bucket).ToList(),
+            Series =
+            [
+                ("Completed", AppColors.StatusApproved, r.Completion.Select(c => (double)c.Completed).ToList()),
+                ("Outstanding", AppColors.StatusPending, r.Completion.Select(c => (double)c.Outstanding).ToList()),
+            ],
+        };
+        CompletionChart.Invalidate();
+        CompletionChart.IsVisible = r.Completion.Count > 0;
+        CompletionEmptyLabel.IsVisible = r.Completion.Count == 0;
 
         // Busiest first, capped to 8 - same as the web client's chart.
-        var workloadRows = r.Workload
-            .OrderByDescending(w => w.Assigned)
-            .Take(8)
-            .Select(w => new WorkloadRow(w))
-            .ToList();
-        BindableLayout.SetItemsSource(WorkloadList, workloadRows);
-        WorkloadList.IsVisible = workloadRows.Count > 0;
-        WorkloadEmptyLabel.IsVisible = workloadRows.Count == 0;
+        var busiest = r.Workload.OrderByDescending(w => w.Assigned).Take(8).ToList();
+        WorkloadChart.Drawable = new GroupedBarChartDrawable
+        {
+            // First names only: full names would overlap at 8 side-by-side groups on a phone width.
+            Categories = busiest.Select(w => w.FullName.Split(' ')[0]).ToList(),
+            Series =
+            [
+                ("Assigned", AppColors.AccentBlue, busiest.Select(w => (double)w.Assigned).ToList()),
+                ("Completed", AppColors.StatusApproved, busiest.Select(w => (double)w.Completed).ToList()),
+                ("Overdue", AppColors.StatusDenied, busiest.Select(w => (double)w.Overdue).ToList()),
+            ],
+        };
+        WorkloadChart.Invalidate();
+        WorkloadChart.IsVisible = busiest.Count > 0;
+        WorkloadEmptyLabel.IsVisible = busiest.Count == 0;
 
         var progressRows = r.Progress.Select(p => new ProgressRow(p)).ToList();
         BindableLayout.SetItemsSource(ProgressList, progressRows);
         ProgressList.IsVisible = progressRows.Count > 0;
         ProgressEmptyLabel.IsVisible = progressRows.Count == 0;
-    }
-
-    /// <summary>Evenly-spaced subset of at most <paramref name="max"/> items, keeping the first and last.</summary>
-    private static List<T> Thin<T>(IReadOnlyList<T> items, int max)
-    {
-        if (items.Count <= max) return items.ToList();
-        var step = (double)(items.Count - 1) / (max - 1);
-        return Enumerable.Range(0, max)
-            .Select(i => items[(int)Math.Round(i * step)])
-            .Distinct()
-            .ToList();
     }
 }
