@@ -24,13 +24,13 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Data
             (Roles.FacilityManager, 3, []),
             (Roles.Staff, 4, []),
         ];
-
+//----------------------------------------------------------------------------------------------------------------------//
         private static readonly string[] NotificationTypeSeed =
         [
             "TaskAssigned", "TaskCancelled", "DeadlineApproaching", "ProjectAssigned", "EventInvite",
             "RequestSubmitted", "RequestReviewed", "RequestCompleted", "RequestEscalated", "UserLocked", "Announcement",
         ];
-
+//----------------------------------------------------------------------------------------------------------------------//
         public static void Seed(AppDbContext db, IConfiguration config)
         {
             if (!db.Roles.Any())

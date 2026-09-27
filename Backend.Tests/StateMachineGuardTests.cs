@@ -33,7 +33,7 @@ public class StateMachineGuardTests
         Assert.Equal(Lifecycle.UserLocked, user.Status);
         Assert.False(user.IsActive);
     }
-
+//----------------------------------------------------------------------------------------------------------------------//
     [Fact]
     public async Task A_task_cannot_start_without_an_assignee_and_reopening_needs_ReopenTask()
     {
@@ -57,7 +57,7 @@ public class StateMachineGuardTests
         await tasks.ChangeStatusAsync(todo.TaskId, "In Progress", staff.UserId);
         Assert.Equal("In Progress", todo.Status);
     }
-
+//----------------------------------------------------------------------------------------------------------------------//
     [Fact]
     public async Task Deactivating_a_user_hands_their_open_tasks_to_the_project_owner()
     {
@@ -79,7 +79,7 @@ public class StateMachineGuardTests
         Assert.Equal([owner.UserId], db.TaskAssignments.Where(a => a.TaskId == open.TaskId).Select(a => a.UserId));
         Assert.Equal([leaver.UserId], db.TaskAssignments.Where(a => a.TaskId == finished.TaskId).Select(a => a.UserId));
     }
-
+//----------------------------------------------------------------------------------------------------------------------//
     [Theory]
     [InlineData(29, true)]
     [InlineData(31, false)]
@@ -114,14 +114,15 @@ public class StateMachineGuardTests
         return new AuthService(db, null!, audit, new NotificationService(db, null!), Email(db, config),
             config, NullLogger<AuthService>.Instance);
     }
-
+//----------------------------------------------------------------------------------------------------------------------//
     private static TaskAssignmentService Tasks(AppDbContext db) =>
         new(db, new AuditService(db), new NotificationService(db, null!),
             Email(db, new ConfigurationBuilder().Build()), new AccessGuard(db));
-
+//----------------------------------------------------------------------------------------------------------------------//
     private static EmailService Email(AppDbContext db, IConfiguration config) =>
         new(null!, config, db, NullLogger<EmailService>.Instance);
-
+//----------------------------------------------------------------------------------------------------------------------//
     private static AppDbContext NewDb() => new(new DbContextOptionsBuilder<AppDbContext>()
         .UseInMemoryDatabase(Guid.NewGuid().ToString()).Options);
 }
+//---------------------------DDDDDDDDDDDoooooooooooooo END OF FILE DDDDDDDDDDDoooooooooooooo---------------------------//
