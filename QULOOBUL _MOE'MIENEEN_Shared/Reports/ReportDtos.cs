@@ -17,11 +17,11 @@ namespace QULOOBUL__MOE_MIENEEN_Shared.Reports
         public string ReportType { get; init; } = "TaskCompletion";
         public int? SubjectUserId { get; init; }
     }
-
+//----------------------------------------------------------------------------------------------------------------------//
     public record TaskCompletionStat(string Bucket, int Completed, int Outstanding);
     public record WorkloadStat(int UserId, string FullName, int Assigned, int Completed, int Overdue);
     public record ProjectProgressStat(int ProjectId, string ProjectName, int Total, int Done, double PercentComplete);
-
+//----------------------------------------------------------------------------------------------------------------------//
     /// <summary>UC-09 "progress over time": tasks completed in each bucket, plus the running total.</summary>
     public record ProgressPoint(DateTime BucketStart, int Completed, int CumulativeCompleted);
 
@@ -31,7 +31,8 @@ namespace QULOOBUL__MOE_MIENEEN_Shared.Reports
         IReadOnlyList<WorkloadStat> Workload,
         IReadOnlyList<ProjectProgressStat> Progress,
         IReadOnlyList<ProgressPoint> Trend);
-
+//----------------------------------------------------------------------------------------------------------------------//
     /// <summary>The exported CSV lives in Blob Storage; this is a short-lived read SAS to it.</summary>
     public record ReportExportResponse(int ReportId, string DownloadUrl, DateTime ExpiresAtUtc);
 }
+//---------------------------DDDDDDDDDDDoooooooooooooo END OF FILE DDDDDDDDDDDoooooooooooooo---------------------------//

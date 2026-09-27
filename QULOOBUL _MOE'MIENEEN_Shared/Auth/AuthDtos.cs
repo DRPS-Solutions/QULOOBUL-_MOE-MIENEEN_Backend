@@ -8,6 +8,7 @@ namespace QULOOBUL__MOE_MIENEEN_Shared.Auth
     internal class AuthDtos
     {
     }
+//----------------------------------------------------------------------------------------------------------------------//
     public record LoginRequest
     {
         [Required, EmailAddress, MaxLength(256)]
@@ -15,7 +16,7 @@ namespace QULOOBUL__MOE_MIENEEN_Shared.Auth
         [Required, MaxLength(128)]
         public string Password { get; init; } = string.Empty;
     }
-
+//----------------------------------------------------------------------------------------------------------------------//
     public record AuthResponse(
         string Token,
         DateTime ExpiresAtUtc,
@@ -23,13 +24,13 @@ namespace QULOOBUL__MOE_MIENEEN_Shared.Auth
         string FullName,
         string Role,
         IReadOnlyList<string> Permissions);
-
+//----------------------------------------------------------------------------------------------------------------------//
     public record PasswordResetRequest
     {
         [Required, EmailAddress] 
         public string Email { get; init; } = string.Empty;
     }
-
+//----------------------------------------------------------------------------------------------------------------------//
     /// <summary>SM-03 setPassword: redeems the emailed activation or reset token.</summary>
     public record SetPasswordRequest
     {
@@ -40,3 +41,4 @@ namespace QULOOBUL__MOE_MIENEEN_Shared.Auth
     }
 
 }
+//---------------------------DDDDDDDDDDDoooooooooooooo END OF FILE DDDDDDDDDDDoooooooooooooo---------------------------//
