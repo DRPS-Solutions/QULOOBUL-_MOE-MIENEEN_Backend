@@ -30,12 +30,12 @@ namespace Backend.Tests;
 public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
     public const string AdminEmail = "admin@test.local", StaffEmail = "staff@test.local", Password = "Passw0rd!Passw0rd";
-
+//----------------------------------------------------------------------------------------------------------------------//
     public string ConnectionString { get; } = new SqlConnectionStringBuilder(
         Environment.GetEnvironmentVariable("TEST_SQL_CONNECTION")
         ?? @"Server=(localdb)\mssqllocaldb;Trusted_Connection=True;TrustServerCertificate=True")
     { InitialCatalog = $"QM_Test_{Guid.NewGuid():N}" }.ConnectionString;
-
+//----------------------------------------------------------------------------------------------------------------------//
     protected override void ConfigureWebHost(IWebHostBuilder b)
     {
         // The ' in the project folder name breaks the MSBuild expression Mvc.Testing writes into
@@ -52,7 +52,7 @@ public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         // The clock-driven jobs would race the assertions; MaintenanceJobTests covers them.
         b.ConfigureServices(s => s.RemoveAll<IHostedService>());
     }
-
+//----------------------------------------------------------------------------------------------------------------------//
     public async Task InitializeAsync()
     {
         using var scope = Services.CreateScope();
@@ -68,14 +68,14 @@ public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         db.Users.Add(staff);
         await db.SaveChangesAsync();
     }
-
+//----------------------------------------------------------------------------------------------------------------------//
     public new async Task DisposeAsync()
     {
         using (var scope = Services.CreateScope())
             await scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.EnsureDeletedAsync();
         await base.DisposeAsync();
     }
-
+//----------------------------------------------------------------------------------------------------------------------//
     public async Task<(HttpClient Client, AuthResponse Me)> SignInAsync(string email)
     {
         var client = CreateClient();
@@ -85,9 +85,12 @@ public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", me.Token);
         return (client, me);
     }
-
+//----------------------------------------------------------------------------------------------------------------------//
     public AppDbContext Db(IServiceScope scope) => scope.ServiceProvider.GetRequiredService<AppDbContext>();
 }
+//----------------------------------------------------------------------------------------------------------------------//
+//----------------------------------------New integration tests go here, not in LifecycleTests.cs----------------------------------------//
+//----------------------------------------------------------------------------------------------------------------------//
 
 public class ApiIntegrationTests(ApiFactory api) : IClassFixture<ApiFactory>
 {
@@ -98,7 +101,7 @@ public class ApiIntegrationTests(ApiFactory api) : IClassFixture<ApiFactory>
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/health")).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/tasks")).StatusCode);
     }
-
+//----------------------------------------------------------------------------------------------------------------------//
     [Fact]
     public async Task Responses_carry_the_security_headers()
     {
@@ -106,7 +109,7 @@ public class ApiIntegrationTests(ApiFactory api) : IClassFixture<ApiFactory>
         Assert.Contains("default-src 'none'", res.Headers.GetValues("Content-Security-Policy").Single());
         Assert.Equal("nosniff", res.Headers.GetValues("X-Content-Type-Options").Single());
     }
-
+//----------------------------------------------------------------------------------------------------------------------//
     [Fact]
     public async Task The_directory_is_read_through_the_view_and_hides_the_system_account()
     {
@@ -116,7 +119,7 @@ public class ApiIntegrationTests(ApiFactory api) : IClassFixture<ApiFactory>
         Assert.Contains(users!, u => u.Email == ApiFactory.AdminEmail && u.Role == Roles.Admin);
         Assert.DoesNotContain(users!, u => u.Email == SystemAccountEmail);
     }
-
+//----------------------------------------------------------------------------------------------------------------------//
     [Fact]
     public async Task Staff_cannot_reach_admin_routes()
     {

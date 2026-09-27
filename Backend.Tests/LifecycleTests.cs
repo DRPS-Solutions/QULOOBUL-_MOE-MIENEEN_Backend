@@ -25,7 +25,7 @@ public class LifecycleTests
     [InlineData("In Progress", "In Progress", true)] // idempotent no-op
     public void TaskTransitions(string? from, string to, bool allowed) =>
         Assert.Equal(allowed, Lifecycle.TaskCanMove(from, to));
-
+//----------------------------------------------------------------------------------------------------------------------//
     [Theory]
     [InlineData(null, "Under Review", true)]
     [InlineData("Pending", "Approved", false)]       // must be under review first
@@ -40,7 +40,7 @@ public class LifecycleTests
     [InlineData("Completed", "Approved", false)]
     public void RequestTransitions(string? from, string to, bool allowed) =>
         Assert.Equal(allowed, Lifecycle.RequestCanMove(from, to));
-
+//----------------------------------------------------------------------------------------------------------------------//
     [Theory]
     [InlineData("Pending Activation", "Active", true)]
     [InlineData("Pending Activation", "Locked", false)]
@@ -54,7 +54,7 @@ public class LifecycleTests
     [InlineData("Anonymised", "Active", false)]      // terminal
     public void UserTransitions(string from, string to, bool allowed) =>
         Assert.Equal(allowed, Lifecycle.UserCanMove(from, to));
-
+//----------------------------------------------------------------------------------------------------------------------//
     [Fact]
     public void MoveUser_keeps_IsActive_in_step()
     {
@@ -64,8 +64,9 @@ public class LifecycleTests
         Lifecycle.MoveUser(user, Lifecycle.UserActive);
         Assert.True(user.IsActive);
     }
-
+//----------------------------------------------------------------------------------------------------------------------//
     [Fact]
     public void EnsureRequestMove_throws_on_illegal_transition() =>
         Assert.Throws<InvalidOperationException>(() => Lifecycle.EnsureRequestMove("Declined", "Approved"));
 }
+//---------------------------DDDDDDDDDDDoooooooooooooo END OF FILE DDDDDDDDDDDoooooooooooooo---------------------------//
