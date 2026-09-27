@@ -128,7 +128,7 @@ public class ApiIntegrationTests(ApiFactory api) : IClassFixture<ApiFactory>
         Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync("/api/notifications/send",
             new { userIds = new[] { 1 }, message = "hi" })).StatusCode);
     }
-
+//----------------------------------------------------------------------------------------------------------------------//
     [Fact]
     public async Task Only_the_organiser_or_an_admin_changes_an_events_attendees()
     {
@@ -147,7 +147,7 @@ public class ApiIntegrationTests(ApiFactory api) : IClassFixture<ApiFactory>
         Assert.Equal(HttpStatusCode.Forbidden, (await staff.DeleteAsync($"/api/events/{ev.EventId}/attendees/{adminMe.UserId}")).StatusCode);
         Assert.Equal(HttpStatusCode.NoContent, (await staff.DeleteAsync($"/api/events/{ev.EventId}/attendees/{staffMe.UserId}")).StatusCode);
     }
-
+//----------------------------------------------------------------------------------------------------------------------//
     [Fact]
     public async Task Row_level_security_hides_other_users_notifications_even_from_a_raw_query()
     {
@@ -179,7 +179,7 @@ public class ApiIntegrationTests(ApiFactory api) : IClassFixture<ApiFactory>
         var (staff, _) = await api.SignInAsync(ApiFactory.StaffEmail);
         Assert.Equal(HttpStatusCode.OK, (await staff.GetAsync("/api/notifications")).StatusCode);
     }
-
+//----------------------------------------------------------------------------------------------------------------------//
     [Fact]
     public async Task Deleting_a_task_cascades_its_comments_and_unlinks_its_files()
     {
@@ -209,7 +209,7 @@ public class ApiIntegrationTests(ApiFactory api) : IClassFixture<ApiFactory>
         Assert.False(await db.Set<TaskComment>().AnyAsync(c => c.TaskId == card.TaskId));
         Assert.Null(await db.FileUploads.Where(f => f.FileId == file.FileId).Select(f => f.TaskId).SingleAsync());
     }
-
+//----------------------------------------------------------------------------------------------------------------------//
     [Fact]
     public async Task The_login_route_is_rate_limited_per_client()
     {
@@ -223,3 +223,4 @@ public class ApiIntegrationTests(ApiFactory api) : IClassFixture<ApiFactory>
         Assert.Equal(HttpStatusCode.TooManyRequests, codes[2]);
     }
 }
+//---------------------------DDDDDDDDDDDoooooooooooooo END OF FILE DDDDDDDDDDDoooooooooooooo---------------------------//
