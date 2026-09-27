@@ -19,15 +19,16 @@ namespace QULOOBUL__MOE_MIENEEN_Shared.Tasks
 //----------------------------------------------------------------------------------------------------------------------//
     public record CreateTaskRequest
     {
-        [Required]
+        [Required, Range(1, int.MaxValue)]
         public int ProjectId { get; init; }
         [Required, MaxLength(200)]
         public string Title { get; init; } = string.Empty;
         [MaxLength(2000)]
         public string? Description { get; init; }
-        [MaxLength(20)]
+        [MaxLength(20), RegularExpression("Low|Normal|Medium|High")]
         public string Priority { get; init; } = "Normal";
-        [Required]
+        /// <summary>The Range rejects the unset default (0001-01-01), which [Required] alone lets through.</summary>
+        [Required, Range(typeof(DateTime), "2000-01-01", "2100-12-31")]
         public DateTime Deadline { get; init; }
     }
 //----------------------------------------------------------------------------------------------------------------------//
@@ -37,12 +38,14 @@ namespace QULOOBUL__MOE_MIENEEN_Shared.Tasks
         public string? Title { get; init; }
         [MaxLength(2000)]
         public string? Description { get; init; }
-        [MaxLength(20)]
+        [MaxLength(20), RegularExpression("Low|Normal|Medium|High")]
         public string? Priority { get; init; }
+        [Range(typeof(DateTime), "2000-01-01", "2100-12-31")]
         public DateTime? Deadline { get; init; }
         [Range(0, 100)]
         public int? PercentComplete { get; init; }
         /// <summary>Moves the task to another project (the web client's "linked event").</summary>
+        [Range(1, int.MaxValue)]
         public int? ProjectId { get; init; }
     }
 //----------------------------------------------------------------------------------------------------------------------//
@@ -55,7 +58,7 @@ namespace QULOOBUL__MOE_MIENEEN_Shared.Tasks
 //----------------------------------------------------------------------------------------------------------------------//
     public record AssignTaskRequest
     {
-        [Required] 
+        [Required, Range(1, int.MaxValue)]
         public int AssigneeId { get; init; }
     }
 //----------------------------------------------------------------------------------------------------------------------//
@@ -76,7 +79,7 @@ namespace QULOOBUL__MOE_MIENEEN_Shared.Tasks
         /// <summary>English day name, e.g. "Saturday".</summary>
         [Required, MaxLength(10)]
         public string DayOfWeek { get; init; } = string.Empty;
-        [Required]
+        [Required, Range(1, int.MaxValue)]
         public int AssignedTo { get; init; }
     }
 //----------------------------------------------------------------------------------------------------------------------//
@@ -86,6 +89,7 @@ namespace QULOOBUL__MOE_MIENEEN_Shared.Tasks
         public string? Title { get; init; }
         [MaxLength(10)]
         public string? DayOfWeek { get; init; }
+        [Range(1, int.MaxValue)]
         public int? AssignedTo { get; init; }
         public bool? IsActive { get; init; }
     }

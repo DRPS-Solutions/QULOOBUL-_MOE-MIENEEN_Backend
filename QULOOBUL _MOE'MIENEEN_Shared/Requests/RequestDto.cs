@@ -13,10 +13,10 @@ namespace QULOOBUL__MOE_MIENEEN_Shared.Requests
 //----------------------------------------------------------------------------------------------------------------------//
     public record CreateResourceRequest
     {
-        [Required]
+        [Required, Range(1, int.MaxValue)]
         public int CategoryId { get; init; }
 
-        [MaxLength(20)] 
+        [MaxLength(20), RegularExpression("Low|Normal|Medium|High")]
         public string Priority { get; init; } = "Normal";
 
         [MaxLength(1000)] 

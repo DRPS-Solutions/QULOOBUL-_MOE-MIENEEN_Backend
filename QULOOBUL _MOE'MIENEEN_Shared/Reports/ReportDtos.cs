@@ -7,14 +7,15 @@ namespace QULOOBUL__MOE_MIENEEN_Shared.Reports
 {
     public record ReportRequest
     {
-        [Required]
+        [Required, Range(typeof(DateTime), "2000-01-01", "2100-12-31")]
         public DateTime PeriodStart { get; init; }
 
-        [Required] 
+        [Required, Range(typeof(DateTime), "2000-01-01", "2100-12-31")]
         public DateTime PeriodEnd { get; init; }
 
         [Required, RegularExpression("TaskCompletion|Workload|ProjectProgress")]
         public string ReportType { get; init; } = "TaskCompletion";
+        [Range(1, int.MaxValue)]
         public int? SubjectUserId { get; init; }
     }
 //----------------------------------------------------------------------------------------------------------------------//

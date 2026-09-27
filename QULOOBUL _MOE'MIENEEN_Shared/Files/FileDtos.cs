@@ -18,9 +18,11 @@ namespace QULOOBUL__MOE_MIENEEN_Shared.Files
         [Required, Range(1, long.MaxValue)]
         public long SizeBytes { get; init; }
 
-        [Required]
+        [Required, Range(1, int.MaxValue)]
         public int CategoryId { get; init; }
+        [Range(1, int.MaxValue)]
         public int? TaskId { get; init; }
+        [Range(1, int.MaxValue)]
         public int? MeetingId { get; init; }
         public DateTime? PeriodMonth { get; init; }
     }
@@ -35,6 +37,6 @@ namespace QULOOBUL__MOE_MIENEEN_Shared.Files
         int UploadedBy, int? TaskId, int? MeetingId, DateTime? PeriodMonth, bool IsArchived);
 
     public record FileCategoryDto(int CategoryId, string CategoryName);
-    public record RecategoriseFileRequest { [Required] public int CategoryId { get; init; } }
+    public record RecategoriseFileRequest { [Required, Range(1, int.MaxValue)] public int CategoryId { get; init; } }
 }
 //---------------------------DDDDDDDDDDDoooooooooooooo END OF FILE DDDDDDDDDDDoooooooooooooo---------------------------//
