@@ -133,6 +133,11 @@ public class ApiIntegrationTests(ApiFactory api) : IClassFixture<ApiFactory>
 
         Assert.Equal(HttpStatusCode.Forbidden, (await client.PatchAsJsonAsync($"/api/users/{me.UserId}",
             new UpdateUserRequest { RoleId = 1 })).StatusCode);
+
+        // Email is the sign-in name: another account's address is refused.
+        Assert.False((await client.PatchAsJsonAsync($"/api/users/{me.UserId}",
+            new UpdateUserRequest { Email = ApiFactory.AdminEmail })).IsSuccessStatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PostAsync("/api/users/me/password-link", null)).StatusCode);
     }
 //----------------------------------------------------------------------------------------------------------------------//
     [Fact]

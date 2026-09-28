@@ -2,6 +2,7 @@
 @using MudBlazor
 @implements IDisposable
 @inject AppDataService AppData
+@inject NavigationManager Nav
 
 <MudThemeProvider IsDarkMode="isDarkMode" Theme="_theme" />
 <MudPopoverProvider />
@@ -22,6 +23,13 @@
             <div class="drps-login-card">
                 <img src="images/logos/QULOOBUL MOE'MIENEEN Logo.png" alt="Company Logo" class="drps-login-logo" />
                 <MudText Typo="Typo.h5" Class="drps-login-title">QULOOBUL MOE'MIENEEN</MudText>
+                @* The emailed activation / change-password link is opened signed out, so that one page renders here. *@
+                @if (OnSetPasswordPage)
+                {
+                    @Body
+                }
+                else
+                {
                 <MudText Typo="Typo.body2" Class="drps-login-subtitle">Sign in to continue</MudText>
 
                 <MudTextField @bind-Value="emailInput"
@@ -57,6 +65,7 @@
                            OnClick="Login">
                     @(loggingIn ? "Signing in..." : "Log In")
                 </MudButton>
+                }
             </div>
         </div>
     </div>
@@ -116,6 +125,8 @@ else
     private string passwordInput = string.Empty;
     private string? loginError = null;
     private bool loggingIn = false;
+
+    private bool OnSetPasswordPage => Nav.ToBaseRelativePath(Nav.Uri).StartsWith("set-password");
 
     private bool CanLogin =>
         !loggingIn && !string.IsNullOrWhiteSpace(emailInput) && !string.IsNullOrWhiteSpace(passwordInput);

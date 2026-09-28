@@ -28,6 +28,14 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Controllers
         [HttpGet("me")]
         public async Task<ActionResult<UserDto>> Me() => Ok(await users.GetAsync(UserId()));
 //----------------------------------------------------------------------------------------------------------------------//
+        /// <summary>Emails the signed-in user a link to choose a new password.</summary>
+        [HttpPost("me/password-link")]
+        public async Task<IActionResult> PasswordLink()
+        {
+            await users.SendOwnPasswordLinkAsync(UserId());
+            return NoContent();
+        }
+//----------------------------------------------------------------------------------------------------------------------//
         /// <summary>SM-03 updateProfile: self, or an admin (who alone may change the role).</summary>
         [HttpPatch("{id:int}")]
         public async Task<ActionResult<UserDto>> Update(int id, UpdateUserRequest req) =>

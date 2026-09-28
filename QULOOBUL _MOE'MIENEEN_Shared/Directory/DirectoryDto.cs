@@ -40,6 +40,9 @@ namespace QULOOBUL__MOE_MIENEEN_Shared.Directory
         [Phone, MaxLength(20)] 
         public string? CellNo { get; init; }
 
+        [EmailAddress, MaxLength(256)]
+        public string? Email { get; init; }
+
         [Range(1, int.MaxValue)]
         public int? RoleId { get; init; }
     }

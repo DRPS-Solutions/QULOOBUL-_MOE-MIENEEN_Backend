@@ -77,16 +77,21 @@
                 <MudTextField T="string" @bind-Value="surname" Label="Surname" Required="true" RequiredError="Enter a surname." Variant="Variant.Outlined" MaxLength="100" Immediate="true" Class="mb-3" />
                 <MudTextField T="string" @bind-Value="cellNo" Label="Cell Number" Required="true" RequiredError="Enter a cell number." Validation="@PhoneRule" InputType="InputType.Telephone" Variant="Variant.Outlined" MaxLength="20" Immediate="true" Class="mb-3" />
 
-                @* Email is the sign-in name and role is an admin's call (SM-03), so both are read-only here. *@
-                <MudTextField T="string" Value="@user.Email" Label="Email Address" Variant="Variant.Outlined" ReadOnly="true" Disabled="true" Class="mb-3" />
+                @* Email is also the sign-in name: after saving, the user signs in with the new address. *@
+                <MudTextField T="string" @bind-Value="email" Label="Email Address" Required="true" RequiredError="Enter an email address." Validation="@EmailRule" InputType="InputType.Email" Variant="Variant.Outlined" MaxLength="256" Immediate="true" HelperText="You sign in with this address." Class="mb-3" />
+                @* Role is an admin's call (SM-03), so it is read-only here. *@
                 <MudTextField T="string" Value="@user.Role" Label="Role" Variant="Variant.Outlined" ReadOnly="true" Disabled="true" Class="mb-2" />
-                <div class="drps-profile-muted mb-4">To change your email or role, ask an administrator.</div>
+                <div class="drps-profile-muted mb-4">To change your role, ask an administrator.</div>
 
-                <div class="d-flex gap-2">
+                <div class="d-flex gap-2 flex-wrap">
                     <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Save" Disabled="@(!CanSave)">
                         @(saving ? "Saving..." : "Save Changes")
                     </MudButton>
                     <MudButton Variant="Variant.Text" OnClick="Reset" Disabled="@(saving || !IsDirty)">Discard</MudButton>
+                    <MudSpacer />
+                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Lock" OnClick="SendPasswordLink" Disabled="@sendingLink">
+                        @(sendingLink ? "Sending..." : "Update Password")
+                    </MudButton>
                 </div>
             }
         </div>
@@ -95,20 +100,23 @@
 
 @code {
     private UserDto? user;
-    private string firstName = "", surname = "", cellNo = "";
-    private bool saving;
+    private string firstName = "", surname = "", cellNo = "", email = "";
+    private bool saving, sendingLink;
 
-    // The same rule UpdateUserRequest applies server-side, so the message shows before Save.
+    // The same rules UpdateUserRequest applies server-side, so the message shows before Save.
     private static readonly PhoneAttribute PhoneRule = new() { ErrorMessage = "Enter a valid phone number, e.g. 082 123 4567." };
+    private static readonly EmailAddressAttribute EmailRule = new() { ErrorMessage = "Enter a valid email address." };
 
     private bool IsDirty =>
-        user is not null && (firstName.Trim() != user.FirstName || surname.Trim() != user.Surname || cellNo.Trim() != user.CellNo);
+        user is not null && (firstName.Trim() != user.FirstName || surname.Trim() != user.Surname
+            || cellNo.Trim() != user.CellNo || email.Trim() != user.Email);
 
     private bool CanSave =>
         !saving && IsDirty &&
         !string.IsNullOrWhiteSpace(firstName) &&
         !string.IsNullOrWhiteSpace(surname) &&
-        !string.IsNullOrWhiteSpace(cellNo) && PhoneRule.IsValid(cellNo.Trim());
+        !string.IsNullOrWhiteSpace(cellNo) && PhoneRule.IsValid(cellNo.Trim()) &&
+        !string.IsNullOrWhiteSpace(email) && EmailRule.IsValid(email.Trim());
 
     protected override async Task OnInitializedAsync()
     {
@@ -119,7 +127,16 @@
     private void Reset()
     {
         if (user is null) return;
-        (firstName, surname, cellNo) = (user.FirstName, user.Surname, user.CellNo);
+        (firstName, surname, cellNo, email) = (user.FirstName, user.Surname, user.CellNo, user.Email);
+    }
+
+    // The link goes to the address saved on the account, and lands on /set-password.
+    private async Task SendPasswordLink()
+    {
+        sendingLink = true;
+        var sent = await AppData.SendAsync(HttpMethod.Post, "api/users/me/password-link");
+        sendingLink = false;
+        if (sent) Snackbar.Add($"We've emailed a link to {user!.Email} to change your password.", Severity.Success);
     }
 
     private async Task Save()
@@ -130,6 +147,7 @@
             FirstName = firstName.Trim(),
             Surname = surname.Trim(),
             CellNo = cellNo.Trim(),
+            Email = email.Trim(),
         });
         saving = false;
         if (saved is null) return; // AppData already showed the error

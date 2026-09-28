@@ -109,12 +109,15 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
         }
 //----------------------------------------------------------------------------------------------------------------------//
         /// <summary>Email the set-password link. Call after the token has been saved.</summary>
-        public Task SendPasswordLinkAsync(User user, string token, bool activation)
+        public Task SendPasswordLinkAsync(User user, string token, bool activation, bool selfService = false)
         {
             var link = $"{config["App:BaseUrl"]?.TrimEnd('/')}/set-password?token={token}";
             return activation
                 ? email.SendAccountEmailAsync(user.Email, "Activate your account",
                     $"An account was created for you. Set your password to activate it: {link}")
+                : selfService
+                ? email.SendAccountEmailAsync(user.Email, "Change your password",
+                    $"You asked to change your password. Choose a new one here: {link} If this wasn't you, ignore this email.")
                 : email.SendAccountEmailAsync(user.Email, "Your password was reset",
                     $"An admin reset your password. Choose a new one here: {link}");
         }
