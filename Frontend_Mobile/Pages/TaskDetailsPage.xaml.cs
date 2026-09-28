@@ -3,6 +3,7 @@ using QULOOBUL__MOE_MIENEEN_Shared.Tasks;
 using System;
 using System.Collections.Generic;
 using System.Text;
+using Frontend_Mobile.Models;
 
 namespace Frontend_Mobile.Pages
 {
@@ -51,7 +52,7 @@ namespace Frontend_Mobile.Pages
             BindableLayout.SetItemsSource(CommentList, comments);
         }
 
-        private void OnCommentTextChanged(object? sender, TappedEventArgs e)
+        private void OnCommentTextChanged(object? sender, TextChangedEventArgs e)
         {
             PostButton.IsEnabled = !string.IsNullOrWhiteSpace(e.NewTextValue);
         }
