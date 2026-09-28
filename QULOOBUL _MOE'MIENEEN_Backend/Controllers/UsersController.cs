@@ -25,6 +25,9 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Controllers
         public async Task<ActionResult<UserDto>> Create(CreateUserRequest req) =>
             Ok(await users.CreateAsync(req, UserId()));
 //----------------------------------------------------------------------------------------------------------------------//
+        [HttpGet("me")]
+        public async Task<ActionResult<UserDto>> Me() => Ok(await users.GetAsync(UserId()));
+//----------------------------------------------------------------------------------------------------------------------//
         /// <summary>SM-03 updateProfile: self, or an admin (who alone may change the role).</summary>
         [HttpPatch("{id:int}")]
         public async Task<ActionResult<UserDto>> Update(int id, UpdateUserRequest req) =>

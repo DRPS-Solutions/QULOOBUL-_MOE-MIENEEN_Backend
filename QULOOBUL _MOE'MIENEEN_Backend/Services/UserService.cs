@@ -48,6 +48,13 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             return ToDto(user, role.RoleName);
         }
 //----------------------------------------------------------------------------------------------------------------------//
+        /// <summary>The signed-in user's own details, for the profile page.</summary>
+        public async Task<UserDto> GetAsync(int userId)
+        {
+            var user = await Load(userId);
+            return ToDto(user, await db.Roles.Where(x => x.RoleId == user.RoleId).Select(x => x.RoleName).FirstAsync());
+        }
+//----------------------------------------------------------------------------------------------------------------------//
         /// <summary>SM-03 updateProfile(details) / write AuditLog: an Active self-transition. A user edits
         /// their own details; changing a role is an admin's call.</summary>
         public async Task<UserDto> UpdateProfileAsync(int userId, UpdateUserRequest req, int actorId)

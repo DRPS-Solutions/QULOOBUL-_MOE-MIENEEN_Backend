@@ -91,6 +91,16 @@ public class AppDataService(HttpClient http, ISnackbar snackbar)
         Changed();
     }
 
+    /// <summary>SM-03 updateProfile on the signed-in user; keeps the navbar name and directory in step.</summary>
+    public async Task<UserDto?> UpdateProfileAsync(UpdateUserRequest req)
+    {
+        var user = await SendAsync<UserDto>(HttpMethod.Patch, $"api/users/{CurrentUser!.UserId}", req);
+        if (user is null) return null;
+        CurrentUser = CurrentUser with { FullName = $"{user.FirstName} {user.Surname}" };
+        await RefreshUsersAsync(); // calls Changed()
+        return user;
+    }
+
     public string? Role => CurrentUser?.Role;
 
     public bool HasPermission(string permission) => CurrentUser?.Permissions.Contains(permission) == true;

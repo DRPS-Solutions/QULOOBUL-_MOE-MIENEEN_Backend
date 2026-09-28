@@ -128,6 +128,13 @@
                   title="Settings"
                   AnchorOrigin="Origin.BottomRight"
                   TransformOrigin="Origin.TopRight">
+            <MudMenuItem OnClick="@(() => Navigation.NavigateTo("profile"))">
+                <div class="d-flex align-items-center">
+                    <MudIcon Icon="@Icons.Material.Filled.Person" Class="me-2" Size="Size.Small" />
+                    <span>My Profile</span>
+                </div>
+            </MudMenuItem>
+            <MudDivider Class="my-1" />
             <MudMenuItem OnClick="@(() => OnToggleDarkMode.InvokeAsync())">
                 <div class="d-flex align-items-center">
                     <MudIcon Icon="@(IsDarkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)" Class="me-2" Size="Size.Small" />

@@ -121,6 +121,21 @@ public class ApiIntegrationTests(ApiFactory api) : IClassFixture<ApiFactory>
     }
 //----------------------------------------------------------------------------------------------------------------------//
     [Fact]
+    public async Task A_user_reads_and_edits_their_own_profile_but_not_their_role()
+    {
+        var (client, me) = await api.SignInAsync(ApiFactory.StaffEmail);
+        var profile = await client.GetFromJsonAsync<UserDto>("/api/users/me");
+        Assert.Equal(ApiFactory.StaffEmail, profile!.Email);
+
+        var res = await client.PatchAsJsonAsync($"/api/users/{me.UserId}", new UpdateUserRequest { CellNo = "082 123 4567" });
+        res.EnsureSuccessStatusCode();
+        Assert.Equal("082 123 4567", (await client.GetFromJsonAsync<UserDto>("/api/users/me"))!.CellNo);
+
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.PatchAsJsonAsync($"/api/users/{me.UserId}",
+            new UpdateUserRequest { RoleId = 1 })).StatusCode);
+    }
+//----------------------------------------------------------------------------------------------------------------------//
+    [Fact]
     public async Task Staff_cannot_reach_admin_routes()
     {
         var (client, _) = await api.SignInAsync(ApiFactory.StaffEmail);
