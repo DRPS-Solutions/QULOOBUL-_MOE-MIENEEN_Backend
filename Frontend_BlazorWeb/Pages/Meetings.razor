@@ -1,6 +1,9 @@
 @page "/meetings"
 @using MudBlazor
 @inject AppDataService AppData
+@inject IJSRuntime JS
+@inject ISnackbar Snackbar
+@implements IDisposable
 
 <PageTitle>Meeting Minutes</PageTitle>
 
@@ -294,6 +297,14 @@
                         <div class="drps-card-title">
                             <MudIcon Icon="@Icons.Material.Filled.Description" Size="Size.Small" />
                             Meeting Minutes
+                            <MudButton Variant="@(recording ? Variant.Filled : Variant.Outlined)"
+                                       Color="@(recording ? Color.Error : Color.Primary)"
+                                       Size="Size.Small"
+                                       Class="ml-auto"
+                                       StartIcon="@(recording ? Icons.Material.Filled.Stop : Icons.Material.Filled.Mic)"
+                                       OnClick="ToggleRecording">
+                                @(recording ? "Stop recording" : "Record")
+                            </MudButton>
                         </div>
                         <MudTextField T="string"
                                       @bind-Value="active.MinutesText"
@@ -371,6 +382,36 @@
     private bool addingActionItem = false;
     private bool saving;
 
+    // Dictation: the browser transcribes speech and each finished phrase is
+    // appended to the minutes text.
+    private bool recording;
+    private DotNetObjectReference<Meetings>? self;
+
+    private async Task ToggleRecording()
+    {
+        if (recording) { await JS.InvokeVoidAsync("dictation.stop"); return; }
+        self ??= DotNetObjectReference.Create(this);
+        recording = await JS.InvokeAsync<bool>("dictation.start", self);
+        if (!recording) Snackbar.Add("Speech recognition isn't supported in this browser. Try Chrome or Edge.", Severity.Warning);
+    }
+
+    [JSInvokable]
+    public void OnSpeech(string text)
+    {
+        if (active is null || text.Length == 0) return;
+        active.MinutesText = active.MinutesText.Length == 0 ? text : active.MinutesText.TrimEnd() + " " + text;
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public void OnDictationEnded() { recording = false; StateHasChanged(); }
+
+    public void Dispose()
+    {
+        if (recording) _ = JS.InvokeVoidAsync("dictation.stop");
+        self?.Dispose();
+    }
+
     // A new meeting can always be finished; an existing one only once its
     // minutes have changed.
     private bool CanSave => active is not null && !saving &&
@@ -437,7 +478,11 @@
     }
 
     // Leaves without saving.
-    private void BackToList() => active = null;
+    private async Task BackToList()
+    {
+        if (recording) await JS.InvokeVoidAsync("dictation.stop");
+        active = null;
+    }
 
     private void AddNote()
     {
