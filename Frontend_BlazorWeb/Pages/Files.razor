@@ -253,8 +253,9 @@
     private async Task Delete(FileMetadataDto f)
     {
         if (await DialogService.ShowMessageBoxAsync("Delete file", $"Delete \"{f.FileName}\" permanently?",
-                yesText: "Delete", cancelText: "Cancel") == true
-            && await AppData.SendAsync(HttpMethod.Delete, $"api/files/{f.FileId}"))
-            await Load();
+                yesText: "Delete", cancelText: "Cancel") != true) return;
+        // Reload even on failure: the server may have removed the row before erroring.
+        await AppData.SendAsync(HttpMethod.Delete, $"api/files/{f.FileId}");
+        await Load();
     }
 }

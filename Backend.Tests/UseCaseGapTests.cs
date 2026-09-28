@@ -85,7 +85,8 @@ public class UseCaseGapTests
             new FileUpload { Category = cat, Uploader = admin, FileName = "old-budget.xlsx", IsArchived = true },
             new FileUpload { Category = cat, Uploader = admin, FileName = "photo.png" });
         await db.SaveChangesAsync();
-        var files = new FileManagementService(db, null!, new AuditService(db), new AccessGuard(db));
+        var files = new FileManagementService(db, null!, new AuditService(db), new AccessGuard(db),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<FileManagementService>.Instance);
 
         Assert.Equal(["budget.xlsx"], (await files.ListAsync(null, null, null, "budget", false, admin.UserId)).Select(f => f.FileName));
         Assert.Equal(2, (await files.ListAsync(null, null, null, "budget", true, admin.UserId)).Count);
