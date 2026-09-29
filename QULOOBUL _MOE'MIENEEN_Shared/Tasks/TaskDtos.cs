@@ -54,6 +54,9 @@ namespace QULOOBUL__MOE_MIENEEN_Shared.Tasks
     {
         [Required, MaxLength(30)] 
         public string NewStatus { get; init; } = string.Empty;
+        /// <summary>Who actually did the work, when moving to Done; defaults to the caller.</summary>
+        [Range(1, int.MaxValue)]
+        public int? CompletedBy { get; init; }
     }
 //----------------------------------------------------------------------------------------------------------------------//
     public record AssignTaskRequest

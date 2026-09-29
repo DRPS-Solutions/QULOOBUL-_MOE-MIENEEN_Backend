@@ -75,7 +75,9 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
 //----------------------------------------------------------------------------------------------------------------------//
         /// <summary>SM-01 guarded status change, callable directly by a task-board move. The table in
         /// Lifecycle says which moves exist; the guards that need data are checked here.</summary>
-        public async Task ChangeStatusAsync(int taskId, string newStatus, int changedById)
+        /// <remarks><paramref name="completedById"/> names who did the work when it wasn't the caller (a manager
+        /// ticking off a daily task on someone's behalf); it need not be an assignee.</remarks>
+        public async Task ChangeStatusAsync(int taskId, string newStatus, int changedById, int? completedById = null)
         {
             var task = await db.Tasks.FindAsync(taskId)
                 ?? throw new KeyNotFoundException($"Task {taskId} not found.");
@@ -90,8 +92,10 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             if (Is(from, Lifecycle.TaskStart) && Is(newStatus, "In Progress")
                 && !await db.TaskAssignments.AnyAsync(a => a.TaskId == taskId))
                 throw new InvalidOperationException("Assign the task to someone before starting it.");
+            if (completedById is { } cid && !await db.Users.AnyAsync(u => u.UserId == cid && u.IsActive))
+                throw new InvalidOperationException("The person who completed the task must be an active user.");
 
-            MoveStatus(task, newStatus, changedById);
+            MoveStatus(task, newStatus, changedById, completedById);
 
             // cancel(admin) / notify assignee
             var notices = new List<Notification>();
@@ -150,7 +154,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
 //----------------------------------------------------------------------------------------------------------------------//
         private static bool Is(string? a, string b) => string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
 //----------------------------------------------------------------------------------------------------------------------//
-        private void MoveStatus(ProjectTask task, string newStatus, int changedById)
+        private void MoveStatus(ProjectTask task, string newStatus, int changedById, int? completedById = null)
         {
             if (string.Equals(task.Status, newStatus, StringComparison.OrdinalIgnoreCase))
                 return;
@@ -160,7 +164,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             if (newStatus.Equals("Done", StringComparison.OrdinalIgnoreCase))
             {
                 task.PercentComplete = 100;
-                task.CompletedBy = changedById;
+                task.CompletedBy = completedById ?? changedById;
             }
 
             // Task.status is a cache of the latest history row, maintained in the same transaction

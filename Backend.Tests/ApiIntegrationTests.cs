@@ -231,6 +231,37 @@ public class ApiIntegrationTests(ApiFactory api) : IClassFixture<ApiFactory>
     }
 //----------------------------------------------------------------------------------------------------------------------//
     [Fact]
+    public async Task Anyone_creates_daily_tasks_and_records_who_completed_one_not_assigned_to_them()
+    {
+        var (admin, adminMe) = await api.SignInAsync(ApiFactory.AdminEmail);
+        var (staff, staffMe) = await api.SignInAsync(ApiFactory.StaffEmail);
+        var daily = (await staff.GetFromJsonAsync<List<ProjectSummaryDto>>("/api/projects"))!
+            .Single(p => p.ProjectName == DailyTasksProject).ProjectId;
+        Assert.True((await staff.PostAsJsonAsync("/api/tasks", new CreateTaskRequest
+            { ProjectId = daily, Title = "Mop", Deadline = DateTime.UtcNow.AddDays(1) })).IsSuccessStatusCode);
+
+        // The admin's own task: staff neither created it nor is assigned to it.
+        var card = await (await admin.PostAsJsonAsync("/api/tasks", new CreateTaskRequest
+            { ProjectId = daily, Title = "Lock up", Deadline = DateTime.UtcNow.AddDays(1) })).Content.ReadFromJsonAsync<TaskCardDto>();
+        (await admin.PostAsJsonAsync($"/api/tasks/{card!.TaskId}/assignments", new AssignTaskRequest { AssigneeId = adminMe.UserId }))
+            .EnsureSuccessStatusCode();
+
+        Assert.Contains((await staff.GetFromJsonAsync<List<TaskCardDto>>("/api/tasks"))!, t => t.TaskId == card.TaskId);
+        Assert.False((await staff.PostAsJsonAsync($"/api/tasks/{card.TaskId}/move",
+            new MoveTaskRequest { NewStatus = "Done", CompletedBy = SystemUserId() })).IsSuccessStatusCode); // inactive
+        (await staff.PostAsJsonAsync($"/api/tasks/{card.TaskId}/move", new MoveTaskRequest { NewStatus = "Done", CompletedBy = staffMe.UserId }))
+            .EnsureSuccessStatusCode();
+
+        Assert.Equal(staffMe.UserId, (await admin.GetFromJsonAsync<TaskDetailDto>($"/api/tasks/{card.TaskId}"))!.CompletedBy);
+    }
+
+    private int SystemUserId()
+    {
+        using var scope = api.Services.CreateScope();
+        return api.Db(scope).Users.Where(u => u.Email == SystemAccountEmail).Select(u => u.UserId).Single();
+    }
+//----------------------------------------------------------------------------------------------------------------------//
+    [Fact]
     public async Task The_login_route_is_rate_limited_per_client()
     {
         var client = api.WithWebHostBuilder(b => b.UseSetting("RateLimit:AuthPerMinute", "2")).CreateClient();

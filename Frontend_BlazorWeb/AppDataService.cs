@@ -27,7 +27,7 @@ using QULOOBUL__MOE_MIENEEN_Shared.Requests;
 using QULOOBUL__MOE_MIENEEN_Shared.Tasks;
 using static QULOOBUL__MOE_MIENEEN_Shared.Classes.Common;
 
-public class AppDataService(HttpClient http, ISnackbar snackbar)
+public class AppDataService(HttpClient http, ISnackbar snackbar, IDialogService dialogs)
 {
     public event Action? OnChange;
     private void Changed() => OnChange?.Invoke();
@@ -221,14 +221,30 @@ public class AppDataService(HttpClient http, ISnackbar snackbar)
         return ok;
     }
 
-    /// <summary>Ticking a task completes it as the signed-in user; unticking reopens it.
-    /// The API enforces SM-01 (e.g. an unassigned "To Do" task can't jump to Done).</summary>
+    /// <summary>Ticking asks who completed the task (anyone, not just the assignee) and completes
+    /// it; unticking reopens it. SM-01 has no To Do/Blocked → Done edge, so a tick walks through
+    /// In Progress first - two legal moves, each guarded by the API.</summary>
     public async Task SetTaskDoneAsync(TaskCardDto task, bool done)
     {
-        await SendAsync(HttpMethod.Post, $"api/tasks/{task.TaskId}/move",
-            new MoveTaskRequest { NewStatus = done ? "Done" : "In Progress" });
+        int? completedBy = null;
+        if (done)
+        {
+            var dialog = await dialogs.ShowAsync<Frontend_BlazorWeb.Pages.CompletedByDialog>("Complete task",
+                new DialogParameters { ["TaskTitle"] = task.Title },
+                new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true, CloseOnEscapeKey = true });
+            if (await dialog.Result is not { Canceled: false, Data: int who }) return;
+            completedBy = who;
+        }
+
+        var ok = true;
+        if (done && !string.Equals(task.Status, "In Progress", StringComparison.OrdinalIgnoreCase))
+            ok = await Move(task.TaskId, "In Progress");
+        if (ok) await Move(task.TaskId, done ? "Done" : "In Progress", completedBy);
         await RefreshTasksAsync();
     }
+
+    private Task<bool> Move(int taskId, string status, int? completedBy = null) =>
+        SendAsync(HttpMethod.Post, $"api/tasks/{taskId}/move", new MoveTaskRequest { NewStatus = status, CompletedBy = completedBy });
 
     private Task<bool> Assign(int taskId, int userId) =>
         SendAsync(HttpMethod.Post, $"api/tasks/{taskId}/assignments", new AssignTaskRequest { AssigneeId = userId });

@@ -93,10 +93,10 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
         }
 //----------------------------------------------------------------------------------------------------------------------//
         /// <summary>Kanban column move - SM-01 enforced by TaskAssignmentService.</summary>
-        public async Task MoveAsync(int taskId, string newStatus, int actorId)
+        public async Task MoveAsync(int taskId, string newStatus, int actorId, int? completedBy = null)
         {
             await guard.EnsureTaskAsync(actorId, taskId);
-            await assignments.ChangeStatusAsync(taskId, newStatus, actorId);
+            await assignments.ChangeStatusAsync(taskId, newStatus, actorId, completedBy);
             var projectId = await db.Tasks.Where(t => t.TaskId == taskId).Select(t => t.ProjectId).FirstAsync();
             await notify.BroadcastAsync("boardChanged", new { projectId });
         }

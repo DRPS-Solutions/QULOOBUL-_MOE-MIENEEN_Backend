@@ -2,6 +2,7 @@ using QULOOBUL__MOE_MIENEEN_Backend.Data;
 using QULOOBUL__MOE_MIENEEN_Backend.Models.Project;
 using QULOOBUL__MOE_MIENEEN_Shared.Directory;
 using Microsoft.EntityFrameworkCore;
+using static QULOOBUL__MOE_MIENEEN_Shared.Classes.Common;
 
 namespace QULOOBUL__MOE_MIENEEN_Backend.Services
 {
@@ -13,7 +14,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
         {
             var q = db.Projects.AsQueryable();
             if (!await guard.IsAdminAsync(userId))
-                q = q.Where(p => p.OwnerId == userId
+                q = q.Where(p => p.OwnerId == userId || p.ProjectName == DailyTasksProject
                               || db.ProjectMembers.Any(m => m.ProjectId == p.ProjectId && m.UserId == userId));
 
             return await q.OrderBy(p => p.ProjectName).Select(p => new ProjectSummaryDto(
