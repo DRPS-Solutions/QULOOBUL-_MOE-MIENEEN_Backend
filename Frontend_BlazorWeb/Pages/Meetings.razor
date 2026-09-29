@@ -269,6 +269,10 @@
                             Approve minutes
                         </MudButton>
                     }
+                    <MudButton Variant="Variant.Outlined" Color="Color.Inherit" StartIcon="@Icons.Material.Filled.FileDownload"
+                               OnClick="DownloadDocx">
+                        Download .docx
+                    </MudButton>
                     <MudButton Variant="Variant.Filled"
                                Color="Color.Success"
                                StartIcon="@Icons.Material.Filled.Check"
@@ -424,9 +428,60 @@
         MeetingId = meeting.MeetingId,
         Title = meeting.Title,
         MinutesText = meeting.Minutes?.MinutesText ?? string.Empty,
+        MeetingDate = meeting.MeetingDate,
         OrganiserId = meeting.OrganiserId,
         Minutes = meeting.Minutes,
     });
+
+    // The minutes as on screen (unsaved notes included) in a new Word document:
+    // a minimal .docx is just three XML parts in a zip.
+    private string DocxHref()
+    {
+        static string Para(string text, bool heading = false) =>
+            $"<w:p><w:r>{(heading ? "<w:rPr><w:b/><w:sz w:val=\"32\"/></w:rPr>" : "")}" +
+            $"<w:t xml:space=\"preserve\">{System.Security.SecurityElement.Escape(text)}</w:t></w:r></w:p>";
+
+        var title = string.IsNullOrWhiteSpace(active!.Title) ? "Untitled meeting" : active.Title.Trim();
+        var body = Para(title, heading: true) + Para(active.MeetingDate.ToString("dd MMM yyyy")) + Para("")
+            + string.Concat(ComposedMinutes().Split('\n').Select(line => Para(line.TrimEnd('\r'))));
+
+        using var stream = new MemoryStream();
+        using (var zip = new System.IO.Compression.ZipArchive(stream, System.IO.Compression.ZipArchiveMode.Create))
+        {
+            void Add(string path, string xml)
+            {
+                using var w = new StreamWriter(zip.CreateEntry(path).Open());
+                w.Write("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>" + xml);
+            }
+            Add("[Content_Types].xml", "<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\">" +
+                "<Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/>" +
+                "<Default Extension=\"xml\" ContentType=\"application/xml\"/>" +
+                "<Override PartName=\"/word/document.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml\"/></Types>");
+            Add("_rels/.rels", "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">" +
+                "<Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"word/document.xml\"/></Relationships>");
+            Add("word/document.xml", "<w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\">" +
+                $"<w:body>{body}</w:body></w:document>");
+        }
+        return "data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64," + Convert.ToBase64String(stream.ToArray());
+    }
+
+    // Built on click, not at render, so a failure is reported instead of crashing the page; clicking again retries.
+    private async Task DownloadDocx()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("downloadFile", DocxName(), DocxHref());
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine(ex);
+            Snackbar.Add("Couldn't create the Word document. Please try again.", Severity.Error);
+        }
+    }
+
+    private string DocxName() =>
+        string.Concat((string.IsNullOrWhiteSpace(active!.Title) ? "meeting-minutes" : active.Title.Trim())
+            .Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c)) + ".docx";
 
     // The API lets the organiser or an admin sign off the saved minutes, and only unchanged ones.
     private bool CanApprove => active?.Minutes is not null && active.MinutesText == originalMinutes
@@ -536,6 +591,7 @@
         public int? MeetingId { get; set; } // null until the meeting exists
         public string Title { get; set; } = string.Empty;
         public string MinutesText { get; set; } = string.Empty;
+        public DateTime MeetingDate { get; init; } = DateTime.Now;
         public int? OrganiserId { get; init; }
         public MeetingMinutesDto? Minutes { get; set; }  // the saved version, for approval
     }
