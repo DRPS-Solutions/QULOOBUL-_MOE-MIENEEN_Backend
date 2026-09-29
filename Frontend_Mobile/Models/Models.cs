@@ -5,6 +5,7 @@ using QULOOBUL__MOE_MIENEEN_Shared.Notifications;
 using QULOOBUL__MOE_MIENEEN_Shared.Requests;
 using QULOOBUL__MOE_MIENEEN_Shared.Tasks;
 using QULOOBUL__MOE_MIENEEN_Shared.Collaboration;
+using QULOOBUL__MOE_MIENEEN_Shared.Directory;
 
 namespace Frontend_Mobile.Models;
 
@@ -143,6 +144,19 @@ public sealed class MinutesSearch(MeetingMinutesDto meetingMinutesDto, string? t
     public string MeetingTitle => titleOfMeeting ?? $"Meeting #{meetingMinutesDto.MeetingId}";
     public string SnippetOfMeetingMinutes => meetingMinutesDto.MinutesText.Length <= 120 ? meetingMinutesDto.MinutesText : 
         meetingMinutesDto.MinutesText[..120] + "...";
+}
+
+/// <summary>One row in UserManagementPage's roster</summary>
+public sealed class UserRow(UserSummaryDto userSummaryDto, string workloadLabel)
+{
+    public UserSummaryDto Dto => userSummaryDto;
+    public string FullName => userSummaryDto.FullName;
+    public string Role => userSummaryDto.Role;
+    public bool IsActive => userSummaryDto.IsActive;
+    public string WorkloadLabel => workloadLabel;
+    public string UserIntials => string.Concat(userSummaryDto.FullName.Split(
+        ' ', StringSplitOptions.RemoveEmptyEntries)
+        .Select(p => char.ToUpperInvariant(p[0])));
 }
 
 // ----- Resource requests (SM-02 statuses) -----
