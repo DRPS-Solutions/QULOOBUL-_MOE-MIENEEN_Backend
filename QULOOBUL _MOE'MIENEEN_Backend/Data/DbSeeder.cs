@@ -83,6 +83,21 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Data
                 db.SaveChanges();
             }
 
+            // Local testing only: one pre-activated user per non-admin role, so every role's views can be
+            // signed into without the emailed set-password link. Opt-in via user-secrets `Seed:DevPassword`;
+            // it is never set in Azure, so nothing is created there.
+            var devPassword = config["Seed:DevPassword"];
+            if (!string.IsNullOrWhiteSpace(devPassword))
+                foreach (var role in db.Roles.Where(r => r.RoleName != Roles.Admin).ToList())
+                {
+                    var devEmail = $"{role.RoleName.Replace(" ", "").ToLowerInvariant()}@dev.local";
+                    if (db.Users.Any(u => u.Email == devEmail)) continue;
+                    var dev = new User { RoleId = role.RoleId, FirstName = role.RoleName, Surname = "Dev", Email = devEmail };
+                    dev.PasswordHash = new PasswordHasher<User>().HashPassword(dev, devPassword);
+                    db.Users.Add(dev);
+                }
+            db.SaveChanges();
+
             // The actor for clock-driven transitions in MaintenanceJobs. Every history and audit row
             // needs a resolvable user FK, and an escalation has no human behind it. Inactive and with
             // no usable password hash, so it can neither log in nor be assigned work.
