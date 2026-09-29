@@ -24,7 +24,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
 //----------------------------------------------------------------------------------------------------------------------//
         public async Task<TaskScheduleDto> CreateAsync(CreateTaskScheduleRequest req, int actorId)
         {
-            await assignments.EnsureMayAssignAsync(actorId, req.AssignedTo);
+            await assignments.EnsureMayAssignAsync(actorId, req.AssignedTo, strictlyDown: true); // generates daily tasks
             var schedule = new TaskSchedule
             {
                 CreatedBy = actorId,
@@ -49,7 +49,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
 
             if (req.AssignedTo is int assignee && assignee != s.AssignedTo)
             {
-                await assignments.EnsureMayAssignAsync(actorId, assignee);
+                await assignments.EnsureMayAssignAsync(actorId, assignee, strictlyDown: true);
                 s.AssignedTo = assignee;
             }
             if (!string.IsNullOrWhiteSpace(req.Title)) s.Title = req.Title.Trim();

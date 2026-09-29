@@ -66,7 +66,8 @@ public class AppDataService(HttpClient http, ISnackbar snackbar, IDialogService 
         var auth = (await res.Content.ReadFromJsonAsync<AuthResponse>())!;
         http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth.Token);
         // Load names/projects before the shell renders, so nothing shows as "User #3" first.
-        await Task.WhenAll(RefreshUsersAsync(), RefreshProjectsAsync(), RefreshNotificationsAsync());
+        await Task.WhenAll(RefreshUsersAsync(), RefreshProjectsAsync(), RefreshNotificationsAsync(),
+            Refresh<RoleDto>("api/roles", l => roles = l));
         CurrentUser = auth;
         await ConnectHubAsync();
         Changed();
@@ -150,6 +151,12 @@ public class AppDataService(HttpClient http, ISnackbar snackbar, IDialogService 
     // Admins aren't line staff, and the API refuses deactivated assignees.
     public IEnumerable<UserSummaryDto> AssignableUsers =>
         Users.Where(u => u.IsActive && u.Role != Roles.Admin).OrderBy(u => u.FullName);
+
+    // Daily tasks are delegated strictly down the hierarchy (a facility manager → staff); the API enforces it.
+    private IReadOnlyList<RoleDto> roles = [];
+    private int Level(string? role) => roles.FirstOrDefault(r => r.RoleName == role)?.HierarchyLevel ?? 0;
+    public IEnumerable<UserSummaryDto> DailyAssignees =>
+        Users.Where(u => u.IsActive && Level(u.Role) > Level(Role)).OrderBy(u => u.FullName);
 
     public int? DailyProjectId => Projects.FirstOrDefault(p => p.ProjectName == DailyTasksProject)?.ProjectId;
 

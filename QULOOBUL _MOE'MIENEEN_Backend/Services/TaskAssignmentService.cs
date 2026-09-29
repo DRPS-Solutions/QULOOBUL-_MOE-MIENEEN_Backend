@@ -19,8 +19,8 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
     {
         /// <summary>
         /// Assign <paramref name="assigneeId"/> to <paramref name="taskId"/>. Tasks may be assigned
-        /// down the role hierarchy or sideways, never up (architecture doc, "Role.hierarchy_level").
-        /// A "To Do" task moves to "In Progress" on first assignment.
+        /// down the role hierarchy or sideways, never up (architecture doc, "Role.hierarchy_level");
+        /// daily tasks strictly down. A "To Do" task moves to "In Progress" on first assignment.
         /// </summary>
         public async Task<TaskAssignment> AssignAsync(int taskId, int assigneeId, int assignedById)
         {
@@ -29,7 +29,8 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
 
             if (Is(task.Status, Lifecycle.TaskCancelled) || Is(task.Status, Lifecycle.TaskArchived))
                 throw new InvalidOperationException($"Cannot assign a task that is {task.Status.ToLowerInvariant()}.");
-            await EnsureMayAssignAsync(assignedById, assigneeId);
+            var isDaily = await db.Projects.AnyAsync(p => p.ProjectId == task.ProjectId && p.ProjectName == DailyTasksProject);
+            await EnsureMayAssignAsync(assignedById, assigneeId, strictlyDown: isDaily);
 
             if (await db.TaskAssignments.AnyAsync(a => a.TaskId == taskId && a.UserId == assigneeId))
                 throw new InvalidOperationException("That user is already assigned to this task.");
@@ -180,9 +181,11 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
 //----------------------------------------------------------------------------------------------------------------------//
         /// <summary>
         /// The assignment rule on its own, shared with recurring schedules: the assignee is active and
-        /// not higher in the hierarchy than the assigner (lower level = more authority).
+        /// not higher in the hierarchy than the assigner (lower level = more authority). Daily work
+        /// (<paramref name="strictlyDown"/>) is delegated: a facility manager hands it to staff, an
+        /// admin to anyone below them, never to a peer or to themselves.
         /// </summary>
-        public async Task EnsureMayAssignAsync(int assignerId, int assigneeId)
+        public async Task EnsureMayAssignAsync(int assignerId, int assigneeId, bool strictlyDown = false)
         {
             var assignee = await db.Users.FindAsync(assigneeId)
                 ?? throw new KeyNotFoundException($"User {assigneeId} not found.");
@@ -191,8 +194,11 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
 
             if (!assignee.IsActive)
                 throw new InvalidOperationException("Cannot assign a task to a deactivated user.");
-            if (await LevelOf(assigner.RoleId) > await LevelOf(assignee.RoleId))
+            var (from, to) = (await LevelOf(assigner.RoleId), await LevelOf(assignee.RoleId));
+            if (from > to)
                 throw new InvalidOperationException("A task may not be assigned to someone higher in the hierarchy.");
+            if (strictlyDown && from == to)
+                throw new InvalidOperationException("Daily tasks are assigned to someone below you in the hierarchy.");
         }
 //----------------------------------------------------------------------------------------------------------------------//
         private async Task<int> LevelOf(int roleId)

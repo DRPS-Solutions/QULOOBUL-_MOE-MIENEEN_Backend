@@ -240,10 +240,13 @@ public class ApiIntegrationTests(ApiFactory api) : IClassFixture<ApiFactory>
         Assert.True((await staff.PostAsJsonAsync("/api/tasks", new CreateTaskRequest
             { ProjectId = daily, Title = "Mop", Deadline = DateTime.UtcNow.AddDays(1) })).IsSuccessStatusCode);
 
-        // The admin's own task: staff neither created it nor is assigned to it.
+        // Delegated strictly down: not to a peer (here, the admin themselves), but to a colleague of
+        // staff's, so staff neither created it nor is assigned to it.
         var card = await (await admin.PostAsJsonAsync("/api/tasks", new CreateTaskRequest
             { ProjectId = daily, Title = "Lock up", Deadline = DateTime.UtcNow.AddDays(1) })).Content.ReadFromJsonAsync<TaskCardDto>();
-        (await admin.PostAsJsonAsync($"/api/tasks/{card!.TaskId}/assignments", new AssignTaskRequest { AssigneeId = adminMe.UserId }))
+        Assert.False((await admin.PostAsJsonAsync($"/api/tasks/{card!.TaskId}/assignments",
+            new AssignTaskRequest { AssigneeId = adminMe.UserId })).IsSuccessStatusCode);
+        (await admin.PostAsJsonAsync($"/api/tasks/{card.TaskId}/assignments", new AssignTaskRequest { AssigneeId = await AddStaffAsync() }))
             .EnsureSuccessStatusCode();
 
         Assert.Contains((await staff.GetFromJsonAsync<List<TaskCardDto>>("/api/tasks"))!, t => t.TaskId == card.TaskId);
@@ -253,6 +256,20 @@ public class ApiIntegrationTests(ApiFactory api) : IClassFixture<ApiFactory>
             .EnsureSuccessStatusCode();
 
         Assert.Equal(staffMe.UserId, (await admin.GetFromJsonAsync<TaskDetailDto>($"/api/tasks/{card.TaskId}"))!.CompletedBy);
+    }
+
+    private async Task<int> AddStaffAsync()
+    {
+        using var scope = api.Services.CreateScope();
+        var db = api.Db(scope);
+        var user = new User
+        {
+            RoleId = await db.Roles.Where(r => r.RoleName == Roles.Staff).Select(r => r.RoleId).SingleAsync(),
+            FirstName = "Other", Surname = "Staff", Email = $"{Guid.NewGuid():N}@test.local",
+        };
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+        return user.UserId;
     }
 
     private int SystemUserId()

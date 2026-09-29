@@ -49,7 +49,7 @@
 
         <MudSelect T="int?" Label="Assignee" Variant="Variant.Outlined" Required="true" RequiredError="Choose who the task is for." @bind-Value="assigneeId"
                    ToStringFunc="@(id => AppData.UserName(id))" Class="mb-3">
-            @foreach (var user in AppData.AssignableUsers)
+            @foreach (var user in taskType == "Daily" ? AppData.DailyAssignees : AppData.AssignableUsers)
             {
                 <MudSelectItem T="int?" Value="@user.UserId">@user.FullName</MudSelectItem>
             }

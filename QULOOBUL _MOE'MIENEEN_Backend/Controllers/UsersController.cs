@@ -69,7 +69,8 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Controllers
             return NoContent();
         }
 //----------------------------------------------------------------------------------------------------------------------//
-        [HttpGet("~/api/roles"), Authorize(Policy = Permissions.ManageUsers)]
+        // Any signed-in user: clients need the levels to offer only legal assignees.
+        [HttpGet("~/api/roles")]
         public async Task<ActionResult<List<RoleDto>>> Roles() => Ok(await users.RolesAsync());
     }
 }
