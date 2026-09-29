@@ -147,16 +147,18 @@ code {
     --drps-shadow: rgba(0, 0, 0, 0.35);
 }
 
-/* Headers are a dark gradient in both themes: keep their buttons legible, disabled included. */
-:is(.drps-page-header, .drps-notifications-header, .drps-requests-header, .drps-profile-header,
+/* Headers are a dark gradient in both themes: keep their buttons legible, disabled included.
+   MudBlazor 9 marks disabled buttons with the :disabled attribute (no .mud-disabled class) and
+   forces a dark grey text colour with !important, hence the !important here. */
+:is(.drps-header, .drps-page-header, .drps-notifications-header, .drps-requests-header, .drps-profile-header,
     .drps-meeting-header, .drps-events-header, .drps-users-header) .mud-button-outlined {
     color: #fff;
     border-color: rgba(255, 255, 255, 0.8);
 }
 
-:is(.drps-page-header, .drps-notifications-header, .drps-requests-header, .drps-profile-header,
-    .drps-meeting-header, .drps-events-header, .drps-users-header) .mud-button-root.mud-disabled {
-    color: rgba(255, 255, 255, 0.7) !important;
-    background-color: rgba(255, 255, 255, 0.15) !important;
-    border: 1px solid rgba(255, 255, 255, 0.4);
+:is(.drps-header, .drps-page-header, .drps-notifications-header, .drps-requests-header, .drps-profile-header,
+    .drps-meeting-header, .drps-events-header, .drps-users-header) .mud-button-root:disabled {
+    color: rgba(255, 255, 255, 0.85) !important;
+    background-color: rgba(255, 255, 255, 0.12) !important;
+    border: 1px solid rgba(255, 255, 255, 0.5);
 }
