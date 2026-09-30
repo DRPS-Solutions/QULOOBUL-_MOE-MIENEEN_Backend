@@ -68,7 +68,9 @@ jobs:
 
       # Side-loaded for the client demo and for marking. Play Store
       # distribution is Phase 2 and is deliberately not automated.
-      - uses: actions/upload-artifact@v4
+      # Release branches only: an APK per dev push fills the artifact quota.
+      - if: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' }}
+        uses: actions/upload-artifact@v4
         with:
           name: npo-android-apk
           path: ./apk/*.apk
