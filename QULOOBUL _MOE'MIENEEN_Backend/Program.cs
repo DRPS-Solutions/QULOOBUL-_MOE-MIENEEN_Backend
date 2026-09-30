@@ -36,7 +36,8 @@ builder.Services.AddOpenApi();
 // UseSeeding runs after `dotnet ef database update` (and Migrate/EnsureCreated).
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddDbContext<AppDbContext>((sp, o) => o
-    .UseSqlServer(builder.Configuration.GetConnectionString("Default"))
+    // Retries ride out an Azure SQL serverless database resuming from auto-pause (error 40613).
+    .UseSqlServer(builder.Configuration.GetConnectionString("Default"), sql => sql.EnableRetryOnFailure())
     .AddInterceptors(new SessionContextInterceptor(sp.GetRequiredService<IHttpContextAccessor>()))
     .UseSeeding((db, _) => DbSeeder.Seed((AppDbContext)db, builder.Configuration)));
 
