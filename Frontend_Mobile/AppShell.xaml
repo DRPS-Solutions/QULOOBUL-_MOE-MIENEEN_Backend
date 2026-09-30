@@ -101,11 +101,7 @@
     </FlyoutItem>
 
     <FlyoutItem Title="User Management" Route="users" IsVisible="{Binding CanSeeUserManagement}">
-        <ShellContent>
-            <ShellContent.Content>
-                <pages:ComingSoonPage FeatureName="User Management" />
-            </ShellContent.Content>
-        </ShellContent>
+        <ShellContent ContentTemplate="{DataTemplate pages:UserManagementPage}" />
     </FlyoutItem>
 
     <FlyoutItem Title="Event Planning" Route="events" IsVisible="{Binding CanSeeEvents}">
