@@ -1,4 +1,3 @@
-using AndroidX.Core.Provider;
 using Frontend_Mobile.Data;
 using Frontend_Mobile.Models;
 using QULOOBUL__MOE_MIENEEN_Shared.Directory;
@@ -172,7 +171,7 @@ namespace Frontend_Mobile.Pages
             RosterSection.IsVisible = true;
         }
 
-        private void OnFormChanged(object? sender, EventArgs e) => RefresheSaveState();
+        private void OnFormChanged(object? sender, EventArgs e) => RefreshSaveState();
 
         private void RefreshSaveState() => SaveUserButton.IsEnabled =
             !string.IsNullOrWhiteSpace(FirstNameEntry.Text) &&
