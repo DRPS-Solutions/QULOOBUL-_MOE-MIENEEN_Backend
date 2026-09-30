@@ -428,6 +428,33 @@
                                 }
                             </div>
                         </div>
+
+                        <div class="drps-task-col mt-4">
+                            <div class="drps-task-col-title">
+                                <MudIcon Icon="@Icons.Material.Filled.History" Size="Size.Small" />
+                                Activity Log
+                            </div>
+                            @if (!selectedAudit.Any())
+                            {
+                                <div class="drps-task-col-empty">No recorded activity</div>
+                            }
+                            else
+                            {
+                                <MudSimpleTable Dense="true" Hover="true" Style="max-height:360px; overflow-y:auto; background:transparent;">
+                                    <thead><tr><th>When</th><th>Action</th><th>Target</th></tr></thead>
+                                    <tbody>
+                                        @foreach (var entry in selectedAudit)
+                                        {
+                                            <tr>
+                                                <td>@entry.Timestamp.ToLocalTime().ToString("d MMM yyyy HH:mm")</td>
+                                                <td>@entry.Action</td>
+                                                <td>@(entry.EntityId == 0 ? entry.EntityType : $"{entry.EntityType} #{entry.EntityId}")</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </MudSimpleTable>
+                            }
+                        </div>
                     }
                 </MudItem>
             </MudGrid>
@@ -480,6 +507,7 @@
 
     private UserSummaryDto? selectedEmployee;
     private IReadOnlyList<TaskCardDto> selectedTasks = [];
+    private IReadOnlyList<AuditEntryDto> selectedAudit = [];
 
     // Create user form
     private NewUserForm newUser = new();
@@ -534,8 +562,13 @@
     {
         selectedEmployee = employee;
         selectedTasks = [];
-        var tasks = await AppData.GetAsync<List<TaskCardDto>>($"api/tasks?assigneeId={employee.UserId}");
-        if (selectedEmployee == employee) selectedTasks = tasks ?? []; // ignore a slower, older click
+        selectedAudit = [];
+        var tasksLoad = AppData.GetAsync<List<TaskCardDto>>($"api/tasks?assigneeId={employee.UserId}");
+        var auditLoad = AppData.GetAsync<List<AuditEntryDto>>($"api/users/{employee.UserId}/audit");
+        await Task.WhenAll(tasksLoad, auditLoad);
+        if (selectedEmployee != employee) return; // ignore a slower, older click
+        selectedTasks = await tasksLoad ?? [];
+        selectedAudit = await auditLoad ?? [];
     }
 
     private async Task SaveUser()

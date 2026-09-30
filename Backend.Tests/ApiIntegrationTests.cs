@@ -150,6 +150,17 @@ public class ApiIntegrationTests(ApiFactory api) : IClassFixture<ApiFactory>
     }
 //----------------------------------------------------------------------------------------------------------------------//
     [Fact]
+    public async Task Only_the_admin_reads_a_users_audit_trail()
+    {
+        var (staff, staffMe) = await api.SignInAsync(ApiFactory.StaffEmail);
+        Assert.Equal(HttpStatusCode.Forbidden, (await staff.GetAsync($"/api/users/{staffMe.UserId}/audit")).StatusCode);
+
+        var (admin, _) = await api.SignInAsync(ApiFactory.AdminEmail);
+        var trail = await admin.GetFromJsonAsync<List<AuditEntryDto>>($"/api/users/{staffMe.UserId}/audit");
+        Assert.Contains(trail!, e => e.Action == "auth.login");
+    }
+//----------------------------------------------------------------------------------------------------------------------//
+    [Fact]
     public async Task Only_the_organiser_or_an_admin_changes_an_events_attendees()
     {
         var (admin, adminMe) = await api.SignInAsync(ApiFactory.AdminEmail);

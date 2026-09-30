@@ -84,6 +84,9 @@ namespace QULOOBUL__MOE_MIENEEN_Shared.Directory
     public record ProjectMemberDto(int UserId, string FullName, DateTime DateAdded);
     public record AddProjectMemberRequest { [Required, Range(1, int.MaxValue)] public int UserId { get; init; } }
 //----------------------------------------------------------------------------------------------------------------------//
+    /// <summary>One Audit_Log row, as the admin sees it on a user's activity log.</summary>
+    public record AuditEntryDto(DateTime Timestamp, string Action, string EntityType, int EntityId);
+//----------------------------------------------------------------------------------------------------------------------//
     /// <summary>UC-06 admin dashboard row.</summary>
     public record StaffOverviewRow(
         int UserId, string FullName, string Role, int ActiveTasks, int OverdueTasks, int OpenRequests);

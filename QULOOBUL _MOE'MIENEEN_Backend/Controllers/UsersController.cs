@@ -6,7 +6,7 @@ using static QULOOBUL__MOE_MIENEEN_Shared.Classes.Common;
 
 namespace QULOOBUL__MOE_MIENEEN_Backend.Controllers
 {
-    public class UsersController(StaffOverviewService staff, UserService users) : ApiControllerBase
+    public class UsersController(StaffOverviewService staff, UserService users, AuditService audit) : ApiControllerBase
     {
         /// <summary>Staff directory: every signed-in user needs it for names and assignee pickers.</summary>
         [HttpGet]
@@ -24,6 +24,11 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Controllers
         [HttpPost, Authorize(Policy = Permissions.ManageUsers)]
         public async Task<ActionResult<UserDto>> Create(CreateUserRequest req) =>
             Ok(await users.CreateAsync(req, UserId()));
+//----------------------------------------------------------------------------------------------------------------------//
+        /// <summary>The main admin's view of what a user has done (Audit_Log), newest first.</summary>
+        [HttpGet("{id:int}/audit"), Authorize(Policy = Permissions.ManageUsers)]
+        public async Task<ActionResult<List<AuditEntryDto>>> Audit(int id, int take = 100) =>
+            Ok(await audit.ForUserAsync(id, take));
 //----------------------------------------------------------------------------------------------------------------------//
         [HttpGet("me")]
         public async Task<ActionResult<UserDto>> Me() => Ok(await users.GetAsync(UserId()));

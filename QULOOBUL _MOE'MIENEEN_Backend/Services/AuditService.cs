@@ -1,5 +1,7 @@
+using Microsoft.EntityFrameworkCore;
 using QULOOBUL__MOE_MIENEEN_Backend.Data;
 using QULOOBUL__MOE_MIENEEN_Backend.Models.NotificationsAudit;
+using QULOOBUL__MOE_MIENEEN_Shared.Directory;
 
 namespace QULOOBUL__MOE_MIENEEN_Backend.Services
 {
@@ -32,6 +34,15 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             Record(userId, action, entityType, entityId);
             await db.SaveChangesAsync();
         }
+//----------------------------------------------------------------------------------------------------------------------//
+        /// <summary>The user's most recent audit entries, newest first. Read-only.</summary>
+        public Task<List<AuditEntryDto>> ForUserAsync(int userId, int take) =>
+            db.AuditLogs.AsNoTracking()
+                .Where(a => a.UserId == userId)
+                .OrderByDescending(a => a.Timestamp)
+                .Take(Math.Clamp(take, 1, 500))
+                .Select(a => new AuditEntryDto(a.Timestamp, a.Action, a.EntityType, a.EntityId))
+                .ToListAsync();
     }
 }
 //---------------------------DDDDDDDDDDDoooooooooooooo END OF FILE DDDDDDDDDDDoooooooooooooo---------------------------//
