@@ -17,13 +17,11 @@
 
 <body>
     <script src="_content/MudBlazor/MudBlazor.min.js"></script>
-    <div id="app">
-        <svg class="loading-progress">
-            <circle r="40%" cx="50%" cy="50%" />
-            <circle r="40%" cx="50%" cy="50%" />
-        </svg>
-        <div class="loading-progress-text"></div>
-    </div>
+    <script src="js/dictation.js"></script>
+    <script>
+        window.downloadFile = (name, href) => Object.assign(document.createElement("a"), { href, download: name }).click();
+    </script>
+    <div id="app"></div>
 
     <div id="blazor-error-ui">
         An unhandled error has occurred.

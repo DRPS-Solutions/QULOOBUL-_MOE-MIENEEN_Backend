@@ -14,7 +14,7 @@
                 <MudText Typo="Typo.h6" Style="font-weight:600;">Calendar</MudText>
                 <div class="drps-subtitle">Upcoming events, who is invited, and your RSVP.</div>
             </div>
-            <MudButton Variant="Variant.Outlined" Style="color:white;border-color:rgba(255,255,255,0.4);"
+            <MudButton Variant="Variant.Outlined"
                        StartIcon="@Icons.Material.Filled.Add" OnClick="@(() => { creating = true; selected = null; })">
                 New event
             </MudButton>
@@ -44,10 +44,10 @@
                     @if (creating)
                     {
                         <MudText Typo="Typo.subtitle1" Style="font-weight:600;" Class="mb-3">New event</MudText>
-                        <MudTextField T="string" @bind-Value="newTitle" Label="Title" Variant="Variant.Outlined" MaxLength="200" Immediate="true" Class="mb-3" />
+                        <MudTextField T="string" @bind-Value="newTitle" Label="Title" Variant="Variant.Outlined" Required="true" RequiredError="Give the event a title." MaxLength="200" Immediate="true" Class="mb-3" />
                         <div class="d-flex gap-3 mb-3">
-                            <MudDatePicker @bind-Date="newDate" Label="Date" Variant="Variant.Outlined" />
-                            <MudTimePicker @bind-Time="newTime" Label="Time" Variant="Variant.Outlined" />
+                            <MudDatePicker @bind-Date="newDate" Label="Date" Variant="Variant.Outlined" Required="true" RequiredError="Choose a date." />
+                            <MudTimePicker @bind-Time="newTime" Label="Time" Variant="Variant.Outlined" Required="true" RequiredError="Choose a time." />
                         </div>
                         <MudTextField T="string" @bind-Value="newLocation" Label="Location" Variant="Variant.Outlined" MaxLength="200" Class="mb-3" />
                         <div class="d-flex gap-2">
@@ -69,6 +69,8 @@
                             @(string.IsNullOrEmpty(selected.Location) ? "" : $" · {selected.Location}")
                             · organised by @AppData.UserName(selected.OrganiserId)
                         </div>
+                        <MudButton Size="Size.Small" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.EventAvailable" Class="mb-4"
+                                   Href="@IcsHref(selected)" download="@($"event-{selected.EventId}.ics")">Add to calendar</MudButton>
 
                         @if (me is not null)
                         {
@@ -185,6 +187,26 @@
     {
         if (await AppData.SendAsync(HttpMethod.Delete, $"api/events/{selected!.EventId}/attendees/{userId}"))
             await Select(selected.EventId);
+    }
+
+    // iCalendar (RFC 5545) file as a data: link, so any calendar app can import the event without an API call.
+    // EventDate is wall-clock, so DTSTART is a "floating" time (no Z / TZID): it shows at the same clock time everywhere.
+    // ponytail: Event has no duration, so every export is 1 hour; add DTEND when the entity gets an end time.
+    // ponytail: lines aren't folded at 75 octets; Google/Outlook/Apple accept long lines anyway.
+    private static string IcsHref(EventDto ev)
+    {
+        static string Esc(string s) => s.Replace("\\", "\\\\").Replace(";", "\\;").Replace(",", "\\,").Replace("\r", "").Replace("\n", "\\n");
+        var ics = string.Join("\r\n",
+            "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//DRPS Solutions//Calendar//EN",
+            "BEGIN:VEVENT",
+            $"UID:event-{ev.EventId}@drps",
+            FormattableString.Invariant($"DTSTAMP:{DateTime.UtcNow:yyyyMMdd'T'HHmmss'Z'}"),
+            FormattableString.Invariant($"DTSTART:{ev.EventDate:yyyyMMdd'T'HHmmss}"),
+            "DURATION:PT1H",
+            $"SUMMARY:{Esc(ev.Title)}",
+            $"LOCATION:{Esc(ev.Location ?? "")}",
+            "END:VEVENT", "END:VCALENDAR", "");
+        return "data:text/calendar;charset=utf-8," + Uri.EscapeDataString(ics);
     }
 
     private static Color StatusColor(string status) => status switch

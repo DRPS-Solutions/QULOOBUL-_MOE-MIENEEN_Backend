@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using QULOOBUL__MOE_MIENEEN_Backend.Services;
 using QULOOBUL__MOE_MIENEEN_Shared.Auth;
+using static QULOOBUL__MOE_MIENEEN_Shared.Classes.Common;
 
 namespace QULOOBUL__MOE_MIENEEN_Backend.Controllers
 {
@@ -20,13 +21,21 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Controllers
         /// <param name="req"></param>
         /// <returns></returns>
         [HttpPost("login"), AllowAnonymous]
-        public async Task<ActionResult<AuthResponse>> Login(LoginRequest req) => Ok(await auth.LoginAsync(req));
+        public async Task<ActionResult<AuthResponse>> Login(LoginRequest req)
+        {
+            // A wrong password is routine, so it is answered here rather than left to the middleware
+            // (an exception escaping user code makes the debugger stop on every typo).
+            try { return Ok(await auth.LoginAsync(req)); }
+            catch (UnauthorizedAccessException ex) { return Unauthorized(new ErrorResponse(ex.Message)); }
+        }
 
         /// <summary>SM-03 setPassword: redeem the activation / reset link's token.</summary>
         [HttpPost("set-password"), AllowAnonymous]
         public async Task<IActionResult> SetPassword(SetPasswordRequest req)
         {
-            await auth.SetPasswordAsync(req);
+            // 403, not 401: the client treats a 401 as an expired session and would hide the message.
+            try { await auth.SetPasswordAsync(req); }
+            catch (UnauthorizedAccessException ex) { return StatusCode(StatusCodes.Status403Forbidden, new ErrorResponse(ex.Message)); }
             return NoContent();
         }
     }

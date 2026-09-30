@@ -1,0 +1,48 @@
+@* =====================================================================
+   CompletedByDialog
+   Shown via IDialogService when a task is ticked. Asks who actually did
+   the work - defaulting to the signed-in user - since whoever ticks it
+   (a facility manager, or a colleague) isn't always the one who did it,
+   and it needn't be the assignee. Returns the chosen user id; cancelling
+   leaves the task open.
+   ===================================================================== *@
+@using MudBlazor
+@inject AppDataService AppData
+
+<MudDialog Style="border-radius:16px;">
+    <TitleContent>
+        <MudText Typo="Typo.h6" Style="font-weight:600;">Complete task</MudText>
+    </TitleContent>
+    <DialogContent>
+        <div class="drps-modal-task-name">@TaskTitle</div>
+        <MudSelect T="int?" Label="Completed by" Variant="Variant.Outlined" Required="true" RequiredError="Choose who completed the task."
+                   @bind-Value="completedBy" ToStringFunc="@(id => AppData.UserName(id))">
+            @foreach (var user in AppData.Users.Where(u => u.IsActive).OrderBy(u => u.FullName))
+            {
+                <MudSelectItem T="int?" Value="@user.UserId">@user.FullName</MudSelectItem>
+            }
+        </MudSelect>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="@(completedBy is null)" OnClick="Confirm">
+            Mark complete
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter]
+    public string TaskTitle { get; set; } = string.Empty;
+
+    private int? completedBy;
+
+    protected override void OnInitialized() => completedBy = AppData.CurrentUser?.UserId;
+
+    private void Confirm() => MudDialog.Close(DialogResult.Ok(completedBy!.Value));
+
+    private void Cancel() => MudDialog.Cancel();
+}

@@ -28,7 +28,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Controllers
         [HttpPost("{id:int}/move")]
         public async Task<IActionResult> Move(int id, MoveTaskRequest req)
         {
-            await tasks.MoveAsync(id, req.NewStatus, UserId());
+            await tasks.MoveAsync(id, req.NewStatus, UserId(), req.CompletedBy);
             return NoContent();
         }
 //----------------------------------------------------------------------------------------------------------------------//
