@@ -77,6 +77,7 @@ jobs:
 
       # Staging never swaps, so it deploys straight to its own app rather than a slot.
       - name: Deploy API to the staging app
+        id: deploy
         uses: azure/webapps-deploy@v3
         with:
           app-name: ${{ vars.AZURE_WEBAPP_NAME }}
@@ -84,7 +85,7 @@ jobs:
 
       # Points the client at this API and writes its CSP (hash of the build-specific import map).
       - name: Configure Blazor client for Static Web Apps
-        run: bash .github/scripts/web-config.sh ./web "https://${{ vars.AZURE_WEBAPP_NAME }}.azurewebsites.net"
+        run: bash .github/scripts/web-config.sh ./web "${{ steps.deploy.outputs.webapp-url }}"
 
       - name: Deploy Blazor client to Static Web Apps
         if: ${{ vars.AZURE_STATIC_WEB_APP != '' }}
@@ -123,4 +124,4 @@ jobs:
         env:
           SMOKE_EMAIL: ${{ secrets.SMOKE_EMAIL }}
           SMOKE_PASSWORD: ${{ secrets.SMOKE_PASSWORD }}
-        run: bash .github/scripts/smoke-test.sh "https://${{ vars.AZURE_WEBAPP_NAME }}.azurewebsites.net"
+        run: bash .github/scripts/smoke-test.sh "${{ steps.deploy.outputs.webapp-url }}"
