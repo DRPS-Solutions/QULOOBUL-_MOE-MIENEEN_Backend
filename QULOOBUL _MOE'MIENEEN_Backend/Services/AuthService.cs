@@ -20,7 +20,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
         private static readonly PasswordHasher<User> Hasher = new();
 
         public const string FailedAction = "auth.login.failed";
-        public const int MaxFailedLogins = 3;
+        public const int MaxFailedLogins = 5;
         public static readonly TimeSpan PasswordTokenLifetime = TimeSpan.FromDays(3);
 //----------------------------------------------------------------------------------------------------------------------//
         public async Task<AuthResponse> LoginAsync(LoginRequest req)
@@ -51,7 +51,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             if (Hasher.VerifyHashedPassword(user, user.PasswordHash, req.Password)
                 == PasswordVerificationResult.Failed)
             {
-                // SD-01, alt [valid = false]; SM-03 Authenticate [3 consecutive failures] → Locked.
+                // SD-01, alt [valid = false]; SM-03 Authenticate [5 consecutive failures] → Locked.
                 user.FailedLoginCount++;
                 audit.Record(user.UserId, FailedAction, nameof(User), user.UserId);
                 if (user.FailedLoginCount >= MaxFailedLogins) await LockAsync(user);

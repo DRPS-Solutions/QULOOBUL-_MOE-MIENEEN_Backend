@@ -1,9 +1,8 @@
 // One environment of the architecture doc's resource table, in South Africa North (POPIA).
 // Deploy once per environment into one resource group; both environments share the App Service plan.
 //
-//   az group create -n rg-quloobul -l southafricanorth
-//   az deployment group create -g rg-quloobul -f infra/main.bicep -p env=staging sqlAdminPassword=... jwtSigningKey=...
-//   az deployment group create -g rg-quloobul -f infra/main.bicep -p env=prod sqlAdminPassword=... jwtSigningKey=... alertEmail=...
+//   az deployment group create -g XBCAD -f infra/main.bicep -p env=staging sqlAdminPassword=... jwtSigningKey=...
+//   az deployment group create -g XBCAD -f infra/main.bicep -p env=prod sqlAdminPassword=... jwtSigningKey=... alertEmail=...
 //
 // The deployer needs Owner (or User Access Administrator) on the group: it grants the apps Key Vault access.
 
@@ -18,13 +17,12 @@ param sqlAdminPassword string
 @secure()
 @minLength(32)
 param jwtSigningKey string
-@secure()
-@description('Empty keeps notifications in-app only (EmailService is inert without a key).')
-param resendApiKey string = ''
 @description('Receives the availability and DTU alerts (prod only).')
 param alertEmail string = ''
 @description('Named developer IPs admitted to SQL. The doc requires these to be removed before go-live.')
 param devIps array = []
+@description('Existing vault in this resource group. Must use the Azure RBAC permission model.')
+param keyVaultName string = 'XBCADKeys'
 
 var name = 'quloobul'
 var suffix = take(uniqueString(resourceGroup().id, env), 5)
@@ -55,16 +53,16 @@ func kvRef(vault string, secret string) string => '@Microsoft.KeyVault(VaultName
 
 var webOrigin = 'https://${web.properties.defaultHostname}'
 var appSettings = concat([
-  { name: 'ConnectionStrings__Default', value: kvRef(kv.name, 'sql-connection') }
-  { name: 'ConnectionStrings__BlobStorage', value: kvRef(kv.name, 'blob-connection') }
-  { name: 'Jwt__SigningKey', value: kvRef(kv.name, 'jwt-signing-key') }
+  { name: 'ConnectionStrings__Default', value: kvRef(kv.name, '${env}-sql-connection') }
+  { name: 'ConnectionStrings__BlobStorage', value: kvRef(kv.name, '${env}-blob-connection') }
+  { name: 'Jwt__SigningKey', value: kvRef(kv.name, '${env}-jwt-signing-key') }
   { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', value: appi.properties.ConnectionString }
   { name: 'Cors__Origins__0', value: webOrigin }
   { name: 'App__BaseUrl', value: webOrigin }
-], empty(resendApiKey) ? [] : [
-  { name: 'Email__ResendApiKey', value: kvRef(kv.name, 'resend-api-key') }
+  { name: 'Email__ConnectionString', value: kvRef(kv.name, '${env}-acs-connection') }
+  { name: 'Email__From', value: 'DoNotReply@${emailDomain.properties.fromSenderDomain}' }
 ], isProd ? [
-  { name: 'Azure__SignalR__ConnectionString', value: kvRef(kv.name, 'signalr-connection') }
+  { name: 'Azure__SignalR__ConnectionString', value: kvRef(kv.name, '${env}-signalr-connection') }
 ] : [])
 
 resource app 'Microsoft.Web/sites@2023-12-01' = {
@@ -182,60 +180,85 @@ resource signalR 'Microsoft.SignalRService/signalR@2024-03-01' = if (isProd) {
   }
 }
 
+// Email: an Azure-managed sender domain (<guid>.azurecomm.net) needs no DNS. Once the NPO owns a
+// domain, add it as a CustomerManaged domain here, link it, and point Email__From at it.
+resource emailService 'Microsoft.Communication/emailServices@2023-04-01' = {
+  name: 'ecs-${name}-${env}'
+  location: 'global'
+  properties: { dataLocation: 'Africa' }   // POPIA: data at rest stays in South Africa
+}
+
+resource emailDomain 'Microsoft.Communication/emailServices/domains@2023-04-01' = {
+  parent: emailService
+  name: 'AzureManagedDomain'
+  location: 'global'
+  properties: { domainManagement: 'AzureManaged', userEngagementTracking: 'Disabled' }
+}
+
+resource acs 'Microsoft.Communication/communicationServices@2023-04-01' = {
+  name: 'acs-${name}-${env}-${suffix}'
+  location: 'global'
+  properties: { dataLocation: 'Africa', linkedDomains: [emailDomain.id] }
+}
+
 // ------------------------------------------------ Secrets ------------------------------------------------
 // Read by the apps' system-assigned identities through Key Vault references: no key in any app setting.
-resource kv 'Microsoft.KeyVault/vaults@2023-07-01' = {
-  name: 'kv${name}${env}${suffix}'
-  location: location
-  properties: {
-    tenantId: subscription().tenantId
-    sku: { family: 'A', name: 'standard' }
-    enableRbacAuthorization: true
-  }
+// Shared by both environments, hence the env prefix on every secret name.
+resource kv 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
+  name: keyVaultName
 }
 
 resource sqlSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
   parent: kv
-  name: 'sql-connection'
+  name: '${env}-sql-connection'
   properties: { value: 'Server=tcp:${sql.properties.fullyQualifiedDomainName},1433;Database=${db.name};User ID=${sqlAdminLogin};Password=${sqlAdminPassword};Encrypt=True;MultipleActiveResultSets=True' }
 }
 
 // An account-key connection string: BlobStorageService signs its SAS with the shared key.
 resource blobSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
   parent: kv
-  name: 'blob-connection'
+  name: '${env}-blob-connection'
   properties: { value: 'DefaultEndpointsProtocol=https;AccountName=${storage.name};AccountKey=${storage.listKeys().keys[0].value};EndpointSuffix=${environment().suffixes.storage}' }
 }
 
 resource jwtSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
   parent: kv
-  name: 'jwt-signing-key'
+  name: '${env}-jwt-signing-key'
   properties: { value: jwtSigningKey }
 }
 
-resource resendSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if (!empty(resendApiKey)) {
+resource acsSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
   parent: kv
-  name: 'resend-api-key'
-  properties: { value: resendApiKey }
+  name: '${env}-acs-connection'
+  properties: { value: acs.listKeys().primaryConnectionString }
 }
 
 resource signalRSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if (isProd) {
   parent: kv
-  name: 'signalr-connection'
+  name: '${env}-signalr-connection'
   properties: { value: signalR!.listKeys().primaryConnectionString }
 }
 
-resource appCanRead 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(kv.id, app.id, secretsUserRole)
-  scope: kv
-  properties: { roleDefinitionId: secretsUserRole, principalId: app.identity.principalId, principalType: 'ServicePrincipal' }
-}
+// Granted per secret rather than on the shared vault, so staging cannot read prod's secrets.
+var secretNames = concat(['sql-connection', 'blob-connection', 'jwt-signing-key', 'acs-connection'], isProd ? ['signalr-connection'] : [])
+resource envSecrets 'Microsoft.KeyVault/vaults/secrets@2023-07-01' existing = [for s in secretNames: {
+  parent: kv
+  name: '${env}-${s}'
+}]
 
-resource slotCanRead 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (isProd) {
-  name: guid(kv.id, '${app.id}/staging', secretsUserRole)
-  scope: kv
+resource appCanRead 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for (s, i) in secretNames: {
+  name: guid(kv.id, s, app.id, secretsUserRole)
+  scope: envSecrets[i]
+  properties: { roleDefinitionId: secretsUserRole, principalId: app.identity.principalId, principalType: 'ServicePrincipal' }
+  dependsOn: [sqlSecret, blobSecret, jwtSecret, acsSecret, signalRSecret]
+}]
+
+resource slotCanRead 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for (s, i) in secretNames: if (isProd) {
+  name: guid(kv.id, s, '${app.id}/staging', secretsUserRole)
+  scope: envSecrets[i]
   properties: { roleDefinitionId: secretsUserRole, principalId: slot!.identity.principalId, principalType: 'ServicePrincipal' }
-}
+  dependsOn: [sqlSecret, blobSecret, jwtSecret, acsSecret, signalRSecret]
+}]
 
 // ------------------------------------------------ Monitoring ---------------------------------------------
 resource logs 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {

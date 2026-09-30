@@ -47,7 +47,6 @@ if (builder.Configuration["Azure:SignalR:ConnectionString"] is not null) signalR
 // Application Insights: traces, dependencies and exceptions, only where App Service provides the key.
 if (builder.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"] is not null)
     builder.Services.AddOpenTelemetry().UseAzureMonitor();
-builder.Services.AddHttpClient();     // EmailService talks to the Resend REST API
 
 // UC-07 needs this: BlobStorageService cannot resolve without it. Locally it points at Azurite
 // ("UseDevelopmentStorage=true"); in production the connection string comes from Key Vault.

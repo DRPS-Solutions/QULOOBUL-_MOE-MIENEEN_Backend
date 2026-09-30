@@ -120,7 +120,7 @@ public class StateMachineGuardTests
             Email(db, new ConfigurationBuilder().Build()), new AccessGuard(db));
 //----------------------------------------------------------------------------------------------------------------------//
     private static EmailService Email(AppDbContext db, IConfiguration config) =>
-        new(null!, config, db, NullLogger<EmailService>.Instance);
+        new(config, db, NullLogger<EmailService>.Instance);
 //----------------------------------------------------------------------------------------------------------------------//
     private static AppDbContext NewDb() => new(new DbContextOptionsBuilder<AppDbContext>()
         .UseInMemoryDatabase(Guid.NewGuid().ToString()).Options);
