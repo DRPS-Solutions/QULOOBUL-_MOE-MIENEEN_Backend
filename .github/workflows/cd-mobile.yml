@@ -72,3 +72,4 @@ jobs:
         with:
           name: npo-android-apk
           path: ./apk/*.apk
+          retention-days: 14
