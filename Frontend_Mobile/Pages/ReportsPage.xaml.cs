@@ -70,7 +70,7 @@ public partial class ReportsPage : ContentPage
 
         if (await _state.ExportReportAsync(Request) is { } file)
         {
-            try { await Launcher.Default.OpenAsync(new Uri(file.DownloadUrl)); }
+            try { await Launcher.Default.OpenAsync(AppState.ForThisDevice(new Uri(file.DownloadUrl))); }
             catch (Exception) { await DisplayAlertAsync("Export ready", "The download link couldn't be opened automatically.", "OK"); }
         }
 

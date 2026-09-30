@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ContentPage
+    x:Class="Frontend_Mobile.Pages.FilesPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:models="clr-namespace:Frontend_Mobile.Models"
+    Title="Files">
+
+    <!-- Files.razor: UC-07 / SD-04. The API records metadata and hands back a short-lived
+         single-blob SAS; the bytes go straight between this device and Blob Storage, never
+         through the API. Open to every role - only Recategorise/Archive/Delete are gated
+         (server-side, ManageFiles), so those three buttons are hidden per-row instead. -->
+
+    <ScrollView>
+        <VerticalStackLayout Padding="16" Spacing="16">
+
+            <Border Style="{StaticResource HeaderBanner}">
+                <VerticalStackLayout Spacing="4">
+                    <Label Text="Files" Style="{StaticResource BannerTitle}" />
+                    <Label Text="Upload, find and download shared documents." Style="{StaticResource BannerSubtitle}" />
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Upload -->
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout Spacing="12">
+                    <Label Text="Upload a file" Style="{StaticResource TitleMedium}" />
+
+                    <VerticalStackLayout>
+                        <Label Text="Category" Style="{StaticResource LabelSmall}" />
+                        <Border Style="{StaticResource FieldBox}">
+                            <Picker x:Name="CategoryPicker" Title="" SelectedIndexChanged="OnUploadFormChanged" />
+                        </Border>
+                    </VerticalStackLayout>
+
+                    <HorizontalStackLayout Spacing="10">
+                        <Button Text="Choose file" Style="{StaticResource OutlineButton}" Clicked="OnChooseFile" />
+                        <Label x:Name="PickedFileLabel" Text="No file chosen" Style="{StaticResource LabelSmall}" VerticalOptions="Center" LineBreakMode="TailTruncation" />
+                    </HorizontalStackLayout>
+
+                    <Label Text="Up to 25 MB. Office documents, PDFs, text and images." Style="{StaticResource Muted}" FontSize="11" />
+
+                    <Button x:Name="UploadButton" Text="Upload" Clicked="OnUpload" IsEnabled="False" />
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Filters -->
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout Spacing="12">
+                    <Border Style="{StaticResource FieldBox}">
+                        <Entry x:Name="SearchEntry" Placeholder="Search by name" TextChanged="OnSearchChanged" />
+                    </Border>
+
+                    <Border Style="{StaticResource FieldBox}">
+                        <Picker x:Name="FilterCategoryPicker" Title="Category" SelectedIndexChanged="OnFilterChanged" />
+                    </Border>
+
+                    <HorizontalStackLayout x:Name="ShowArchivedRow" Spacing="8" IsVisible="False">
+                        <Switch x:Name="ShowArchivedSwitch" Toggled="OnShowArchivedToggled" />
+                        <Label Text="Show archived" VerticalOptions="Center" />
+                    </HorizontalStackLayout>
+                </VerticalStackLayout>
+            </Border>
+
+            <ActivityIndicator x:Name="Busy" IsRunning="False" IsVisible="False" />
+            <Label x:Name="EmptyLabel" Text="No files match." Style="{StaticResource Muted}" IsVisible="False" Margin="4,0" />
+
+            <!-- File list -->
+            <VerticalStackLayout x:Name="FileList" Spacing="10">
+                <BindableLayout.ItemTemplate>
+                    <DataTemplate x:DataType="models:FileRow">
+                        <Border Style="{StaticResource OutlinedRow}">
+                            <VerticalStackLayout Spacing="6">
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                    <Label Text="{Binding FileName}" FontSize="14" FontAttributes="Bold" LineBreakMode="TailTruncation" />
+                                    <Border Grid.Column="1"
+                                            IsVisible="{Binding IsArchived}"
+                                            BackgroundColor="{StaticResource TintAmber}"
+                                            StrokeThickness="0"
+                                            StrokeShape="RoundRectangle 10"
+                                            Padding="8,2"
+                                            VerticalOptions="Center">
+                                        <Label Text="Archived" TextColor="{StaticResource StatusPending}" FontSize="10" FontAttributes="Bold" />
+                                    </Border>
+                                </Grid>
+                                <Label Text="{Binding CategoryName}" Style="{StaticResource LabelSmall}" />
+                                <Label Text="{Binding UploaderLabel}" Style="{StaticResource LabelSmall}" />
+
+                                <HorizontalStackLayout Spacing="8">
+                                    <Button Text="Download" Clicked="OnDownload" Style="{StaticResource OutlineButton}"
+                                            FontSize="11" Padding="10,4" MinimumHeightRequest="0" />
+                                    <Button Text="Move" Clicked="OnRecategorise" IsVisible="{Binding CanManage}" Style="{StaticResource OutlineButton}"
+                                            FontSize="11" Padding="10,4" MinimumHeightRequest="0" />
+                                    <Button Text="{Binding ArchiveActionLabel}" Clicked="OnToggleArchive" IsVisible="{Binding CanManage}" Style="{StaticResource OutlineButton}"
+                                            FontSize="11" Padding="10,4" MinimumHeightRequest="0" />
+                                    <Button Text="Delete" Clicked="OnDelete" IsVisible="{Binding CanManage}" Style="{StaticResource OutlineButton}"
+                                            TextColor="{StaticResource StatusDenied}" FontSize="11" Padding="10,4" MinimumHeightRequest="0" />
+                                </HorizontalStackLayout>
+                            </VerticalStackLayout>
+                        </Border>
+                    </DataTemplate>
+                </BindableLayout.ItemTemplate>
+            </VerticalStackLayout>
+
+        </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>
