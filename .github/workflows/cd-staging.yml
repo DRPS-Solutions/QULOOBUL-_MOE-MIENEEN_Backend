@@ -45,26 +45,12 @@ jobs:
       - name: Coverage gate
         run: bash .github/scripts/coverage-gate.sh 70
 
+      # Proves both projects publish. The deploy job republishes from the same commit
+      # instead of passing artifacts, so a full artifact quota cannot block a release.
       - name: Publish
         run: |
           dotnet publish "$PROJECT" -c Release --no-build -o ./publish
           dotnet publish "Frontend_BlazorWeb/Frontend_BlazorWeb.csproj" -c Release -o ./web
-
-      - if: ${{ vars.AZURE_WEBAPP_NAME != '' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: api
-          path: ./publish
-          # Only handed to the deploy job; do not hoard quota.
-          retention-days: 1
-
-      - if: ${{ vars.AZURE_WEBAPP_NAME != '' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: web
-          path: ./web/wwwroot
-          # Only handed to the deploy job; do not hoard quota.
-          retention-days: 1
 
   deploy:
     needs: build
@@ -79,15 +65,11 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      - uses: actions/download-artifact@v4
-        with:
-          name: api
-          path: ./publish
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: web
-          path: ./web
+      - name: Publish
+        run: |
+          dotnet publish "$PROJECT" -c Release -o ./publish
+          dotnet publish "Frontend_BlazorWeb/Frontend_BlazorWeb.csproj" -c Release -o ./web-build
+          mv ./web-build/wwwroot ./web
 
       - uses: azure/login@v2
         with:
