@@ -27,7 +27,8 @@ using QULOOBUL__MOE_MIENEEN_Shared.Requests;
 using QULOOBUL__MOE_MIENEEN_Shared.Tasks;
 using static QULOOBUL__MOE_MIENEEN_Shared.Classes.Common;
 
-public class AppDataService(HttpClient http, ISnackbar snackbar, IDialogService dialogs)
+public class AppDataService(HttpClient http, ISnackbar snackbar, IDialogService dialogs,
+    Microsoft.AspNetCore.Components.NavigationManager nav)
 {
     public event Action? OnChange;
     private void Changed() => OnChange?.Invoke();
@@ -89,6 +90,8 @@ public class AppDataService(HttpClient http, ISnackbar snackbar, IDialogService 
             await hub.DisposeAsync();
             hub = null;
         }
+        // Don't leave the next account on a page its role can't see (e.g. /users).
+        nav.NavigateTo("/");
         Changed();
     }
 
@@ -114,6 +117,20 @@ public class AppDataService(HttpClient http, ISnackbar snackbar, IDialogService 
     public bool CanSeeMeetings => Role is Roles.SecondaryAdmin or Roles.Admin;
     public bool CanSeeEvents => CanSeeMeetings;
     public bool CanSeeUserManagement => Role is Roles.Admin;
+    public bool CanSeeReports => HasPermission(Permissions.GenerateReports);
+
+    /// <summary>Whether the signed-in role may open this base-relative path (e.g. "users?x=1").
+    /// MainLayout enforces it, so a typed URL can't reach a page the menu hides.</summary>
+    public bool CanSee(string relativePath) => relativePath.Split('/', '?', '#')[0].ToLowerInvariant() switch
+    {
+        "tasks" => CanSeeTasks,
+        "requests" => CanSeeRequests,
+        "meetings" => CanSeeMeetings,
+        "events" => CanSeeEvents,
+        "users" => CanSeeUserManagement,
+        "reports" => CanSeeReports,
+        _ => true,
+    };
 
     // ------------------------------------------------------------------
     // Shared lists and lookups
