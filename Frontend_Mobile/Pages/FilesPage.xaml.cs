@@ -60,6 +60,9 @@ public partial class FilesPage : ContentPage
     private List<FileCategoryDto> _categories = [];
     private FileResult? _picked;
     private CancellationTokenSource? _searchDebounce;
+    // Bumped per Load(); a response that comes back after a newer Load() started is dropped,
+    // so a slow earlier search can't overwrite the results of a later one.
+    private int _loadVersion;
 
     private bool CanManage => _state.HasPermission(Permissions.ManageFiles);
 
@@ -72,7 +75,8 @@ public partial class FilesPage : ContentPage
     {
         base.OnAppearing();
         ShowArchivedRow.IsVisible = CanManage;
-        await LoadCategories();
+        // Once only - re-setting the pickers' ItemsSource would wipe the user's selections.
+        if (_categories.Count == 0) await LoadCategories();
         await Load();
     }
 
@@ -89,11 +93,13 @@ public partial class FilesPage : ContentPage
         filterOptions.AddRange(_categories.Select(c => new Option<int?>(c.CategoryId, c.CategoryName)));
         FilterCategoryPicker.ItemsSource = filterOptions;
         FilterCategoryPicker.ItemDisplayBinding = new Binding(nameof(Option<int?>.Label));
-        FilterCategoryPicker.SelectedIndex = 0;
+        // No SelectedIndex = 0 here: it would fire OnFilterChanged and load the list a second
+        // time. Unselected already means "all categories" (SelectedItem is null).
     }
 
     private async Task Load()
     {
+        var version = ++_loadVersion;
         Busy.IsVisible = true;
         Busy.IsRunning = true;
 
@@ -101,6 +107,8 @@ public partial class FilesPage : ContentPage
         var includeArchived = CanManage && ShowArchivedSwitch.IsToggled;
 
         var files = await _state.ListFilesAsync(includeArchived, SearchEntry.Text, filterCategoryId) ?? [];
+        if (version != _loadVersion) return; // a newer Load() owns the list and the spinner now
+
         var rows = files.Select(f => new FileRow(f, CanManage)).ToList();
         BindableLayout.SetItemsSource(FileList, rows);
         FileList.IsVisible = rows.Count > 0;
@@ -191,20 +199,22 @@ public partial class FilesPage : ContentPage
             using var blobClient = new HttpClient();
             using var content = new StreamContent(stream);
             content.Headers.ContentType = new MediaTypeHeaderValue(contentType);
-            var put = new HttpRequestMessage(HttpMethod.Put, AppState.ForThisDevice(new Uri(ticket.UploadUrl))) { Content = content };
+            using var put = new HttpRequestMessage(HttpMethod.Put, AppState.ForThisDevice(new Uri(ticket.UploadUrl))) { Content = content };
             put.Headers.Add("x-ms-blob-type", "BlockBlob");
 
-            var res = await blobClient.SendAsync(put);
+            using var res = await blobClient.SendAsync(put);
             if (res.IsSuccessStatusCode)
             {
                 _picked = null;
-                PickedFileLabel.Text = "No file chosen";
-                await Load();
+                PickedFileLabel.Text = $"Uploaded {picked.FileName}";
             }
             else
             {
                 await DisplayAlertAsync("Upload failed", $"Storage refused the upload ({(int)res.StatusCode}).", "OK");
             }
+            // Either way: the API recorded the metadata row before the PUT, so even a failed
+            // upload left a row behind - show it rather than hide it (same as Files.razor).
+            await Load();
         }
         catch (Exception)
         {
