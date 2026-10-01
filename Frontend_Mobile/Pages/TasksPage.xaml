@@ -122,6 +122,9 @@
                                         StrokeThickness="0"
                                         StrokeShape="RoundRectangle 10"
                                         Padding="8">
+                                    <Border.GestureRecognizers>
+                                        <TapGestureRecognizer Tapped="OnTaskTapped" />
+                                    </Border.GestureRecognizers>
                                     <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
                                         <Label Text="{Binding Glyph}" FontSize="14" VerticalOptions="Center" />
                                         <VerticalStackLayout Grid.Column="1" VerticalOptions="Center">
@@ -172,6 +175,9 @@
                                                     StrokeThickness="0"
                                                     StrokeShape="RoundRectangle 8"
                                                     Padding="10">
+                                                <Border.GestureRecognizers>
+                                                    <TapGestureRecognizer Tapped="OnTaskTapped" />
+                                                </Border.GestureRecognizers>
                                                 <Grid ColumnDefinitions="*,Auto">
                                                     <VerticalStackLayout>
                                                         <Label Text="{Binding Title}"

@@ -125,6 +125,14 @@ public sealed class TaskItem(TaskCardDto card, string? eventName, string? comple
                 .Select(part => char.ToUpperInvariant(part[0])));
 }
 
+/// <summary>One comment on a task as TaskDetailsPage lists them</summary>
+public sealed class TaskCommentItem(TaskCommentDto commentDto, string authorName)
+{
+    public string Comment => commentDto.Comment;
+    public string MetaLabel => $"{authorName} - {AppState.Local(
+        commentDto.TimeCreated):dd MMM, HH:mm}";
+}
+
 /// <summary>One row as MettingsPage list shows it</summary>
 public sealed class MeetingRow(MeetingDto meetingDto, string nameOfOrganiser)
 {
