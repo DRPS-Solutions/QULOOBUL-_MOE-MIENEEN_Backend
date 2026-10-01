@@ -118,6 +118,12 @@
         <ShellContent ContentTemplate="{DataTemplate pages:CalendarPage}" />
     </FlyoutItem>
 
+    <!-- Files.razor: also open to every role. Only Recategorise/Archive/Delete are gated
+         (server-side, ManageFiles) - FilesPage checks that per-action, not for the page itself. -->
+    <FlyoutItem Title="Files" Route="files">
+        <ShellContent ContentTemplate="{DataTemplate pages:FilesPage}" />
+    </FlyoutItem>
+
     <!-- Reached from the bell in the title bar, not listed in the drawer -
          same as the Android port. -->
     <ShellContent Title="Notifications"

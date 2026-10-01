@@ -7,11 +7,15 @@ using Microsoft.AspNetCore.SignalR.Client;
 using QULOOBUL__MOE_MIENEEN_Shared.Auth;
 using QULOOBUL__MOE_MIENEEN_Shared.Collaboration;
 using QULOOBUL__MOE_MIENEEN_Shared.Directory;
+using QULOOBUL__MOE_MIENEEN_Shared.Files;
 using QULOOBUL__MOE_MIENEEN_Shared.Notifications;
 using QULOOBUL__MOE_MIENEEN_Shared.Reports;
 using QULOOBUL__MOE_MIENEEN_Shared.Requests;
 using QULOOBUL__MOE_MIENEEN_Shared.Tasks;
 using static QULOOBUL__MOE_MIENEEN_Shared.Classes.Common;
+// MAUI's own Microsoft.Maui.ApplicationModel.Permissions (camera/location prompts) is brought
+// into every file by a project-wide global using, and collides by name with the one Common.
+// Permissions above resolves via "using static". This alias wins over both, unambiguously.
 using Permissions = QULOOBUL__MOE_MIENEEN_Shared.Classes.Common.Permissions;
 
 namespace Frontend_Mobile.Data;
@@ -339,6 +343,36 @@ public sealed class AppState : Observable
     public Task<bool> RemoveEventAttendeeAsync(int eventId, int userId) =>
         SendAsync(HttpMethod.Delete, $"api/events/{eventId}/attendees/{userId}");
 
+    // ----- Files (UC-07 / SD-04) -----
+
+    // Open to every role - like Calendar, no CanSeeFiles gate; only Recategorise/Archive/Delete
+    // are gated server-side on ManageFiles, so FilesPage checks HasPermission per-action instead.
+    public Task<List<FileCategoryDto>?> GetFileCategoriesAsync() => GetAsync<List<FileCategoryDto>>("api/files/categories");
+
+    public Task<List<FileMetadataDto>?> ListFilesAsync(bool includeArchived, string? search, int? categoryId)
+    {
+        var url = $"api/files?includeArchived={includeArchived}"
+            + (string.IsNullOrWhiteSpace(search) ? "" : $"&q={Uri.EscapeDataString(search.Trim())}")
+            + (categoryId is { } c ? $"&categoryId={c}" : "");
+        return GetAsync<List<FileMetadataDto>>(url);
+    }
+
+    /// <summary>Records the metadata row and returns a short-lived upload SAS; the caller PUTs
+    /// the actual bytes straight to that URL, never through this client's authenticated HttpClient.</summary>
+    public Task<FileUploadResponse?> InitiateFileUploadAsync(FileUploadInitRequest request) =>
+        SendAsync<FileUploadResponse>(HttpMethod.Post, "api/files", request);
+
+    public Task<FileDownloadResponse?> GetFileDownloadLinkAsync(int fileId) =>
+        GetAsync<FileDownloadResponse>($"api/files/{fileId}/download");
+
+    public Task<bool> RecategoriseFileAsync(int fileId, int categoryId) =>
+        SendAsync(HttpMethod.Patch, $"api/files/{fileId}/category", new RecategoriseFileRequest { CategoryId = categoryId });
+
+    public Task<bool> SetFileArchivedAsync(int fileId, bool archived) =>
+        SendAsync(archived ? HttpMethod.Post : HttpMethod.Delete, $"api/files/{fileId}/archive");
+
+    public Task<bool> DeleteFileAsync(int fileId) => SendAsync(HttpMethod.Delete, $"api/files/{fileId}");
+
     // ----- Live updates: the SignalR Observer from the architecture doc. The
     // server says what changed; refetching that list keeps one data path. -----
 
@@ -460,4 +494,18 @@ public sealed class AppState : Observable
 
     // Times the server stamps itself (submitted, reviewed) are UTC.
     public static DateTime Local(DateTime utc) => DateTime.SpecifyKind(utc, DateTimeKind.Utc).ToLocalTime();
+
+    /// <summary>
+    /// A server-issued link (Blob Storage SAS for a file download/upload, a report export) can
+    /// point at "localhost" or "127.0.0.1" - meaningful on the machine running the API, but
+    /// inside the Android emulator that means the emulator itself, not the host. Same problem
+    /// ApiBase already solves for direct API calls; this covers links the server hands back.
+    /// No-op on every other platform, and on a physical device (nothing to rewrite it to).
+    /// </summary>
+    public static Uri ForThisDevice(Uri serverUri)
+    {
+        if (DeviceInfo.Platform != DevicePlatform.Android) return serverUri;
+        if (serverUri.Host is not ("localhost" or "127.0.0.1")) return serverUri;
+        return new UriBuilder(serverUri) { Host = "10.0.2.2" }.Uri;
+    }
 }

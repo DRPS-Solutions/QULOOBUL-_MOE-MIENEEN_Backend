@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using Frontend_Mobile.Data;
 using QULOOBUL__MOE_MIENEEN_Shared.Collaboration;
+using QULOOBUL__MOE_MIENEEN_Shared.Files;
 using QULOOBUL__MOE_MIENEEN_Shared.Notifications;
 using QULOOBUL__MOE_MIENEEN_Shared.Reports;
 using QULOOBUL__MOE_MIENEEN_Shared.Requests;
@@ -285,6 +286,20 @@ public sealed record ProgressRow(ProjectProgressStat Stat)
     public string ProjectName => Stat.ProjectName;
     public double Fraction => Stat.PercentComplete / 100.0;
     public string SummaryText => $"{Stat.Done}/{Stat.Total} tasks \u2022 {Stat.PercentComplete:0}%";
+}
+
+// ----- Files (UC-07 / SD-04) -----
+
+/// <summary>One row in the file list. CanManage is baked in per-row (not looked up from
+/// AppState inside the row) because a DataTemplate binds only to its item, the same pattern
+/// AttendeeRow.ShowRemove already uses for Calendar.</summary>
+public sealed record FileRow(FileMetadataDto Dto, bool CanManage)
+{
+    public string FileName => Dto.FileName;
+    public string CategoryName => Dto.CategoryName;
+    public bool IsArchived => Dto.IsArchived;
+    public string UploaderLabel => $"Uploaded by {AppState.Current.UserName(Dto.UploadedBy)}";
+    public string ArchiveActionLabel => Dto.IsArchived ? "Unarchive" : "Archive";
 }
 
 // ----- Calendar (dated organisational events, UC-06) -----
