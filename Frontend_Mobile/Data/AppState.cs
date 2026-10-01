@@ -31,14 +31,18 @@ namespace Frontend_Mobile.Data;
 /// </summary>
 public sealed class AppState : Observable
 {
-    // The API's https launch profile. Android's emulator reaches the host's localhost at 10.0.2.2.
-    // ponytail: hard-coded dev address; a physical phone or a deployed API needs this read from config.
+    // Debug: the API's https launch profile (Android's emulator reaches the host's localhost at 10.0.2.2).
+    // Release: the production App Service, so a side-loaded APK works on a real phone.
     // Declared before Current: Current's own initializer constructs an AppState instance (whose
     // _http field reads ApiBase), and static fields initialize in declaration order - ApiBase has
     // to exist first, or _http.BaseAddress silently ends up null.
+#if DEBUG
     private static readonly Uri ApiBase = new(DeviceInfo.Platform == DevicePlatform.Android
         ? "https://10.0.2.2:7272/"
         : "https://localhost:7272/");
+#else
+    private static readonly Uri ApiBase = new("https://xbcad-api-prod-e2fef0gxejcbhtd2.southafricanorth-01.azurewebsites.net/");
+#endif
 
     public static AppState Current { get; } = new();
 

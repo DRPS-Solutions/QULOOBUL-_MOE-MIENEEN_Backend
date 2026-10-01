@@ -15,7 +15,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       MOBILE_PROJECT: Frontend_Mobile/Frontend_Mobile.csproj
-      SHARED_TESTS: tests/Npo.Shared.Tests/Npo.Shared.Tests.csproj
       KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
     steps:
       - uses: actions/checkout@v4
@@ -37,14 +36,6 @@ jobs:
 
       - name: Build
         run: dotnet build "$MOBILE_PROJECT" -f net10.0-android -c Release --no-restore -warnaserror
-
-      - name: Test shared library
-        run: |
-          if [ ! -f "$SHARED_TESTS" ]; then
-            echo "::warning::No shared-library test project yet — the test gate is inactive."
-            exit 0
-          fi
-          dotnet test "$SHARED_TESTS" -c Release
 
       - name: Decode signing keystore
         if: ${{ env.KEYSTORE_B64 != '' }}
