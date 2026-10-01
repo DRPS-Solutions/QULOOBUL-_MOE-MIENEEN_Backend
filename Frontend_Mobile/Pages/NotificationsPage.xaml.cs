@@ -114,17 +114,13 @@ public partial class NotificationsPage : ContentPage
 
         if (!item.IsRead) await _state.MarkReadAsync([item.Dto.NotificationId]);
 
-        var route = (item.Dto.EntityType, item.Dto.EntityId) switch
+        var route = _state.LinkTo(item.Dto.EntityType, item.Dto.EntityId) ?? item.Kind switch
         {
-            ("ProjectTask", { } id) when _state.CanSeeTasks => $"//tasks?task={id}",
-            _ => item.Kind switch
-            {
-                NotificationKind.ResourceRequest when _state.CanSeeRequests => "//requests",
-                NotificationKind.EventAssignment when _state.CanSeeEvents => "//events",
-                NotificationKind.CalendarEvent => item.Dto.EntityId is { } eventId ? $"//calendar?event={eventId}" : "//calendar",
-                NotificationKind.TaskAssignment => _state.CanSeeTasks ? "//tasks" : "//home",
-                _ => null
-            }
+            NotificationKind.ResourceRequest when _state.CanSeeRequests => "//requests",
+            NotificationKind.EventAssignment when _state.CanSeeEvents => "//events",
+            NotificationKind.CalendarEvent => "//calendar",
+            NotificationKind.TaskAssignment => _state.CanSeeTasks ? "//tasks" : "//home",
+            _ => null
         };
         if (route is not null) await Shell.Current.GoToAsync(route);
     }

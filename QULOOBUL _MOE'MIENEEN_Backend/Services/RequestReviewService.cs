@@ -20,17 +20,17 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
 //----------------------------------------------------------------------------------------------------------------------//
         /// <summary>Reviewers see every request; a facility manager also sees what was escalated to
         /// them; everyone else sees only their own.</summary>
-        public async Task<List<ResourceRequestDto>> ListAsync(int userId)
+        public async Task<IQueryable<ResourceRequest>> VisibleAsync(int userId)
         {
             var q = db.ResourceRequests.AsQueryable();
-            if (!await HasPermission(userId, ReviewPermission))
-            {
-                var manager = await IsFacilityManager(userId);
-                q = q.Where(r => r.RequestedBy == userId
-                    || (manager && (r.Status == Lifecycle.RequestEscalated || r.ReviewedBy == userId)));
-            }
-
-            return await q.OrderByDescending(r => r.DateSubmitted)
+            if (await HasPermission(userId, ReviewPermission)) return q;
+            var manager = await IsFacilityManager(userId);
+            return q.Where(r => r.RequestedBy == userId
+                || (manager && (r.Status == Lifecycle.RequestEscalated || r.ReviewedBy == userId)));
+        }
+//----------------------------------------------------------------------------------------------------------------------//
+        public async Task<List<ResourceRequestDto>> ListAsync(int userId) =>
+            await (await VisibleAsync(userId)).OrderByDescending(r => r.DateSubmitted)
                 .Select(r => new ResourceRequestDto(
                     r.RequestId, r.RequestedBy, r.CategoryId, r.Category!.CategoryName,
                     r.Status, r.Priority, r.DateSubmitted, r.ReviewedBy,
@@ -38,7 +38,6 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
                         .Select(h => new RequestStatusHistoryDto(h.NewStatus, h.ChangedBy, h.TimeCreated)).ToList(),
                     r.Detail))
                 .ToListAsync();
-        }
 //----------------------------------------------------------------------------------------------------------------------//
         public Task<List<RequestCategoryDto>> CategoriesAsync() =>
             db.RequestCategories.OrderBy(c => c.CategoryName)

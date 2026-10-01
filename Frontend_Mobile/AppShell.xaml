@@ -27,15 +27,26 @@
     <!-- Set on the Shell so every page inherits the same bar: title, the bell
          with its unread badge, and the dark-mode switch. -->
     <Shell.TitleView>
-        <Grid ColumnDefinitions="*,Auto,Auto" VerticalOptions="Fill">
+        <Grid ColumnDefinitions="*,Auto,Auto,Auto" VerticalOptions="Fill">
 
             <Label Text="QULOOBUL MOE'MIENEEN"
                    TextColor="{StaticResource White}"
                    FontSize="16"
                    FontAttributes="Bold"
+                   LineBreakMode="TailTruncation"
                    VerticalOptions="Center" />
 
-            <Grid Grid.Column="1" WidthRequest="46">
+            <Button Grid.Column="1"
+                    Text="&#x1F50D;"
+                    Clicked="OnOpenSearch"
+                    BackgroundColor="Transparent"
+                    TextColor="{StaticResource White}"
+                    FontSize="18"
+                    WidthRequest="44"
+                    Padding="0"
+                    CornerRadius="0" />
+
+            <Grid Grid.Column="2" WidthRequest="46">
                 <Button Text="&#x1F514;"
                         Clicked="OnOpenNotifications"
                         BackgroundColor="Transparent"
@@ -62,7 +73,7 @@
                 </Border>
             </Grid>
 
-            <Button Grid.Column="2"
+            <Button Grid.Column="3"
                     x:Name="ThemeToggle"
                     Clicked="OnToggleTheme"
                     BackgroundColor="Transparent"
@@ -129,6 +140,12 @@
     <ShellContent Title="Notifications"
                   Route="notifications"
                   ContentTemplate="{DataTemplate pages:NotificationsPage}"
+                  FlyoutItemIsVisible="False" />
+
+    <!-- Reached from the magnifier in the title bar, like Notifications. -->
+    <ShellContent Title="Search"
+                  Route="search"
+                  ContentTemplate="{DataTemplate pages:SearchPage}"
                   FlyoutItemIsVisible="False" />
 
     <Shell.FlyoutFooter>

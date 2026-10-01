@@ -1,0 +1,109 @@
+@page "/search"
+@using MudBlazor
+@using QULOOBUL__MOE_MIENEEN_Shared.Search
+@inject AppDataService AppData
+@inject NavigationManager Navigation
+
+<PageTitle>Search</PageTitle>
+
+@* One box over tasks, requests, projects, meetings, events and files. The API only returns
+   what this user may open; hits whose page this role can't see are dropped here. *@
+<div class="drps-page">
+    <MudContainer MaxWidth="MaxWidth.Medium" Class="pt-6">
+
+        <div class="drps-page-header">
+            <div>
+                <MudText Typo="Typo.h6" Style="font-weight:600;">Search</MudText>
+                <div class="drps-subtitle">Find tasks, requests, projects, meetings, events and files.</div>
+            </div>
+        </div>
+
+        <div class="drps-panel">
+            <MudTextField T="string" Value="query" ValueChanged="OnQueryChanged" DebounceInterval="300" Immediate="true"
+                          Placeholder="Type at least 2 characters" Variant="Variant.Outlined" AutoFocus="true"
+                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" Class="mb-3" />
+
+            @if (searching)
+            {
+                <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+            }
+            else if (results is null)
+            {
+                <div class="drps-muted">Results appear as you type.</div>
+            }
+            else if (results.Count == 0)
+            {
+                <div class="drps-muted">Nothing matches "@query".</div>
+            }
+            else
+            {
+                @foreach (var group in results.GroupBy(r => r.Kind))
+                {
+                    <MudText Typo="Typo.subtitle2" Style="font-weight:600;" Class="mt-3 mb-1">@KindLabel(group.Key)</MudText>
+                    <MudList T="SearchResultDto" Dense="true">
+                        @foreach (var hit in group)
+                        {
+                            <MudListItem T="SearchResultDto" Icon="@KindIcon(hit.Kind)" OnClick="@(() => Navigation.NavigateTo(AppData.LinkTo(hit.Kind, hit.Id)!))">
+                                <div>@hit.Title</div>
+                                @if (!string.IsNullOrEmpty(hit.Detail))
+                                {
+                                    <div class="drps-muted">@hit.Detail</div>
+                                }
+                            </MudListItem>
+                        }
+                    </MudList>
+                }
+            }
+        </div>
+    </MudContainer>
+</div>
+
+@code {
+    // search?q=budget pre-fills the box, so a result list can be bookmarked or linked.
+    [SupplyParameterFromQuery(Name = "q")] public string? Q { get; set; }
+
+    private string query = string.Empty;
+    private List<SearchResultDto>? results;
+    private bool searching;
+    private int latest; // a slow earlier request must not overwrite a later one's results
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!string.IsNullOrWhiteSpace(Q)) await OnQueryChanged(Q);
+    }
+
+    private async Task OnQueryChanged(string? value)
+    {
+        query = value ?? string.Empty;
+        var mine = ++latest;
+        if (query.Trim().Length < 2) { results = null; searching = false; return; }
+
+        searching = true;
+        var hits = await AppData.GetAsync<List<SearchResultDto>>($"api/search?q={Uri.EscapeDataString(query.Trim())}") ?? [];
+        if (mine != latest) return;
+        results = hits.Where(h => AppData.LinkTo(h.Kind, h.Id) is not null).ToList();
+        searching = false;
+    }
+
+    private static string KindLabel(string kind) => kind switch
+    {
+        "ProjectTask" => "Tasks",
+        "ResourceRequest" => "Resource requests",
+        "Project" => "Projects",
+        "Meeting" => "Meetings",
+        "Event" => "Calendar events",
+        "File" => "Files",
+        _ => kind
+    };
+
+    private static string KindIcon(string kind) => kind switch
+    {
+        "ProjectTask" => Icons.Material.Filled.CheckBox,
+        "ResourceRequest" => Icons.Material.Filled.Inbox,
+        "Project" => Icons.Material.Filled.Folder,
+        "Meeting" => Icons.Material.Filled.Groups,
+        "Event" => Icons.Material.Filled.Event,
+        "File" => Icons.Material.Filled.InsertDriveFile,
+        _ => Icons.Material.Filled.Search
+    };
+}

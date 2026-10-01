@@ -11,6 +11,7 @@ using QULOOBUL__MOE_MIENEEN_Shared.Files;
 using QULOOBUL__MOE_MIENEEN_Shared.Notifications;
 using QULOOBUL__MOE_MIENEEN_Shared.Reports;
 using QULOOBUL__MOE_MIENEEN_Shared.Requests;
+using QULOOBUL__MOE_MIENEEN_Shared.Search;
 using QULOOBUL__MOE_MIENEEN_Shared.Tasks;
 using static QULOOBUL__MOE_MIENEEN_Shared.Classes.Common;
 // MAUI's own Microsoft.Maui.ApplicationModel.Permissions (camera/location prompts) is brought
@@ -90,6 +91,24 @@ public sealed class AppState : Observable
     /// <summary>Generic permission check, for one-off gates (Calendar's organiser-or-admin rule)
     /// that don't warrant their own named CanSee* property.</summary>
     public bool HasPermission(string permission) => CurrentUser?.Permissions.Contains(permission) == true;
+
+    /// <summary>The Shell route that opens one record, by the entity type name the API uses on
+    /// notifications and search hits; null when this role has no page for it. Only Tasks and
+    /// Calendar take a deep-link id; the rest open their list page.</summary>
+    public string? LinkTo(string? entityType, int? id) => (entityType, id) switch
+    {
+        ("ProjectTask", { } t) when CanSeeTasks => $"//tasks?task={t}",
+        ("ResourceRequest", _) when CanSeeRequests => "//requests",
+        ("Project", _) when CanSeeEvents => "//events",
+        ("Event", { } e) => $"//calendar?event={e}",
+        ("Meeting", _) when CanSeeMeetings => "//meetings",
+        ("File", _) => "//files",
+        ("User", _) when CanSeeUserManagement => "//users",
+        _ => null
+    };
+
+    public Task<List<SearchResultDto>?> SearchAsync(string q) =>
+        GetAsync<List<SearchResultDto>>($"api/search?q={Uri.EscapeDataString(q.Trim())}");
 
     /// <summary>Returns null on success, otherwise the message for the login form.</summary>
     public async Task<string?> LoginAsync(string email, string password)

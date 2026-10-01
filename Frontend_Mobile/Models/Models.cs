@@ -6,6 +6,7 @@ using QULOOBUL__MOE_MIENEEN_Shared.Files;
 using QULOOBUL__MOE_MIENEEN_Shared.Notifications;
 using QULOOBUL__MOE_MIENEEN_Shared.Reports;
 using QULOOBUL__MOE_MIENEEN_Shared.Requests;
+using QULOOBUL__MOE_MIENEEN_Shared.Search;
 using QULOOBUL__MOE_MIENEEN_Shared.Tasks;
 using QULOOBUL__MOE_MIENEEN_Shared.Directory;
 
@@ -155,6 +156,25 @@ public sealed class MinutesSearch(MeetingMinutesDto meetingMinutesDto, string? t
     public string MeetingTitle => titleOfMeeting ?? $"Meeting #{meetingMinutesDto.MeetingId}";
     public string SnippetOfMeetingMinutes => meetingMinutesDto.MinutesText.Length <= 120 ? meetingMinutesDto.MinutesText : 
         meetingMinutesDto.MinutesText[..120] + "...";
+}
+
+/// <summary>One global-search hit on SearchPage</summary>
+public sealed class SearchHit(SearchResultDto dto)
+{
+    public SearchResultDto Dto => dto;
+    public string Title => dto.Title;
+    public string Detail => dto.Detail ?? "";
+    public bool HasDetail => !string.IsNullOrEmpty(dto.Detail);
+    public string KindLabel => dto.Kind switch
+    {
+        "ProjectTask" => "Task",
+        "ResourceRequest" => "Resource request",
+        "Project" => "Project",
+        "Meeting" => "Meeting",
+        "Event" => "Calendar event",
+        "File" => "File",
+        _ => dto.Kind
+    };
 }
 
 /// <summary>One row in UserManagementPage's roster</summary>

@@ -110,6 +110,13 @@
             from AppDataService and updates live via OnChange whenever
             the API pushes a new notification over SignalR.
         -->
+        <MudIconButton Icon="@Icons.Material.Filled.Search"
+                       Color="Color.Inherit"
+                       Size="Size.Small"
+                       title="Search"
+                       Class="mx-1"
+                       OnClick="@(() => Navigation.NavigateTo("search"))" />
+
         <MudBadge Content="@UnreadCount"
                   Color="Color.Error"
                   Overlap="true"

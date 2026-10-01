@@ -93,6 +93,29 @@ public class UseCaseGapTests
     }
 //----------------------------------------------------------------------------------------------------------------------//
     [Fact]
+    public async Task Global_search_only_returns_what_the_caller_may_open()
+    {
+        using var db = NewDb();
+        var alice = User(db, "alice", 4);
+        var bob = User(db, "bob", 4);
+        var cat = new FileCategory { CategoryName = "Other" };
+        db.Meetings.Add(new Meeting { Organiser = alice, Title = "Budget review", MeetingDate = DateTime.UtcNow });
+        db.FileUploads.Add(new FileUpload { Category = cat, Uploader = alice, FileName = "budget.xlsx" });
+        db.Events.Add(new Event { Organiser = alice, Title = "Budget fete", EventDate = DateTime.UtcNow, Location = "Hall" });
+        await db.SaveChangesAsync();
+        var guard = new AccessGuard(db);
+        var search = new SearchService(db, guard,
+            new ProjectService(db, null!, null!, guard, null!),
+            new RequestReviewService(db, null!, null!, null!),
+            new MeetingMinutesService(db, null!, guard));
+
+        // "udget": the in-memory provider compares case-sensitively; SQL Server's collation does not.
+        Assert.Equal(["Meeting", "Event", "File"], (await search.SearchAsync("udget", alice.UserId)).Select(r => r.Kind));
+        Assert.Equal(["Event"], (await search.SearchAsync("udget", bob.UserId)).Select(r => r.Kind));
+        Assert.Empty(await search.SearchAsync("b", alice.UserId));
+    }
+//----------------------------------------------------------------------------------------------------------------------//
+    [Fact]
     public async Task An_empty_period_asks_for_a_wider_range_and_is_not_logged_as_run()
     {
         using var db = NewDb();
