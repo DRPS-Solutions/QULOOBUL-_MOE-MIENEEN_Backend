@@ -91,7 +91,8 @@ else
                 @* Pages read the signed-in user from AppDataService. A page that throws shows
                    this message instead of taking the whole app down; navigating away resets it. *@
                 <ErrorBoundary @ref="pageErrors">
-                    <ChildContent>@Body</ChildContent>
+                    @* A page the role can't see never renders (so it never calls the API); OnAfterRender sends them home. *@
+                    <ChildContent>@if (CanSeePage) { @Body }</ChildContent>
                     <ErrorContent>
                         <MudAlert Severity="Severity.Error" Class="mt-6">
                             Something went wrong on this page. Your other pages still work.
@@ -127,6 +128,13 @@ else
     private bool loggingIn = false;
 
     private bool OnSetPasswordPage => Nav.ToBaseRelativePath(Nav.Uri).StartsWith("set-password");
+
+    private bool CanSeePage => AppData.CanSee(Nav.ToBaseRelativePath(Nav.Uri));
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (AppData.CurrentUser is not null && !CanSeePage) Nav.NavigateTo("/", replace: true);
+    }
 
     private bool CanLogin =>
         !loggingIn && !string.IsNullOrWhiteSpace(emailInput) && !string.IsNullOrWhiteSpace(passwordInput);
