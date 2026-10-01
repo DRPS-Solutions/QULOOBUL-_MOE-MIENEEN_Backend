@@ -6,6 +6,7 @@ using QULOOBUL__MOE_MIENEEN_Shared.Notifications;
 using QULOOBUL__MOE_MIENEEN_Shared.Reports;
 using QULOOBUL__MOE_MIENEEN_Shared.Requests;
 using QULOOBUL__MOE_MIENEEN_Shared.Tasks;
+using QULOOBUL__MOE_MIENEEN_Shared.Directory;
 
 namespace Frontend_Mobile.Models;
 
@@ -125,6 +126,47 @@ public sealed class TaskItem(TaskCardDto card, string? eventName, string? comple
             : string.Concat(CompletedBy.Trim()
                 .Split(' ', StringSplitOptions.RemoveEmptyEntries)
                 .Select(part => char.ToUpperInvariant(part[0])));
+}
+
+/// <summary>One comment on a task as TaskDetailsPage lists them</summary>
+public sealed class TaskCommentItem(TaskCommentDto commentDto, string authorName)
+{
+    public string Comment => commentDto.Comment;
+    public string MetaLabel => $"{authorName} - {AppState.Local(
+        commentDto.TimeCreated):dd MMM, HH:mm}";
+}
+
+/// <summary>One row as MettingsPage list shows it</summary>
+public sealed class MeetingRow(MeetingDto meetingDto, string nameOfOrganiser)
+{
+    public MeetingDto MeetingDto => meetingDto;
+    public string MeetingTitle => meetingDto.Title;
+    public string MeetingDateLabel => meetingDto.MeetingDate.ToString("dd MM yyyy");
+    public string MeetingOrganiser => nameOfOrganiser;
+    public string MeetingMinutesStatus => meetingDto.Minutes is null ? "Not Recorded" : 
+        meetingDto.Minutes.ApprovedBy is null ? "Awaiting Approval" : "Approved";
+}
+
+/// <summary>One search hit with the meeting title resolved from the loaded list</summary>
+public sealed class MinutesSearch(MeetingMinutesDto meetingMinutesDto, string? titleOfMeeting)
+{
+    public MeetingMinutesDto MeetingMinutesDto => meetingMinutesDto;
+    public string MeetingTitle => titleOfMeeting ?? $"Meeting #{meetingMinutesDto.MeetingId}";
+    public string SnippetOfMeetingMinutes => meetingMinutesDto.MinutesText.Length <= 120 ? meetingMinutesDto.MinutesText : 
+        meetingMinutesDto.MinutesText[..120] + "...";
+}
+
+/// <summary>One row in UserManagementPage's roster</summary>
+public sealed class UserRow(UserSummaryDto userSummaryDto, string workloadLabel)
+{
+    public UserSummaryDto Dto => userSummaryDto;
+    public string FullName => userSummaryDto.FullName;
+    public string Role => userSummaryDto.Role;
+    public bool IsActive => userSummaryDto.IsActive;
+    public string WorkloadLabel => workloadLabel;
+    public string UserIntials => string.Concat(userSummaryDto.FullName.Split(
+        ' ', StringSplitOptions.RemoveEmptyEntries)
+        .Select(p => char.ToUpperInvariant(p[0])));
 }
 
 // ----- Resource requests (SM-02 statuses) -----

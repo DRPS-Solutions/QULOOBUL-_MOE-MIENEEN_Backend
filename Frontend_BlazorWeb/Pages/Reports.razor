@@ -3,6 +3,7 @@
 @using QULOOBUL__MOE_MIENEEN_Shared.Reports
 @inject AppDataService AppData
 @inject IJSRuntime JS
+@inject ISnackbar Snackbar
 
 <PageTitle>Reports</PageTitle>
 
@@ -25,14 +26,23 @@
                 <MudSelectItem T="string" Value="@("Workload")">Staff workload</MudSelectItem>
                 <MudSelectItem T="string" Value="@("ProjectProgress")">Project progress</MudSelectItem>
             </MudSelect>
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Run" Disabled="@(busy || !Valid)">Run</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Run" Disabled="@busy">Run</MudButton>
             <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.FileDownload"
-                       OnClick="Export" Disabled="@(busy || !Valid)">Export CSV</MudButton>
+                       OnClick="Export" Disabled="@busy">Export CSV</MudButton>
         </div>
+
+        @if (RangeError is { } rangeError)
+        {
+            <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-3">@rangeError</MudAlert>
+        }
 
         @if (report is null)
         {
             <div class="drps-panel drps-muted">Pick a period and run a report.</div>
+        }
+        else if (IsEmpty(report))
+        {
+            <div class="drps-panel drps-muted">No tasks were due or completed in this period. Try a wider date range.</div>
         }
         else
         {
@@ -46,13 +56,27 @@
                 <MudItem xs="12" md="6">
                     <div class="drps-panel">
                         <MudText Typo="Typo.subtitle1" Style="font-weight:600;">Tasks by priority</MudText>
-                        <MudChart T="double" ChartType="ChartType.StackedBar" ChartSeries="completionSeries" ChartLabels="completionLabels" Height="260px" />
+                        @if (completionLabels.Length == 0)
+                        {
+                            <div class="drps-muted">No tasks were due in this period.</div>
+                        }
+                        else
+                        {
+                            <MudChart T="double" ChartType="ChartType.StackedBar" ChartSeries="completionSeries" ChartLabels="completionLabels" Height="260px" />
+                        }
                     </div>
                 </MudItem>
                 <MudItem xs="12" md="6">
                     <div class="drps-panel">
                         <MudText Typo="Typo.subtitle1" Style="font-weight:600;">Staff workload</MudText>
-                        <MudChart T="double" ChartType="ChartType.Bar" ChartSeries="workloadSeries" ChartLabels="workloadLabels" Height="260px" />
+                        @if (workloadLabels.Length == 0)
+                        {
+                            <div class="drps-muted">No active staff to show.</div>
+                        }
+                        else
+                        {
+                            <MudChart T="double" ChartType="ChartType.Bar" ChartSeries="workloadSeries" ChartLabels="workloadLabels" Height="260px" />
+                        }
                     </div>
                 </MudItem>
                 <MudItem xs="12" md="6">
@@ -61,6 +85,10 @@
                         <MudSimpleTable Dense="true" Elevation="0">
                             <thead><tr><th>Project</th><th>Done</th><th>Total</th><th>%</th></tr></thead>
                             <tbody>
+                                @if (report.Progress.Count == 0)
+                                {
+                                    <tr><td colspan="4" class="drps-muted">No projects yet.</td></tr>
+                                }
                                 @foreach (var p in report.Progress)
                                 {
                                     <tr>
@@ -87,7 +115,22 @@
     private List<ChartSeries<double>> trendSeries = [], completionSeries = [], workloadSeries = [];
     private string[] trendLabels = [], completionLabels = [], workloadLabels = [];
 
-    private bool Valid => from is not null && to is not null && to >= from;
+    // Why the chosen period can't be reported on, or null when it can.
+    private string? RangeError =>
+        from is null || to is null ? "Choose both a From and a To date."
+        : to < from ? "The To date must be on or after the From date."
+        : null;
+
+    // The API refuses a period with no data, but a run can still come back with nothing to chart.
+    private static bool IsEmpty(ReportDto r) =>
+        r.Completion.Count == 0 && r.Trend.All(p => p.Completed == 0) && r.Workload.All(w => w.Assigned == 0);
+
+    private bool CanSend()
+    {
+        if (RangeError is not { } error) return true;
+        Snackbar.Add(error, Severity.Warning);
+        return false;
+    }
 
     // The end date is inclusive: a report "to 23 Sep" covers all of that day.
     private ReportRequest Request => new()
@@ -99,18 +142,44 @@
 
     private async Task Run()
     {
+        if (!CanSend()) return;
         busy = true;
-        report = await AppData.SendAsync<ReportDto>(HttpMethod.Post, "api/reports", Request);
-        if (report is not null) BuildCharts(report);
-        busy = false;
+        try
+        {
+            report = await AppData.SendAsync<ReportDto>(HttpMethod.Post, "api/reports", Request);
+            if (report is not null) BuildCharts(report);
+        }
+        finally
+        {
+            busy = false;
+        }
     }
 
     private async Task Export()
     {
+        if (!CanSend()) return;
+        // The API also refuses an empty period ("Not enough data..."); this just skips the round trip.
+        if (report is not null && IsEmpty(report) && report.PeriodStart == Request.PeriodStart && report.PeriodEnd == Request.PeriodEnd)
+        {
+            Snackbar.Add("There's nothing to export for this period. Try a wider date range.", Severity.Warning);
+            return;
+        }
         busy = true;
-        if (await AppData.SendAsync<ReportExportResponse>(HttpMethod.Post, "api/reports/export", Request) is { } file)
-            await JS.InvokeVoidAsync("open", file.DownloadUrl, "_blank");
-        busy = false;
+        try
+        {
+            if (await AppData.SendAsync<ReportExportResponse>(HttpMethod.Post, "api/reports/export", Request) is not { } file)
+                return; // AppDataService has already shown why
+            // window.open returns null when a pop-up blocker stops it.
+            await using var tab = await JS.InvokeAsync<IJSObjectReference?>("open", file.DownloadUrl, "_blank");
+            if (tab is null)
+                Snackbar.Add("The report was exported, but the browser blocked the download tab. Allow pop-ups for this site and export again.", Severity.Warning);
+            else
+                Snackbar.Add("Report exported. The CSV download has opened in a new tab.", Severity.Success);
+        }
+        finally
+        {
+            busy = false;
+        }
     }
 
     private void BuildCharts(ReportDto r)
@@ -127,7 +196,7 @@
         ];
 
         var busiest = r.Workload.OrderByDescending(w => w.Assigned).Take(8).ToList();
-        workloadLabels = busiest.Select(w => w.FullName.Split(' ')[0]).ToArray();
+        workloadLabels = busiest.Select(w => w.FullName.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? $"#{w.UserId}").ToArray();
         workloadSeries =
         [
             Series("Assigned", busiest.Select(w => (double)w.Assigned)),

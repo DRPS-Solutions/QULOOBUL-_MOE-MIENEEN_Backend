@@ -1,19 +1,20 @@
 name: CD Mobile
 
 # Separate deployable: a failing mobile build does not block an API or web release.
-# Path-filtered, so it stays dormant until the MAUI project exists.
+# Path-filtered: runs only when the MAUI app or the shared library it references changes.
 on:
   push:
     branches: [main, master, develop, dev]
     paths:
-      - 'src/Npo.Mobile/**'
-      - 'src/Npo.Shared/**'
+      - 'Frontend_Mobile/**'
+      - "QULOOBUL _MOE'MIENEEN_Shared/**"
+      - '.github/workflows/cd-mobile.yml'
 
 jobs:
   android:
     runs-on: ubuntu-latest
     env:
-      MOBILE_PROJECT: src/Npo.Mobile/Npo.Mobile.csproj
+      MOBILE_PROJECT: Frontend_Mobile/Frontend_Mobile.csproj
       SHARED_TESTS: tests/Npo.Shared.Tests/Npo.Shared.Tests.csproj
       KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
     steps:
@@ -67,7 +68,10 @@ jobs:
 
       # Side-loaded for the client demo and for marking. Play Store
       # distribution is Phase 2 and is deliberately not automated.
-      - uses: actions/upload-artifact@v4
+      # Release branches only: an APK per dev push fills the artifact quota.
+      - if: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' }}
+        uses: actions/upload-artifact@v4
         with:
           name: npo-android-apk
           path: ./apk/*.apk
+          retention-days: 14

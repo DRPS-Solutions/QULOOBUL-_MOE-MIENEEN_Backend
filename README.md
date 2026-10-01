@@ -278,8 +278,8 @@ Roughly in dependency order:
    (UC-09), Calendar (event attendees and RSVPs), task comments, minutes search/approval,
    request fulfilment, admin announcements and notification deep links. MAUI has none of
    these, its Meetings and User Management are still stubs, and it lacks the offline SQLite cache.
-2. **Mobile push** (Notification Hubs) — an NFR, absent. Email via Resend is wired in
-   `EmailService` but stays in-app-only with no API key set.
+2. **Mobile push** (Notification Hubs) — an NFR, absent. Email goes through Azure
+   Communication Services (`EmailService`); without `Email:ConnectionString` it stays in-app only.
 3. **`cd-mobile.yml` paths** — see above; the workflow cannot fire as written.
 4. **Localisation and accessibility.** Mobile UI text is inline in XAML rather than `.resx`,
    and `SemanticProperties` are not set anywhere.

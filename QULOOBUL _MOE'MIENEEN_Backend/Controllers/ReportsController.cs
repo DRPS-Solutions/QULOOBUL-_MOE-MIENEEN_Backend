@@ -11,13 +11,23 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Controllers
     public class ReportsController(ReportingService reports) : ApiControllerBase
     {
         [HttpPost]
-        public async Task<ActionResult<ReportDto>> Build(ReportRequest req) =>
-            Ok(await reports.BuildAsync(req, UserId()));
+        public Task<ActionResult<ReportDto>> Build(ReportRequest req) =>
+            Refusable(() => reports.BuildAsync(req, UserId()));
 //----------------------------------------------------------------------------------------------------------------------//
         /// <summary>Same figures as a CSV in Blob Storage; returns a 15-minute download link.</summary>
         [HttpPost("export")]
-        public async Task<ActionResult<ReportExportResponse>> Export(ReportRequest req) =>
-            Ok(await reports.ExportAsync(req, UserId()));
+        public Task<ActionResult<ReportExportResponse>> Export(ReportRequest req) =>
+            Refusable(() => reports.ExportAsync(req, UserId()));
+//----------------------------------------------------------------------------------------------------------------------//
+        /// <summary>
+        /// "Bad period" and "not enough data" are expected outcomes (UC-09), so they become a 400 here, in our own
+        /// code, rather than an exception unwinding through the framework (which also trips the debugger).
+        /// </summary>
+        private async Task<ActionResult<T>> Refusable<T>(Func<Task<T>> run)
+        {
+            try { return Ok(await run()); }
+            catch (ArgumentException ex) { return BadRequest(new ErrorResponse(ex.Message)); }
+        }
     }
 }
 //---------------------------DDDDDDDDDDDoooooooooooooo END OF FILE DDDDDDDDDDDoooooooooooooo---------------------------//

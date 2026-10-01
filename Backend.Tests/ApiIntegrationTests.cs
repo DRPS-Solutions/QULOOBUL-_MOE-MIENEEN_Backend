@@ -30,12 +30,12 @@ namespace Backend.Tests;
 public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
     public const string AdminEmail = "admin@test.local", StaffEmail = "staff@test.local", Password = "Passw0rd!Passw0rd";
-
+//----------------------------------------------------------------------------------------------------------------------//
     public string ConnectionString { get; } = new SqlConnectionStringBuilder(
         Environment.GetEnvironmentVariable("TEST_SQL_CONNECTION")
         ?? @"Server=(localdb)\mssqllocaldb;Trusted_Connection=True;TrustServerCertificate=True")
     { InitialCatalog = $"QM_Test_{Guid.NewGuid():N}" }.ConnectionString;
-
+//----------------------------------------------------------------------------------------------------------------------//
     protected override void ConfigureWebHost(IWebHostBuilder b)
     {
         // The ' in the project folder name breaks the MSBuild expression Mvc.Testing writes into
@@ -52,7 +52,7 @@ public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         // The clock-driven jobs would race the assertions; MaintenanceJobTests covers them.
         b.ConfigureServices(s => s.RemoveAll<IHostedService>());
     }
-
+//----------------------------------------------------------------------------------------------------------------------//
     public async Task InitializeAsync()
     {
         using var scope = Services.CreateScope();
@@ -68,14 +68,14 @@ public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         db.Users.Add(staff);
         await db.SaveChangesAsync();
     }
-
+//----------------------------------------------------------------------------------------------------------------------//
     public new async Task DisposeAsync()
     {
         using (var scope = Services.CreateScope())
             await scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.EnsureDeletedAsync();
         await base.DisposeAsync();
     }
-
+//----------------------------------------------------------------------------------------------------------------------//
     public async Task<(HttpClient Client, AuthResponse Me)> SignInAsync(string email)
     {
         var client = CreateClient();
@@ -85,9 +85,12 @@ public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", me.Token);
         return (client, me);
     }
-
+//----------------------------------------------------------------------------------------------------------------------//
     public AppDbContext Db(IServiceScope scope) => scope.ServiceProvider.GetRequiredService<AppDbContext>();
 }
+//----------------------------------------------------------------------------------------------------------------------//
+//----------------------------------------New integration tests go here, not in LifecycleTests.cs----------------------------------------//
+//----------------------------------------------------------------------------------------------------------------------//
 
 public class ApiIntegrationTests(ApiFactory api) : IClassFixture<ApiFactory>
 {
@@ -98,7 +101,7 @@ public class ApiIntegrationTests(ApiFactory api) : IClassFixture<ApiFactory>
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/health")).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/tasks")).StatusCode);
     }
-
+//----------------------------------------------------------------------------------------------------------------------//
     [Fact]
     public async Task Responses_carry_the_security_headers()
     {
@@ -106,7 +109,7 @@ public class ApiIntegrationTests(ApiFactory api) : IClassFixture<ApiFactory>
         Assert.Contains("default-src 'none'", res.Headers.GetValues("Content-Security-Policy").Single());
         Assert.Equal("nosniff", res.Headers.GetValues("X-Content-Type-Options").Single());
     }
-
+//----------------------------------------------------------------------------------------------------------------------//
     [Fact]
     public async Task The_directory_is_read_through_the_view_and_hides_the_system_account()
     {
@@ -116,7 +119,27 @@ public class ApiIntegrationTests(ApiFactory api) : IClassFixture<ApiFactory>
         Assert.Contains(users!, u => u.Email == ApiFactory.AdminEmail && u.Role == Roles.Admin);
         Assert.DoesNotContain(users!, u => u.Email == SystemAccountEmail);
     }
+//----------------------------------------------------------------------------------------------------------------------//
+    [Fact]
+    public async Task A_user_reads_and_edits_their_own_profile_but_not_their_role()
+    {
+        var (client, me) = await api.SignInAsync(ApiFactory.StaffEmail);
+        var profile = await client.GetFromJsonAsync<UserDto>("/api/users/me");
+        Assert.Equal(ApiFactory.StaffEmail, profile!.Email);
 
+        var res = await client.PatchAsJsonAsync($"/api/users/{me.UserId}", new UpdateUserRequest { CellNo = "082 123 4567" });
+        res.EnsureSuccessStatusCode();
+        Assert.Equal("082 123 4567", (await client.GetFromJsonAsync<UserDto>("/api/users/me"))!.CellNo);
+
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.PatchAsJsonAsync($"/api/users/{me.UserId}",
+            new UpdateUserRequest { RoleId = 1 })).StatusCode);
+
+        // Email is the sign-in name: another account's address is refused.
+        Assert.False((await client.PatchAsJsonAsync($"/api/users/{me.UserId}",
+            new UpdateUserRequest { Email = ApiFactory.AdminEmail })).IsSuccessStatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PostAsync("/api/users/me/password-link", null)).StatusCode);
+    }
+//----------------------------------------------------------------------------------------------------------------------//
     [Fact]
     public async Task Staff_cannot_reach_admin_routes()
     {
@@ -125,7 +148,18 @@ public class ApiIntegrationTests(ApiFactory api) : IClassFixture<ApiFactory>
         Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync("/api/notifications/send",
             new { userIds = new[] { 1 }, message = "hi" })).StatusCode);
     }
+//----------------------------------------------------------------------------------------------------------------------//
+    [Fact]
+    public async Task Only_the_admin_reads_a_users_audit_trail()
+    {
+        var (staff, staffMe) = await api.SignInAsync(ApiFactory.StaffEmail);
+        Assert.Equal(HttpStatusCode.Forbidden, (await staff.GetAsync($"/api/users/{staffMe.UserId}/audit")).StatusCode);
 
+        var (admin, _) = await api.SignInAsync(ApiFactory.AdminEmail);
+        var trail = await admin.GetFromJsonAsync<List<AuditEntryDto>>($"/api/users/{staffMe.UserId}/audit");
+        Assert.Contains(trail!, e => e.Action == "auth.login");
+    }
+//----------------------------------------------------------------------------------------------------------------------//
     [Fact]
     public async Task Only_the_organiser_or_an_admin_changes_an_events_attendees()
     {
@@ -144,7 +178,7 @@ public class ApiIntegrationTests(ApiFactory api) : IClassFixture<ApiFactory>
         Assert.Equal(HttpStatusCode.Forbidden, (await staff.DeleteAsync($"/api/events/{ev.EventId}/attendees/{adminMe.UserId}")).StatusCode);
         Assert.Equal(HttpStatusCode.NoContent, (await staff.DeleteAsync($"/api/events/{ev.EventId}/attendees/{staffMe.UserId}")).StatusCode);
     }
-
+//----------------------------------------------------------------------------------------------------------------------//
     [Fact]
     public async Task Row_level_security_hides_other_users_notifications_even_from_a_raw_query()
     {
@@ -176,7 +210,7 @@ public class ApiIntegrationTests(ApiFactory api) : IClassFixture<ApiFactory>
         var (staff, _) = await api.SignInAsync(ApiFactory.StaffEmail);
         Assert.Equal(HttpStatusCode.OK, (await staff.GetAsync("/api/notifications")).StatusCode);
     }
-
+//----------------------------------------------------------------------------------------------------------------------//
     [Fact]
     public async Task Deleting_a_task_cascades_its_comments_and_unlinks_its_files()
     {
@@ -206,7 +240,55 @@ public class ApiIntegrationTests(ApiFactory api) : IClassFixture<ApiFactory>
         Assert.False(await db.Set<TaskComment>().AnyAsync(c => c.TaskId == card.TaskId));
         Assert.Null(await db.FileUploads.Where(f => f.FileId == file.FileId).Select(f => f.TaskId).SingleAsync());
     }
+//----------------------------------------------------------------------------------------------------------------------//
+    [Fact]
+    public async Task Anyone_creates_daily_tasks_and_records_who_completed_one_not_assigned_to_them()
+    {
+        var (admin, adminMe) = await api.SignInAsync(ApiFactory.AdminEmail);
+        var (staff, staffMe) = await api.SignInAsync(ApiFactory.StaffEmail);
+        var daily = (await staff.GetFromJsonAsync<List<ProjectSummaryDto>>("/api/projects"))!
+            .Single(p => p.ProjectName == DailyTasksProject).ProjectId;
+        Assert.True((await staff.PostAsJsonAsync("/api/tasks", new CreateTaskRequest
+            { ProjectId = daily, Title = "Mop", Deadline = DateTime.UtcNow.AddDays(1) })).IsSuccessStatusCode);
 
+        // Delegated strictly down: not to a peer (here, the admin themselves), but to a colleague of
+        // staff's, so staff neither created it nor is assigned to it.
+        var card = await (await admin.PostAsJsonAsync("/api/tasks", new CreateTaskRequest
+            { ProjectId = daily, Title = "Lock up", Deadline = DateTime.UtcNow.AddDays(1) })).Content.ReadFromJsonAsync<TaskCardDto>();
+        Assert.False((await admin.PostAsJsonAsync($"/api/tasks/{card!.TaskId}/assignments",
+            new AssignTaskRequest { AssigneeId = adminMe.UserId })).IsSuccessStatusCode);
+        (await admin.PostAsJsonAsync($"/api/tasks/{card.TaskId}/assignments", new AssignTaskRequest { AssigneeId = await AddStaffAsync() }))
+            .EnsureSuccessStatusCode();
+
+        Assert.Contains((await staff.GetFromJsonAsync<List<TaskCardDto>>("/api/tasks"))!, t => t.TaskId == card.TaskId);
+        Assert.False((await staff.PostAsJsonAsync($"/api/tasks/{card.TaskId}/move",
+            new MoveTaskRequest { NewStatus = "Done", CompletedBy = SystemUserId() })).IsSuccessStatusCode); // inactive
+        (await staff.PostAsJsonAsync($"/api/tasks/{card.TaskId}/move", new MoveTaskRequest { NewStatus = "Done", CompletedBy = staffMe.UserId }))
+            .EnsureSuccessStatusCode();
+
+        Assert.Equal(staffMe.UserId, (await admin.GetFromJsonAsync<TaskDetailDto>($"/api/tasks/{card.TaskId}"))!.CompletedBy);
+    }
+
+    private async Task<int> AddStaffAsync()
+    {
+        using var scope = api.Services.CreateScope();
+        var db = api.Db(scope);
+        var user = new User
+        {
+            RoleId = await db.Roles.Where(r => r.RoleName == Roles.Staff).Select(r => r.RoleId).SingleAsync(),
+            FirstName = "Other", Surname = "Staff", Email = $"{Guid.NewGuid():N}@test.local",
+        };
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+        return user.UserId;
+    }
+
+    private int SystemUserId()
+    {
+        using var scope = api.Services.CreateScope();
+        return api.Db(scope).Users.Where(u => u.Email == SystemAccountEmail).Select(u => u.UserId).Single();
+    }
+//----------------------------------------------------------------------------------------------------------------------//
     [Fact]
     public async Task The_login_route_is_rate_limited_per_client()
     {
@@ -220,3 +302,4 @@ public class ApiIntegrationTests(ApiFactory api) : IClassFixture<ApiFactory>
         Assert.Equal(HttpStatusCode.TooManyRequests, codes[2]);
     }
 }
+//---------------------------DDDDDDDDDDDoooooooooooooo END OF FILE DDDDDDDDDDDoooooooooooooo---------------------------//

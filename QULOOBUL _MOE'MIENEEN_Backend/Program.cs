@@ -1,3 +1,4 @@
+using Azure.Monitor.OpenTelemetry.AspNetCore;
 using Azure.Storage.Blobs;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -14,6 +15,19 @@ using System.Text;
 using System.Threading.RateLimiting;
 using static QULOOBUL__MOE_MIENEEN_Shared.Classes.Common;
 
+// Local-only: lift KEY=VALUE lines from .env into the environment before the builder snapshots it,
+// so ConnectionStrings__Default etc. override appsettings.json. Real env vars (CI, App Service) win.
+if (File.Exists(".env"))
+    foreach (var line in File.ReadAllLines(".env"))
+    {
+        var t = line.Trim();
+        var eq = t.IndexOf('=');
+        if (t.Length == 0 || t[0] == '#' || eq < 1) continue;
+        var key = t[..eq].Trim();
+        if (Environment.GetEnvironmentVariable(key) is null)
+            Environment.SetEnvironmentVariable(key, t[(eq + 1)..].Trim().Trim('"'));
+    }
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
@@ -22,12 +36,18 @@ builder.Services.AddOpenApi();
 // UseSeeding runs after `dotnet ef database update` (and Migrate/EnsureCreated).
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddDbContext<AppDbContext>((sp, o) => o
-    .UseSqlServer(builder.Configuration.GetConnectionString("Default"))
+    // Retries ride out an Azure SQL serverless database resuming from auto-pause (error 40613).
+    .UseSqlServer(builder.Configuration.GetConnectionString("Default"), sql => sql.EnableRetryOnFailure())
     .AddInterceptors(new SessionContextInterceptor(sp.GetRequiredService<IHttpContextAccessor>()))
     .UseSeeding((db, _) => DbSeeder.Seed((AppDbContext)db, builder.Configuration)));
 
-builder.Services.AddSignalR();
-builder.Services.AddHttpClient();     // EmailService talks to the Resend REST API
+// Azure SignalR Service is the backplane in Azure (infra/main.bicep sets the connection string);
+// locally and in tests there is none, so the hub runs in-process.
+var signalR = builder.Services.AddSignalR();
+if (builder.Configuration["Azure:SignalR:ConnectionString"] is not null) signalR.AddAzureSignalR();
+// Application Insights: traces, dependencies and exceptions, only where App Service provides the key.
+if (builder.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"] is not null)
+    builder.Services.AddOpenTelemetry().UseAzureMonitor();
 
 // UC-07 needs this: BlobStorageService cannot resolve without it. Locally it points at Azurite
 // ("UseDevelopmentStorage=true"); in production the connection string comes from Key Vault.
@@ -127,7 +147,10 @@ builder.Services.AddScoped<TaskScheduleService>();
 
 // SM-02's 48-hour escalation, SM-01's deadline reminders, and Task_Schedule's recurring-task
 // generation: the transitions the doc drives from a clock rather than from a user action.
-builder.Services.AddHostedService<MaintenanceJobs>();
+// Off in the staging slot (a slot-sticky Jobs__Enabled=false): it shares the production database,
+// and after a swap it runs the previous build, which must not sweep a migrated schema.
+if (builder.Configuration.GetValue("Jobs:Enabled", true))
+    builder.Services.AddHostedService<MaintenanceJobs>();
 
 var app = builder.Build();
 

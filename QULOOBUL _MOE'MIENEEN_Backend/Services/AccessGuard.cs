@@ -35,7 +35,8 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
         }
 //----------------------------------------------------------------------------------------------------------------------//
         public async Task<bool> CanSeeProjectAsync(int userId, int projectId) =>
-            await db.Projects.AnyAsync(p => p.ProjectId == projectId && p.OwnerId == userId)
+            await db.Projects.AnyAsync(p => p.ProjectId == projectId
+                && (p.OwnerId == userId || p.ProjectName == DailyTasksProject)) // the seeded shared project
             || await db.ProjectMembers.AnyAsync(m => m.ProjectId == projectId && m.UserId == userId)
             || await IsAdminAsync(userId);
 //----------------------------------------------------------------------------------------------------------------------//
@@ -114,12 +115,13 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
 //----------------------------------------------------------------------------------------------------------------------//
         /// <summary>
         /// The same rule as <see cref="EnsureTaskAsync"/> expressed as a predicate EF can translate,
-        /// for list endpoints. A board is filtered rather than refused, so a shared project
-        /// (the seeded "Daily Tasks") still shows each caller their own work.
+        /// for list endpoints. The seeded "Daily Tasks" is a shared checklist, so everyone sees all
+        /// of it and can tick off work that wasn't assigned to them.
         /// </summary>
         public IQueryable<ProjectTask> VisibleTasks(IQueryable<ProjectTask> tasks, int userId, bool isAdmin) =>
             isAdmin ? tasks : tasks.Where(t =>
                 t.CreatedBy == userId
+                || db.Projects.Any(p => p.ProjectId == t.ProjectId && p.ProjectName == DailyTasksProject)
                 || db.Projects.Any(p => p.ProjectId == t.ProjectId && p.OwnerId == userId)
                 || db.ProjectMembers.Any(m => m.ProjectId == t.ProjectId && m.UserId == userId)
                 || db.TaskAssignments.Any(a => a.TaskId == t.TaskId && a.UserId == userId));

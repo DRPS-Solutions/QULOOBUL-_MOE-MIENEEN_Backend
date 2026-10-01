@@ -45,20 +45,12 @@ jobs:
       - name: Coverage gate
         run: bash .github/scripts/coverage-gate.sh 70
 
+      # Proves both projects publish. The deploy job republishes from the same commit
+      # instead of passing artifacts, so a full artifact quota cannot block a release.
       - name: Publish
         run: |
           dotnet publish "$PROJECT" -c Release --no-build -o ./publish
           dotnet publish "Frontend_BlazorWeb/Frontend_BlazorWeb.csproj" -c Release -o ./web
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: api
-          path: ./publish
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: web
-          path: ./web/wwwroot
 
   deploy:
     needs: build
@@ -73,30 +65,27 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      - uses: actions/download-artifact@v4
-        with:
-          name: api
-          path: ./publish
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: web
-          path: ./web
+      - name: Publish
+        run: |
+          dotnet publish "$PROJECT" -c Release -o ./publish
+          dotnet publish "Frontend_BlazorWeb/Frontend_BlazorWeb.csproj" -c Release -o ./web-build
+          mv ./web-build/wwwroot ./web
 
       - uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Deploy API to staging slot
+      # Staging never swaps, so it deploys straight to its own app rather than a slot.
+      - name: Deploy API to the staging app
+        id: deploy
         uses: azure/webapps-deploy@v3
         with:
           app-name: ${{ vars.AZURE_WEBAPP_NAME }}
-          slot-name: staging
           package: ./publish
 
       # Points the client at this API and writes its CSP (hash of the build-specific import map).
       - name: Configure Blazor client for Static Web Apps
-        run: bash .github/scripts/web-config.sh ./web "https://${{ vars.AZURE_WEBAPP_NAME }}-staging.azurewebsites.net"
+        run: bash .github/scripts/web-config.sh ./web "${{ steps.deploy.outputs.webapp-url }}"
 
       - name: Deploy Blazor client to Static Web Apps
         if: ${{ vars.AZURE_STATIC_WEB_APP != '' }}
@@ -107,6 +96,13 @@ jobs:
           action: upload
           app_location: ./web
           skip_app_build: true
+
+      # Azure SQL admits only App Service and named developer IPs, so the runner opens a rule for itself.
+      - name: Open SQL firewall for this runner
+        run: |
+          ip=$(curl -fsS https://api.ipify.org)
+          az sql server firewall-rule create -g "${{ vars.AZURE_RESOURCE_GROUP }}" -s "${{ vars.AZURE_SQL_SERVER }}" \
+            -n "gh-${{ github.run_id }}" --start-ip-address "$ip" --end-ip-address "$ip"
 
       # Migrations run against the database the live build is still using,
       # so every migration must be backward compatible.
@@ -119,9 +115,13 @@ jobs:
           dotnet tool install --global dotnet-ef
           dotnet ef database update --project "$PROJECT"
 
+      - name: Close SQL firewall
+        if: always()
+        run: az sql server firewall-rule delete -g "${{ vars.AZURE_RESOURCE_GROUP }}" -s "${{ vars.AZURE_SQL_SERVER }}" -n "gh-${{ github.run_id }}" || true
+
       # SMOKE_EMAIL / SMOKE_PASSWORD: a low-privilege account kept for this check, not the seed admin.
       - name: Smoke test
         env:
           SMOKE_EMAIL: ${{ secrets.SMOKE_EMAIL }}
           SMOKE_PASSWORD: ${{ secrets.SMOKE_PASSWORD }}
-        run: bash .github/scripts/smoke-test.sh "https://${{ vars.AZURE_WEBAPP_NAME }}-staging.azurewebsites.net"
+        run: bash .github/scripts/smoke-test.sh "${{ steps.deploy.outputs.webapp-url }}"

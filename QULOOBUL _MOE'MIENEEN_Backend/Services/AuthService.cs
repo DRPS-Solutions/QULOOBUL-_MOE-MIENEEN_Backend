@@ -20,7 +20,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
         private static readonly PasswordHasher<User> Hasher = new();
 
         public const string FailedAction = "auth.login.failed";
-        public const int MaxFailedLogins = 3;
+        public const int MaxFailedLogins = 5;
         public static readonly TimeSpan PasswordTokenLifetime = TimeSpan.FromDays(3);
 //----------------------------------------------------------------------------------------------------------------------//
         public async Task<AuthResponse> LoginAsync(LoginRequest req)
@@ -51,7 +51,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             if (Hasher.VerifyHashedPassword(user, user.PasswordHash, req.Password)
                 == PasswordVerificationResult.Failed)
             {
-                // SD-01, alt [valid = false]; SM-03 Authenticate [3 consecutive failures] → Locked.
+                // SD-01, alt [valid = false]; SM-03 Authenticate [5 consecutive failures] → Locked.
                 user.FailedLoginCount++;
                 audit.Record(user.UserId, FailedAction, nameof(User), user.UserId);
                 if (user.FailedLoginCount >= MaxFailedLogins) await LockAsync(user);
@@ -109,12 +109,15 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
         }
 //----------------------------------------------------------------------------------------------------------------------//
         /// <summary>Email the set-password link. Call after the token has been saved.</summary>
-        public Task SendPasswordLinkAsync(User user, string token, bool activation)
+        public Task SendPasswordLinkAsync(User user, string token, bool activation, bool selfService = false)
         {
             var link = $"{config["App:BaseUrl"]?.TrimEnd('/')}/set-password?token={token}";
             return activation
                 ? email.SendAccountEmailAsync(user.Email, "Activate your account",
                     $"An account was created for you. Set your password to activate it: {link}")
+                : selfService
+                ? email.SendAccountEmailAsync(user.Email, "Change your password",
+                    $"You asked to change your password. Choose a new one here: {link} If this wasn't you, ignore this email.")
                 : email.SendAccountEmailAsync(user.Email, "Your password was reset",
                     $"An admin reset your password. Choose a new one here: {link}");
         }

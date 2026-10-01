@@ -13,7 +13,7 @@ namespace QULOOBUL__MOE_MIENEEN_Shared.Collaboration
     {
         [Required, MaxLength(200)] 
         public string Title { get; init; } = string.Empty;
-        [Required] 
+        [Required, Range(typeof(DateTime), "2000-01-01", "2100-12-31")]
         public DateTime MeetingDate { get; init; }
         public IReadOnlyList<int> AttendeeIds { get; init; } = [];
     }
@@ -24,7 +24,7 @@ namespace QULOOBUL__MOE_MIENEEN_Shared.Collaboration
 
     public record RecordMinutesRequest
     {
-        [Required, MinLength(1)] 
+        [Required, MaxLength(20000)]
         public string MinutesText { get; init; } = string.Empty;
         public bool IsAiDraft { get; init; }
     }
@@ -32,7 +32,7 @@ namespace QULOOBUL__MOE_MIENEEN_Shared.Collaboration
     /// <summary>UC-03 alternate flow: edit (replace) or append to saved minutes. Saved as a new version.</summary>
     public record EditMinutesRequest
     {
-        [Required, MinLength(1)]
+        [Required, MaxLength(20000)]
         public string MinutesText { get; init; } = string.Empty;
         /// <summary>True adds the text below the current minutes; false replaces them.</summary>
         public bool Append { get; init; }
@@ -44,7 +44,7 @@ namespace QULOOBUL__MOE_MIENEEN_Shared.Collaboration
     {
         [Required, MaxLength(200)]
         public string Title { get; init; } = string.Empty;
-        [Required]
+        [Required, Range(typeof(DateTime), "2000-01-01", "2100-12-31")]
         public DateTime EventDate { get; init; }
         [MaxLength(200)]
         public string Location { get; init; } = string.Empty;
@@ -52,7 +52,7 @@ namespace QULOOBUL__MOE_MIENEEN_Shared.Collaboration
 
     public record EventAttendeeDto(int UserId, string FullName, string Status);
 
-    public record AddEventAttendeeRequest { [Required] public int UserId { get; init; } }
+    public record AddEventAttendeeRequest { [Required, Range(1, int.MaxValue)] public int UserId { get; init; } }
 
     /// <summary>RSVP against an event the caller is already on.</summary>
     public record RespondToEventRequest

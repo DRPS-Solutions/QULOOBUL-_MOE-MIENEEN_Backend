@@ -1,5 +1,6 @@
 @page "/users"
 @using MudBlazor
+@using System.ComponentModel.DataAnnotations
 @implements IDisposable
 @inject AppDataService AppData
 
@@ -310,7 +311,7 @@
                 }
                 else
                 {
-                    <MudButton Variant="Variant.Outlined" Style="color: white; border-color: rgba(255, 255, 255, 0.5);" StartIcon="@Icons.Material.Filled.ArrowBack" OnClick="() => showCreateUserScreen = false">
+                    <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.ArrowBack" OnClick="() => showCreateUserScreen = false">
                         Back to Roster
                     </MudButton>
                 }
@@ -427,6 +428,33 @@
                                 }
                             </div>
                         </div>
+
+                        <div class="drps-task-col mt-4">
+                            <div class="drps-task-col-title">
+                                <MudIcon Icon="@Icons.Material.Filled.History" Size="Size.Small" />
+                                Activity Log
+                            </div>
+                            @if (!selectedAudit.Any())
+                            {
+                                <div class="drps-task-col-empty">No recorded activity</div>
+                            }
+                            else
+                            {
+                                <MudSimpleTable Dense="true" Hover="true" Style="max-height:360px; overflow-y:auto; background:transparent;">
+                                    <thead><tr><th>When</th><th>Action</th><th>Target</th></tr></thead>
+                                    <tbody>
+                                        @foreach (var entry in selectedAudit)
+                                        {
+                                            <tr>
+                                                <td>@entry.Timestamp.ToLocalTime().ToString("d MMM yyyy HH:mm")</td>
+                                                <td>@entry.Action</td>
+                                                <td>@(entry.EntityId == 0 ? entry.EntityType : $"{entry.EntityType} #{entry.EntityId}")</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </MudSimpleTable>
+                            }
+                        </div>
                     }
                 </MudItem>
             </MudGrid>
@@ -439,14 +467,14 @@
 
                 <MudGrid Justify="Justify.Center">
                     <MudItem xs="12" md="6">
-                        <MudTextField T="string" @bind-Value="newUser.FirstName" Label="First Name" Variant="Variant.Outlined" MaxLength="100" Immediate="true" Class="mb-3" />
-                        <MudTextField T="string" @bind-Value="newUser.Surname" Label="Surname" Variant="Variant.Outlined" MaxLength="100" Immediate="true" Class="mb-3" />
-                        <MudTextField T="string" @bind-Value="newUser.Email" Label="Email Address" InputType="InputType.Email" Variant="Variant.Outlined" MaxLength="256" Immediate="true" Class="mb-3" />
-                        <MudTextField T="string" @bind-Value="newUser.CellNo" Label="Cell Number" InputType="InputType.Telephone" Variant="Variant.Outlined" MaxLength="20" Immediate="true" Class="mb-3" />
+                        <MudTextField T="string" @bind-Value="newUser.FirstName" Label="First Name" Required="true" RequiredError="Enter a first name." Variant="Variant.Outlined" MaxLength="100" Immediate="true" Class="mb-3" />
+                        <MudTextField T="string" @bind-Value="newUser.Surname" Label="Surname" Required="true" RequiredError="Enter a surname." Variant="Variant.Outlined" MaxLength="100" Immediate="true" Class="mb-3" />
+                        <MudTextField T="string" @bind-Value="newUser.Email" Label="Email Address" Required="true" RequiredError="Enter an email address." Validation="@EmailRule" InputType="InputType.Email" Variant="Variant.Outlined" MaxLength="256" Immediate="true" Class="mb-3" />
+                        <MudTextField T="string" @bind-Value="newUser.CellNo" Label="Cell Number" Required="true" RequiredError="Enter a cell number." Validation="@PhoneRule" InputType="InputType.Telephone" Variant="Variant.Outlined" MaxLength="20" Immediate="true" Class="mb-3" />
 
                         @* The role decides which pages the account can see (see
                            AppDataService.CanSee*) and what it may do in the API. *@
-                        <MudSelect T="int?" Label="System Role" Variant="Variant.Outlined" @bind-Value="newUser.RoleId"
+                        <MudSelect T="int?" Label="System Role" Variant="Variant.Outlined" Required="true" RequiredError="Choose a role." @bind-Value="newUser.RoleId"
                                    ToStringFunc="@(id => roles.FirstOrDefault(r => r.RoleId == id)?.RoleName)" Class="mb-3">
                             @foreach (var role in roles)
                             {
@@ -479,6 +507,7 @@
 
     private UserSummaryDto? selectedEmployee;
     private IReadOnlyList<TaskCardDto> selectedTasks = [];
+    private IReadOnlyList<AuditEntryDto> selectedAudit = [];
 
     // Create user form
     private NewUserForm newUser = new();
@@ -488,9 +517,13 @@
         !saving &&
         !string.IsNullOrWhiteSpace(newUser.FirstName) &&
         !string.IsNullOrWhiteSpace(newUser.Surname) &&
-        !string.IsNullOrWhiteSpace(newUser.Email) &&
-        !string.IsNullOrWhiteSpace(newUser.CellNo) &&
+        EmailRule.IsValid(newUser.Email.Trim()) && !string.IsNullOrWhiteSpace(newUser.Email) &&
+        PhoneRule.IsValid(newUser.CellNo.Trim()) && !string.IsNullOrWhiteSpace(newUser.CellNo) &&
         newUser.RoleId.HasValue;
+
+    // The same rules CreateUserRequest applies server-side, so the message shows before Save.
+    private static readonly EmailAddressAttribute EmailRule = new() { ErrorMessage = "Enter a valid email address, e.g. name@example.com." };
+    private static readonly PhoneAttribute PhoneRule = new() { ErrorMessage = "Enter a valid phone number, e.g. 082 123 4567." };
 
     private IEnumerable<UserSummaryDto> FilteredEmployees =>
         AppData.Users
@@ -529,8 +562,13 @@
     {
         selectedEmployee = employee;
         selectedTasks = [];
-        var tasks = await AppData.GetAsync<List<TaskCardDto>>($"api/tasks?assigneeId={employee.UserId}");
-        if (selectedEmployee == employee) selectedTasks = tasks ?? []; // ignore a slower, older click
+        selectedAudit = [];
+        var tasksLoad = AppData.GetAsync<List<TaskCardDto>>($"api/tasks?assigneeId={employee.UserId}");
+        var auditLoad = AppData.GetAsync<List<AuditEntryDto>>($"api/users/{employee.UserId}/audit");
+        await Task.WhenAll(tasksLoad, auditLoad);
+        if (selectedEmployee != employee) return; // ignore a slower, older click
+        selectedTasks = await tasksLoad ?? [];
+        selectedAudit = await auditLoad ?? [];
     }
 
     private async Task SaveUser()

@@ -48,6 +48,13 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             return ToDto(user, role.RoleName);
         }
 //----------------------------------------------------------------------------------------------------------------------//
+        /// <summary>The signed-in user's own details, for the profile page.</summary>
+        public async Task<UserDto> GetAsync(int userId)
+        {
+            var user = await Load(userId);
+            return ToDto(user, await db.Roles.Where(x => x.RoleId == user.RoleId).Select(x => x.RoleName).FirstAsync());
+        }
+//----------------------------------------------------------------------------------------------------------------------//
         /// <summary>SM-03 updateProfile(details) / write AuditLog: an Active self-transition. A user edits
         /// their own details; changing a role is an admin's call.</summary>
         public async Task<UserDto> UpdateProfileAsync(int userId, UpdateUserRequest req, int actorId)
@@ -65,6 +72,13 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             if (req.FirstName is { } f) user.FirstName = f.Trim();
             if (req.Surname is { } s) user.Surname = s.Trim();
             if (req.CellNo is { } c) user.CellNo = c.Trim();
+            if (req.Email?.Trim() is { } e && e != user.Email)
+            {
+                // Email is the sign-in name, so it stays unique.
+                if (await db.Users.AnyAsync(u => u.Email == e))
+                    throw new InvalidOperationException("An account with that email already exists.");
+                user.Email = e;
+            }
             if (req.RoleId is { } r)
                 user.RoleId = (await db.Roles.FindAsync(r) ?? throw new InvalidOperationException($"Unknown role {r}.")).RoleId;
 
@@ -124,6 +138,16 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             var token = AuthService.NewPasswordToken(user);
             await audit.RecordAndSaveAsync(actorId, "user.password.reset", nameof(User), userId);
             await auth.SendPasswordLinkAsync(user, token, activation);
+        }
+//----------------------------------------------------------------------------------------------------------------------//
+        /// <summary>A signed-in user asks to change their own password: email them a set-password link.
+        /// Unlike the admin reset, the current password keeps working until the link is redeemed.</summary>
+        public async Task SendOwnPasswordLinkAsync(int userId)
+        {
+            var user = await Load(userId);
+            var token = AuthService.NewPasswordToken(user);
+            await audit.RecordAndSaveAsync(userId, "user.password.link", nameof(User), userId);
+            await auth.SendPasswordLinkAsync(user, token, activation: false, selfService: true);
         }
 //----------------------------------------------------------------------------------------------------------------------//
         /// <summary>SM-03 anonymise() [POPIA retention period elapsed] / scrub personal fields, keep AuditLog

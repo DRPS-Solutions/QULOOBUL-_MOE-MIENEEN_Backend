@@ -291,7 +291,7 @@
                             </div>
                         </div>
 
-                        <MudTextField T="string" @bind-Value="form.Name" Label="Event Title" Variant="Variant.Outlined" MaxLength="200" Class="mb-3" />
+                        <MudTextField T="string" @bind-Value="form.Name" Label="Event Title" Required="true" RequiredError="Give the event a title." Variant="Variant.Outlined" MaxLength="200" Class="mb-3" />
                         <MudTextField T="string" @bind-Value="form.Description" Label="Description" Variant="Variant.Outlined" Lines="3" Class="mb-3" />
 
                         <MudSelect T="int?" Label="Lead Coordinator" Variant="Variant.Outlined" @bind-Value="form.CoordinatorId"

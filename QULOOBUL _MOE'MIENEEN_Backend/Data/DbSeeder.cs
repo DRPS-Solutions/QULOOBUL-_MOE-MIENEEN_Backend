@@ -24,13 +24,13 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Data
             (Roles.FacilityManager, 3, []),
             (Roles.Staff, 4, []),
         ];
-
+//----------------------------------------------------------------------------------------------------------------------//
         private static readonly string[] NotificationTypeSeed =
         [
             "TaskAssigned", "TaskCancelled", "DeadlineApproaching", "ProjectAssigned", "EventInvite",
             "RequestSubmitted", "RequestReviewed", "RequestCompleted", "RequestEscalated", "UserLocked", "Announcement",
         ];
-
+//----------------------------------------------------------------------------------------------------------------------//
         public static void Seed(AppDbContext db, IConfiguration config)
         {
             if (!db.Roles.Any())
@@ -82,6 +82,21 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Data
                 db.Users.Add(admin);
                 db.SaveChanges();
             }
+
+            // Local testing only: one pre-activated user per non-admin role, so every role's views can be
+            // signed into without the emailed set-password link. Opt-in via user-secrets `Seed:DevPassword`;
+            // it is never set in Azure, so nothing is created there.
+            var devPassword = config["Seed:DevPassword"];
+            if (!string.IsNullOrWhiteSpace(devPassword))
+                foreach (var role in db.Roles.Where(r => r.RoleName != Roles.Admin).ToList())
+                {
+                    var devEmail = $"{role.RoleName.Replace(" ", "").ToLowerInvariant()}@dev.local";
+                    if (db.Users.Any(u => u.Email == devEmail)) continue;
+                    var dev = new User { RoleId = role.RoleId, FirstName = role.RoleName, Surname = "Dev", Email = devEmail };
+                    dev.PasswordHash = new PasswordHasher<User>().HashPassword(dev, devPassword);
+                    db.Users.Add(dev);
+                }
+            db.SaveChanges();
 
             // The actor for clock-driven transitions in MaintenanceJobs. Every history and audit row
             // needs a resolvable user FK, and an escalation has no human behind it. Inactive and with

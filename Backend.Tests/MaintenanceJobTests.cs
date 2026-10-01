@@ -15,7 +15,7 @@ namespace Backend.Tests;
 public class MaintenanceJobTests
 {
     private static readonly DateTime Now = new(2026, 9, 18, 12, 0, 0, DateTimeKind.Utc);
-
+//----------------------------------------------------------------------------------------------------------------------//
     [Fact]
     public async Task A_request_with_no_action_for_48_hours_escalates_exactly_once()
     {
@@ -41,7 +41,7 @@ public class MaintenanceJobTests
         Assert.Single(db.RequestStatusHistory);
         Assert.Contains(manager, first.Select(d => d.Notification.UserId));
     }
-
+//----------------------------------------------------------------------------------------------------------------------//
     [Fact]
     public async Task A_request_inside_the_48_hour_window_is_left_alone()
     {
@@ -59,7 +59,7 @@ public class MaintenanceJobTests
         Assert.Empty(await MaintenanceJobs.EscalateStaleRequestsAsync(db, notify, Now));
         Assert.Equal(Lifecycle.RequestStart, db.ResourceRequests.Single().Status);
     }
-
+//----------------------------------------------------------------------------------------------------------------------//
     [Fact]
     public async Task A_deadline_reminder_is_sent_once_per_assignee()
     {
@@ -85,7 +85,7 @@ public class MaintenanceJobTests
         Assert.Empty(await MaintenanceJobs.SendDeadlineRemindersAsync(db, notify, Now));
         Assert.Equal(1, await db.Notifications.CountAsync());
     }
-
+//----------------------------------------------------------------------------------------------------------------------//
     [Fact]
     public async Task A_task_outside_the_reminder_horizon_is_not_announced()
     {
@@ -109,7 +109,7 @@ public class MaintenanceJobTests
 
         Assert.Empty(await MaintenanceJobs.SendDeadlineRemindersAsync(db, notify, Now));
     }
-
+//----------------------------------------------------------------------------------------------------------------------//
     [Fact]
     public async Task A_weekly_template_generates_one_task_on_its_day_and_not_twice()
     {
@@ -136,7 +136,7 @@ public class MaintenanceJobTests
         Assert.Single(db.TaskAssignments);
         Assert.Single(db.TaskStatusHistory);       // SM-01 records the opening state too
     }
-
+//----------------------------------------------------------------------------------------------------------------------//
     [Fact]
     public async Task A_template_for_another_day_generates_nothing()
     {
@@ -157,7 +157,7 @@ public class MaintenanceJobTests
         Assert.Empty(await MaintenanceJobs.GenerateScheduledTasksAsync(db, notify, Now));
         Assert.Equal(0, await db.Tasks.CountAsync());
     }
-
+//----------------------------------------------------------------------------------------------------------------------//
     // Every sweep needs the seeded System account to own the history row it writes.
     private static async Task<(AppDbContext Db, NotificationService Notify)> NewAsync()
     {
@@ -170,7 +170,7 @@ public class MaintenanceJobTests
         await AddUserAsync(db, SystemAccountEmail, Roles.Staff);
         return (db, new NotificationService(db, null!));
     }
-
+//----------------------------------------------------------------------------------------------------------------------//
     private static async Task<int> AddUserAsync(AppDbContext db, string email, string roleName)
     {
         var user = new User { RoleId = db.Roles.Single(r => r.RoleName == roleName).RoleId, Email = email };
@@ -178,7 +178,7 @@ public class MaintenanceJobTests
         await db.SaveChangesAsync();
         return user.UserId;
     }
-
+//----------------------------------------------------------------------------------------------------------------------//
     private static async Task<int> AddDailyProjectAsync(AppDbContext db, int ownerId)
     {
         var project = new Project { OwnerId = ownerId, ProjectName = DailyTasksProject, Status = "Active" };
@@ -187,3 +187,4 @@ public class MaintenanceJobTests
         return project.ProjectId;
     }
 }
+//---------------------------DDDDDDDDDDDoooooooooooooo END OF FILE DDDDDDDDDDDoooooooooooooo---------------------------//
