@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ContentPage
+    x:Class="Frontend_Mobile.Pages.MeetingsPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:models="clr-namespace:Frontend_Mobile.Models"
+    Title="Meetings">
+    
+    <!-- Meetings.razor: List and Search and a Minutes view 
+        for a new or opened meeting -->
+
+    <ScrollView>
+        <VerticalStackLayout Padding="16" Spacing="16">
+
+            <Border Style="{StaticResource HeaderBanner}">
+                <VerticalStackLayout Spacing="4">
+                    <Label Text="Meeting Minutes" Style="{StaticResource BannerTitle}" />
+                    <Label Text="Record, Search and Approve Meeting Minutes" Style="{StaticResource BannerSubtitle}" />
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- List View -->
+            <VerticalStackLayout x:Name="ListSection" Spacing="16">
+
+                <Border Style="{StaticResource Card}">
+                    <VerticalStackLayout Spacing="10">
+                        <Label Text="Search Minutes" Style="{StaticResource TitleMedium}" />
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                            <Border Style="{StaticResource FieldBox}">
+                                <Entry x:Name="SearchEntry" Placeholder="Keyword" />
+                            </Border>
+                            <Button Grid.Column="1" Text="Search" Clicked="OnSearch" />
+                        </Grid>
+                        <Label x:Name="SearchEmptyLabel" Text="No minutes match" Style="{StaticResource Muted}" IsVisible="False" />
+                        <VerticalStackLayout x:Name="SearchResultsList" Spacing="8">
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate x:DataType="models:MinutesSearch">
+                                    <Border Style="{StaticResource OutlinedRow}">
+                                        <Border.GestureRecognizers>
+                                            <TapGestureRecognizer Tapped="OnSearchTapped" />
+                                        </Border.GestureRecognizers>
+                                        <VerticalStackLayout Spacing="2">
+                                            <Label Text="{Binding MeetingTitle}" FontAttributes="Bold" FontSize="13" />
+                                            <Label Text="{Binding SnippetOfMeetingMinutes}" Style="{StaticResource Muted}" />
+                                        </VerticalStackLayout>
+                                    </Border>
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </VerticalStackLayout>
+                    </VerticalStackLayout>
+                </Border>
+
+                <Border Style="{StaticResource Card}">
+                    <VerticalStackLayout Spacing="8">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <Label Text="All Meetings" Style="{StaticResource TitleMedium}" />
+                            <Button Grid.Column="1" Text="+ New" Clicked="OnNewMeeting" />
+                        </Grid>
+                        <ActivityIndicator x:Name="ListLoadingSpinner" IsRunning="True" />
+                        <Label x:Name="EmptyMeetingsLabel" Text="No meetings have been recorded yet" Style="{StaticResource Muted}" IsVisible="False" />
+                        <VerticalStackLayout x:Name="MeetingList" Spacing="8">
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate x:DataType="models:MeetingRow">
+                                    <Border Style="{StaticResource OutlinedRow}">
+                                        <Border.GestureRecognizers>
+                                            <TapGestureRecognizer Tapped="OnMeetingTapped" />
+                                        </Border.GestureRecognizers>
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <VerticalStackLayout>
+                                                <Label Text="{Binding MeetingTitle}" FontAttributes="Bold" FontSize="13" />
+                                                <Label Text="{Binding MeetingDateLabel}" Style="{StaticResource LabelSmall}" />
+                                                <Label Text="{Binding MeetingOrganiser}" Style="{StaticResource Muted}" />
+                                            </VerticalStackLayout>
+                                            <Label Grid.Column="1" Text="{Binding MeetingMinutesStatus}" Style="{StaticResource LabelSmall}" VerticalOptions="Center" />
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </VerticalStackLayout>
+                    </VerticalStackLayout>
+                </Border>
+
+            </VerticalStackLayout>
+
+            <!-- Minutes View -->
+            <VerticalStackLayout x:Name="DetailSection" Spacing="12" IsVisible="False">
+                <Button Text="&#x2190; Back" Style="{StaticResource OutlineButton}" Clicked="OnBackToList" HorizontalOptions="Start" />
+                <Border Style="{StaticResource FieldBox}">
+                    <Entry x:Name="MeetingTitleEntry" Placeholder="Untitled meeting" TextChanged="OnDetailChanged" />
+                </Border>
+                <Label x:Name="ApprovedLabel" Style="{StaticResource Muted}" IsVisible="False" />
+                <Border Style="{StaticResource Card}">
+                    <VerticalStackLayout Spacing="8">
+                        <Label Text="Minutes" Style="{StaticResource TitleMedium}" />
+                        <Border Style="{StaticResource FieldBox}">
+                            <Editor x:Name="MinutesEditor" Placeholder="Type meeting minutes here..."
+                            AutoSize="TextChanges" HeightRequest="180" TextChanged="OnDetailChanged" />
+                        </Border>
+                    </VerticalStackLayout>
+                </Border>
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                    <Button x:Name="ApproveButton" Text="Approve Minutes" Style="{StaticResource OutlineButton}" Clicked="OnApprove" IsVisible="False" />
+                    <Button x:Name="SaveButton" Grid.Column="1" Text="Save" Clicked="OnSaveMeeting" IsEnabled="False" />
+                </Grid>
+            </VerticalStackLayout>
+        </VerticalStackLayout>
+    </ScrollView>
+    
+</ContentPage>

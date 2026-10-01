@@ -31,10 +31,10 @@
                             <MudSelectItem T="int?" Value="@c.CategoryId">@c.CategoryName</MudSelectItem>
                         }
                     </MudSelect>
-                    <InputFile OnChange="@(e => picked = e.File)" class="mb-3" />
+                    <InputFile OnChange="OnFilePicked" class="mb-3" />
                     <div class="drps-muted mb-3">Up to @(MaxBytes / (1024 * 1024)) MB. Office documents, PDFs, text and images.</div>
                     <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" OnClick="Upload"
-                               Disabled="@(uploading || picked is null || uploadCategory is null)">
+                               Disabled="@uploading">
                         @(uploading ? "Uploading..." : "Upload")
                     </MudButton>
                 </div>
@@ -151,48 +151,90 @@
         loading = false;
     }
 
+    private void OnFilePicked(InputFileChangeEventArgs e)
+    {
+        try
+        {
+            // e.File throws when the change event carries no file (picker cancelled) or more than one.
+            picked = e.File;
+        }
+        catch (Exception ex)
+        {
+            picked = null;
+            Console.Error.WriteLine(ex);
+            Snackbar.Add("Couldn't read the selected file. Please choose it again.", Severity.Warning);
+        }
+    }
+
     private async Task Upload()
     {
-        if (picked is null || uploadCategory is null) return;
+        if (uploadCategory is null)
+        {
+            Snackbar.Add(categories.Count == 0
+                ? "There are no file categories yet, so files can't be uploaded. Ask an admin to add one."
+                : "Choose a category for the file.", Severity.Warning);
+            return;
+        }
+        if (picked is null)
+        {
+            Snackbar.Add("Choose a file to upload.", Severity.Warning);
+            return;
+        }
+        if (picked.Size == 0)
+        {
+            Snackbar.Add($"{picked.Name} is empty, so there's nothing to upload.", Severity.Warning);
+            return;
+        }
         if (picked.Size > MaxBytes)
         {
             Snackbar.Add($"That file is larger than {MaxBytes / (1024 * 1024)} MB.", Severity.Error);
             return;
         }
         uploading = true;
-        var type = string.IsNullOrEmpty(picked.ContentType) ? "application/octet-stream" : picked.ContentType;
-        var ticket = await AppData.SendAsync<FileUploadResponse>(HttpMethod.Post, "api/files", new FileUploadInitRequest
+        try
         {
-            FileName = picked.Name, FileType = type, SizeBytes = picked.Size, CategoryId = uploadCategory.Value,
-        });
-        if (ticket is not null)
-        {
+            var type = string.IsNullOrEmpty(picked.ContentType) ? "application/octet-stream" : picked.ContentType;
+            var ticket = await AppData.SendAsync<FileUploadResponse>(HttpMethod.Post, "api/files", new FileUploadInitRequest
+            {
+                FileName = picked.Name, FileType = type, SizeBytes = picked.Size, CategoryId = uploadCategory.Value,
+            });
+            if (ticket is null) return; // AppDataService has already shown why
+
             // A plain client: the SAS in the URL is the credential, so the API's bearer token must not go to Blob Storage.
             using var blob = new HttpClient();
             using var content = new StreamContent(picked.OpenReadStream(MaxBytes));
             content.Headers.ContentType = new(type);
             var put = new HttpRequestMessage(HttpMethod.Put, ticket.UploadUrl) { Content = content };
             put.Headers.Add("x-ms-blob-type", "BlockBlob");
-            try
-            {
-                var res = await blob.SendAsync(put);
-                if (res.IsSuccessStatusCode) Snackbar.Add($"Uploaded {picked.Name}.", Severity.Success);
-                else Snackbar.Add($"Storage refused the upload ({(int)res.StatusCode}).", Severity.Error);
-            }
-            catch (HttpRequestException)
-            {
-                Snackbar.Add("Couldn't reach file storage.", Severity.Error);
-            }
+            var res = await blob.SendAsync(put);
+            if (res.IsSuccessStatusCode) Snackbar.Add($"Uploaded {picked.Name}.", Severity.Success);
+            else Snackbar.Add($"Storage refused the upload ({(int)res.StatusCode}).", Severity.Error);
             picked = null;
             await Load();
         }
-        uploading = false;
+        catch (HttpRequestException)
+        {
+            Snackbar.Add("Couldn't reach file storage.", Severity.Error);
+        }
+        catch (Exception e) when (e is IOException or TaskCanceledException)
+        {
+            // The browser couldn't read the file (moved/deleted since it was picked) or the upload timed out.
+            Snackbar.Add($"Couldn't upload {picked?.Name}. Pick the file again and retry.", Severity.Error);
+            picked = null;
+        }
+        finally
+        {
+            uploading = false;
+        }
     }
 
     private async Task Download(FileMetadataDto f)
     {
-        if (await AppData.GetAsync<FileDownloadResponse>($"api/files/{f.FileId}/download") is { } link)
-            await JS.InvokeVoidAsync("open", link.DownloadUrl, "_blank");
+        if (await AppData.GetAsync<FileDownloadResponse>($"api/files/{f.FileId}/download") is not { } link) return;
+        // window.open returns null when a pop-up blocker stops it.
+        await using var tab = await JS.InvokeAsync<IJSObjectReference?>("open", link.DownloadUrl, "_blank");
+        if (tab is null)
+            Snackbar.Add("The browser blocked the download tab. Allow pop-ups for this site and try again.", Severity.Warning);
     }
 
     private async Task Recategorise(FileMetadataDto f, int categoryId)
@@ -211,8 +253,9 @@
     private async Task Delete(FileMetadataDto f)
     {
         if (await DialogService.ShowMessageBoxAsync("Delete file", $"Delete \"{f.FileName}\" permanently?",
-                yesText: "Delete", cancelText: "Cancel") == true
-            && await AppData.SendAsync(HttpMethod.Delete, $"api/files/{f.FileId}"))
-            await Load();
+                yesText: "Delete", cancelText: "Cancel") != true) return;
+        // Reload even on failure: the server may have removed the row before erroring.
+        await AppData.SendAsync(HttpMethod.Delete, $"api/files/{f.FileId}");
+        await Load();
     }
 }

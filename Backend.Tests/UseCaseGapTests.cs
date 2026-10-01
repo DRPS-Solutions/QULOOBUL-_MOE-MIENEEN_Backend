@@ -31,7 +31,7 @@ public class UseCaseGapTests
         Assert.True(muted.IsMuted);
         Assert.Equal("direct", (await db.Notifications.SingleAsync()).Message);
     }
-
+//----------------------------------------------------------------------------------------------------------------------//
     [Fact]
     public async Task A_meeting_cannot_double_book_someone_already_at_an_event()
     {
@@ -48,7 +48,7 @@ public class UseCaseGapTests
             new CreateMeetingRequest { Title = "Clash", MeetingDate = when, AttendeeIds = [busy.UserId] }, organiser.UserId));
         Assert.Empty(db.Meetings);
     }
-
+//----------------------------------------------------------------------------------------------------------------------//
     [Fact]
     public async Task Minutes_append_as_a_new_version_and_only_the_permitted_may_edit()
     {
@@ -73,7 +73,7 @@ public class UseCaseGapTests
         await Assert.ThrowsAsync<InvalidOperationException>(() =>        // stale version refused
             svc.EditAsync(v1.MinutesId, new EditMinutesRequest { MinutesText = "y" }, recorder.UserId));
     }
-
+//----------------------------------------------------------------------------------------------------------------------//
     [Fact]
     public async Task Archived_files_are_hidden_unless_asked_for_and_search_matches_the_name()
     {
@@ -85,12 +85,13 @@ public class UseCaseGapTests
             new FileUpload { Category = cat, Uploader = admin, FileName = "old-budget.xlsx", IsArchived = true },
             new FileUpload { Category = cat, Uploader = admin, FileName = "photo.png" });
         await db.SaveChangesAsync();
-        var files = new FileManagementService(db, null!, new AuditService(db), new AccessGuard(db));
+        var files = new FileManagementService(db, null!, new AuditService(db), new AccessGuard(db),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<FileManagementService>.Instance);
 
         Assert.Equal(["budget.xlsx"], (await files.ListAsync(null, null, null, "budget", false, admin.UserId)).Select(f => f.FileName));
         Assert.Equal(2, (await files.ListAsync(null, null, null, "budget", true, admin.UserId)).Count);
     }
-
+//----------------------------------------------------------------------------------------------------------------------//
     [Fact]
     public async Task An_empty_period_asks_for_a_wider_range_and_is_not_logged_as_run()
     {
@@ -101,7 +102,7 @@ public class UseCaseGapTests
         Assert.Contains("wider date range", ex.Message);
         Assert.Empty(db.Reports);
     }
-
+//----------------------------------------------------------------------------------------------------------------------//
     [Fact]
     public void Trend_buckets_by_day_up_to_a_month_and_counts_a_reopened_task_once_per_bucket()
     {
@@ -114,14 +115,14 @@ public class UseCaseGapTests
         var weekly = ReportingService.Trend(start, start.AddDays(60), []);
         Assert.Equal(TimeSpan.FromDays(7), weekly[1].BucketStart - weekly[0].BucketStart);
     }
-
+//----------------------------------------------------------------------------------------------------------------------//
     [Theory]
     [InlineData("=HYPERLINK(\"x\")", "\"'=HYPERLINK(\"\"x\"\")\"")]   // formula neutralised, quotes doubled
     [InlineData("-5", "\"-5\"")]                                     // a real negative number is left alone
     [InlineData("Smith, J", "\"Smith, J\"")]
     public void Csv_cells_are_quoted_and_formula_safe(string value, string expected) =>
         Assert.Equal(expected, ReportingService.Cell(value));
-
+//----------------------------------------------------------------------------------------------------------------------//
     [Fact]
     public async Task Schedules_follow_the_assignment_rule_and_take_only_real_day_names()
     {
@@ -142,14 +143,15 @@ public class UseCaseGapTests
         Assert.Equal("Saturday", s.DayOfWeek);                                     // what MaintenanceJobs compares
         Assert.False((await svc.UpdateAsync(s.ScheduleId, new UpdateTaskScheduleRequest { IsActive = false }, boss.UserId)).IsActive);
     }
-
+//----------------------------------------------------------------------------------------------------------------------//
     private static User User(AppDbContext db, string name, int level)
     {
         var u = new User { Role = new Role { RoleName = name, HierarchyLevel = level }, Email = $"{name}@test", FirstName = name };
         db.Users.Add(u);
         return u;
     }
-
+//----------------------------------------------------------------------------------------------------------------------//
     private static AppDbContext NewDb() => new(new DbContextOptionsBuilder<AppDbContext>()
         .UseInMemoryDatabase(Guid.NewGuid().ToString()).Options);
 }
+//---------------------------DDDDDDDDDDDoooooooooooooo END OF FILE DDDDDDDDDDDoooooooooooooo---------------------------//

@@ -44,20 +44,12 @@ jobs:
       - name: Coverage gate
         run: bash .github/scripts/coverage-gate.sh 70
 
+      # Proves both projects publish. Later jobs republish from the same commit
+      # instead of passing artifacts, so a full artifact quota cannot block a release.
       - name: Publish
         run: |
           dotnet publish "$PROJECT" -c Release --no-build -o ./publish
           dotnet publish "Frontend_BlazorWeb/Frontend_BlazorWeb.csproj" -c Release -o ./web
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: api
-          path: ./publish
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: web
-          path: ./web/wwwroot
 
   deploy-slot:
     needs: build
@@ -74,40 +66,27 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      - uses: actions/download-artifact@v4
-        with:
-          name: api
-          path: ./publish
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: web
-          path: ./web
+      - name: Publish API
+        run: dotnet publish "$PROJECT" -c Release -o ./publish
 
       - uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
       - name: Deploy API to production staging slot
+        id: deploy
         uses: azure/webapps-deploy@v3
         with:
           app-name: ${{ vars.AZURE_WEBAPP_NAME_PROD }}
           slot-name: staging
           package: ./publish
 
-      # Points the client at this API and writes its CSP (hash of the build-specific import map).
-      - name: Configure Blazor client for Static Web Apps
-        run: bash .github/scripts/web-config.sh ./web "https://${{ vars.AZURE_WEBAPP_NAME_PROD }}.azurewebsites.net"
-
-      - name: Deploy Blazor client to Static Web Apps
-        if: ${{ vars.AZURE_STATIC_WEB_APP_PROD != '' }}
-        uses: Azure/static-web-apps-deploy@v1
-        with:
-          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_PROD }}
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          action: upload
-          app_location: ./web
-          skip_app_build: true
+      # Azure SQL admits only App Service and named developer IPs, so the runner opens a rule for itself.
+      - name: Open SQL firewall for this runner
+        run: |
+          ip=$(curl -fsS https://api.ipify.org)
+          az sql server firewall-rule create -g "${{ vars.AZURE_RESOURCE_GROUP }}" -s "${{ vars.AZURE_SQL_SERVER }}" \
+            -n "gh-${{ github.run_id }}" --start-ip-address "$ip" --end-ip-address "$ip"
 
       # A failure here stops the run before the swap - production is untouched.
       - name: Apply EF Core migrations
@@ -119,12 +98,16 @@ jobs:
           dotnet tool install --global dotnet-ef
           dotnet ef database update --project "$PROJECT"
 
+      - name: Close SQL firewall
+        if: always()
+        run: az sql server firewall-rule delete -g "${{ vars.AZURE_RESOURCE_GROUP }}" -s "${{ vars.AZURE_SQL_SERVER }}" -n "gh-${{ github.run_id }}" || true
+
       # SMOKE_EMAIL / SMOKE_PASSWORD: a low-privilege account kept for this check, not the seed admin.
       - name: Smoke test the slot
         env:
           SMOKE_EMAIL: ${{ secrets.SMOKE_EMAIL }}
           SMOKE_PASSWORD: ${{ secrets.SMOKE_PASSWORD }}
-        run: bash .github/scripts/smoke-test.sh "https://${{ vars.AZURE_WEBAPP_NAME_PROD }}-staging.azurewebsites.net"
+        run: bash .github/scripts/smoke-test.sh "${{ steps.deploy.outputs.webapp-url }}"
 
   swap:
     needs: deploy-slot
@@ -133,6 +116,19 @@ jobs:
     # Settings > Environments > production. That setting is the approval gate.
     environment: production
     steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      # Built here, not passed as an artifact: this job waits on approval, and an
+      # artifact could expire (or the quota be full) before it runs.
+      - name: Publish Blazor client
+        run: |
+          dotnet publish "Frontend_BlazorWeb/Frontend_BlazorWeb.csproj" -c Release -o ./web-build
+          mv ./web-build/wwwroot ./web
+
       - uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
@@ -145,3 +141,20 @@ jobs:
             --name "${{ vars.AZURE_WEBAPP_NAME_PROD }}" \
             --slot staging \
             --target-slot production
+
+      # The client ships after the swap, so it never goes live ahead of the API it was built against.
+      # Points the client at this API and writes its CSP (hash of the build-specific import map).
+      - name: Configure Blazor client for Static Web Apps
+        run: |
+          host=$(az webapp show -g "${{ vars.AZURE_RESOURCE_GROUP }}" -n "${{ vars.AZURE_WEBAPP_NAME_PROD }}" --query defaultHostName -o tsv)
+          bash .github/scripts/web-config.sh ./web "https://$host"
+
+      - name: Deploy Blazor client to Static Web Apps
+        if: ${{ vars.AZURE_STATIC_WEB_APP_PROD != '' }}
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_PROD }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: upload
+          app_location: ./web
+          skip_app_build: true

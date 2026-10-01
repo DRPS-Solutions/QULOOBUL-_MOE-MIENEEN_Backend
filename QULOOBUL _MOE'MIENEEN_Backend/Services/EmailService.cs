@@ -1,5 +1,5 @@
-using System.Net.Http.Headers;
-using System.Net.Http.Json;
+using Azure;
+using Azure.Communication.Email;
 using Microsoft.EntityFrameworkCore;
 using QULOOBUL__MOE_MIENEEN_Backend.Data;
 using QULOOBUL__MOE_MIENEEN_Backend.Models.NotificationsAudit;
@@ -7,18 +7,16 @@ using QULOOBUL__MOE_MIENEEN_Backend.Models.NotificationsAudit;
 namespace QULOOBUL__MOE_MIENEEN_Backend.Services
 {
     /// <summary>
-    /// Transactional email over the Resend REST API (architecture doc, "Reliable notification
+    /// Transactional email over Azure Communication Services (architecture doc, "Reliable notification
     /// delivery" / Recommendation Summary). A notification always lands in-app; the email is the
     /// second channel so a staff member does not have to check the dashboard to learn about it.
     ///
-    /// No API key configured (local dev, CI, tests) means this is a no-op — the platform runs
-    /// without it rather than failing every write that raises a notification.
+    /// No connection string configured (local dev, CI, tests) means this is a no-op — the platform
+    /// runs without it rather than failing every write that raises a notification.
     /// </summary>
-    public class EmailService(
-        IHttpClientFactory http, IConfiguration config, AppDbContext db, ILogger<EmailService> log)
+    public class EmailService(IConfiguration config, AppDbContext db, ILogger<EmailService> log)
     {
         public const string SentAction = "email.sent";
-        private const string Endpoint = "https://api.resend.com/emails";
 //----------------------------------------------------------------------------------------------------------------------//
         /// <summary>
         /// Emails the owner of an already-committed notification. Call after SaveChanges, alongside
@@ -27,7 +25,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
         /// </summary>
         public async Task SendAsync(Notification notification, string subject)
         {
-            var key = config["Email:ResendApiKey"];
+            var key = config["Email:ConnectionString"];
             if (string.IsNullOrWhiteSpace(key) || notification.IsMuted) return;
 
             if (notification.NotificationId == 0)
@@ -67,12 +65,12 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
 //----------------------------------------------------------------------------------------------------------------------//
         /// <summary>
         /// Account mail (SM-03 activation / password reset): goes to an address, not a notification,
-        /// because the recipient cannot sign in yet. Never throws. With no API key the link is logged
+        /// because the recipient cannot sign in yet. Never throws. Unconfigured, the link is logged
         /// instead, so a local or CI setup can still activate accounts.
         /// </summary>
         public async Task SendAccountEmailAsync(string address, string subject, string message)
         {
-            var key = config["Email:ResendApiKey"];
+            var key = config["Email:ConnectionString"];
             if (string.IsNullOrWhiteSpace(key))
             {
                 log.LogInformation("Email not configured; would send \"{Subject}\" to {Address}: {Message}",
@@ -83,23 +81,25 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             catch (Exception ex) { log.LogError(ex, "Sending \"{Subject}\" failed", subject); }
         }
 //----------------------------------------------------------------------------------------------------------------------//
-        private async Task<bool> PostAsync(string key, string address, string subject, string message)
+        private async Task<bool> PostAsync(string connectionString, string address, string subject, string message)
         {
-            var client = http.CreateClient();
-            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", key);
-            var response = await client.PostAsJsonAsync(Endpoint, new
+            // Must be an address on the domain linked to the ACS resource: infra/main.bicep sets it
+            // to DoNotReply@<the Azure-managed domain>.
+            var from = config["Email:From"] ?? throw new InvalidOperationException("Email:From is not set.");
+            // The message carries user-entered text (task titles, request details), so it is
+            // encoded rather than interpolated into the markup.
+            var html = $"<p>{System.Net.WebUtility.HtmlEncode(message)}</p>";
+            try
             {
-                from = config["Email:From"] ?? "QULOOBUL MOE'MIENEEN <noreply@quloobul.local>",
-                to = new[] { address },
-                subject,
-                // The message carries user-entered text (task titles, request details), so it is
-                // encoded rather than interpolated into the markup.
-                html = $"<p>{System.Net.WebUtility.HtmlEncode(message)}</p>",
-            });
-
-            if (!response.IsSuccessStatusCode)
-                log.LogWarning("Resend rejected \"{Subject}\": {Status}", subject, response.StatusCode);
-            return response.IsSuccessStatusCode;
+                // WaitUntil.Started: return once ACS has accepted it rather than polling for delivery.
+                await new EmailClient(connectionString).SendAsync(WaitUntil.Started, from, address, subject, html);
+                return true;
+            }
+            catch (RequestFailedException ex)
+            {
+                log.LogWarning("ACS rejected \"{Subject}\": {Status} {Code}", subject, ex.Status, ex.ErrorCode);
+                return false;
+            }
         }
     }
 }

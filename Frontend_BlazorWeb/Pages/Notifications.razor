@@ -48,7 +48,7 @@
     }
 
     .drps-notifications-header .drps-subtitle {
-        color: rgba(255, 255, 255, 0.75);
+        color: rgba(255, 255, 255, 0.92);
         font-size: 0.85rem;
         margin-top: 4px;
     }
@@ -214,7 +214,6 @@
             </div>
             <MudButton Size="Size.Small"
                        Variant="Variant.Outlined"
-                       Style="color:white;border-color:rgba(255,255,255,0.4);"
                        Disabled="@(UnreadCount == 0)"
                        OnClick="MarkAllAsRead">
                 Mark all as read
@@ -226,14 +225,14 @@
         {
             <div class="drps-card mb-4">
                 <MudText Typo="Typo.subtitle1" Style="font-weight:600;" Class="mb-2">Send an announcement</MudText>
-                <MudSelect T="int" Label="Recipients" Variant="Variant.Outlined" MultiSelection="true"
+                <MudSelect T="int" Label="Recipients" Variant="Variant.Outlined" MultiSelection="true" HelperText="Pick at least one person."
                            @bind-SelectedValues="recipients" ToStringFunc="@(id => AppData.UserName(id))" Class="mb-3">
                     @foreach (var user in AppData.Users.Where(u => u.IsActive).OrderBy(u => u.FullName))
                     {
                         <MudSelectItem T="int" Value="@user.UserId">@user.FullName</MudSelectItem>
                     }
                 </MudSelect>
-                <MudTextField T="string" @bind-Value="announcement" Label="Message" Variant="Variant.Outlined"
+                <MudTextField T="string" @bind-Value="announcement" Label="Message" Variant="Variant.Outlined" Required="true" RequiredError="Write the announcement."
                               Lines="2" MaxLength="500" Immediate="true" Class="mb-3" />
                 <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SendAnnouncement"
                            Disabled="@(sending || !recipients.Any() || string.IsNullOrWhiteSpace(announcement))">

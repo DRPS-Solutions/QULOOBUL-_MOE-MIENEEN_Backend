@@ -6,7 +6,8 @@ using QULOOBUL__MOE_MIENEEN_Shared.Files;
 namespace QULOOBUL__MOE_MIENEEN_Backend.Services
 {
     public class FileManagementService(
-        AppDbContext db, FileUploadService uploads, AuditService audit, AccessGuard guard)
+        AppDbContext db, FileUploadService uploads, AuditService audit, AccessGuard guard,
+        ILogger<FileManagementService> log)
     {
         /// <summary>
         /// UC-07's "one place to search all documents", narrowed to the documents the caller may see.
@@ -78,7 +79,9 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             db.FileUploads.Remove(f);
             audit.Record(actorId, "file.delete", nameof(FileUpload), fileId);
             await db.SaveChangesAsync();
-            await uploads.DeleteBlobAsync(f);
+            // The row is gone, so the delete succeeded: a blob failure must not surface as a 500.
+            try { await uploads.DeleteBlobAsync(f); }
+            catch (Exception ex) { log.LogError(ex, "Deleting blob for file {Id} failed; left orphaned", fileId); }
         }
 //----------------------------------------------------------------------------------------------------------------------//
         private async Task<FileUpload> FindManagedAsync(int fileId, int actorId)

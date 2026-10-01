@@ -16,7 +16,7 @@ rm -f "$root/appsettings.json.br" "$root/appsettings.json.gz"   # stale precompr
 # Browsers hash the script text after HTML newline normalisation (CRLF and CR become LF).
 hash=$(perl -0ne 'if (/<script type="importmap">(.*?)<\/script>/s) { (my $m = $1) =~ s/\r\n?/\n/g; print $m }' "$root/index.html" \
     | openssl dgst -sha256 -binary | base64)
-csp="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'sha256-$hash'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' $api $ws https://*.blob.core.windows.net; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+csp="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'sha256-$hash'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' $api $ws https://*.blob.core.windows.net https://*.service.signalr.net wss://*.service.signalr.net; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
 
 cat > "$root/staticwebapp.config.json" <<JSON
 {

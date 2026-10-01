@@ -1,5 +1,6 @@
 using Frontend_Mobile.Data;
 using Frontend_Mobile.Models;
+using QULOOBUL__MOE_MIENEEN_Shared.Tasks;
 
 namespace Frontend_Mobile.Pages;
 
@@ -27,6 +28,7 @@ public sealed class HourRow
     public string Label => DateTime.Today.AddHours(Hour).ToString("h tt");
 }
 
+[QueryProperty(nameof(DeepLinkTaskId), "task")]
 public partial class TasksPage : ContentPage
 {
     private const int StartHour = 6;
@@ -35,6 +37,8 @@ public partial class TasksPage : ContentPage
     private readonly AppState _state = AppState.Current;
     private DateTime _selectedDate = DateTime.Today;
     private DateTime _weekStart = StartOfWeek(DateTime.Today);
+    public string? DeepLinkTaskId { get; set; }
+    private int? _openedDeepLinkId;
 
     public TasksPage()
     {
@@ -56,6 +60,7 @@ public partial class TasksPage : ContentPage
         _state.Changed -= Refresh; // a returning modal can re-run OnAppearing
         _state.Changed += Refresh;
         await LoadWeekAsync();
+        await TryOpenDeepLinkAsync();
     }
 
     protected override void OnDisappearing()
@@ -68,6 +73,24 @@ public partial class TasksPage : ContentPage
     {
         Refresh();
         return _state.LoadTasksAsync(_weekStart, _weekStart.AddDays(7));
+    }
+
+    private async Task TryOpenDeepLinkAsync()
+    {
+        if (!int.TryParse(DeepLinkTaskId, out var id) || id == _openedDeepLinkId) return;
+
+        _openedDeepLinkId = id;
+
+        if (await _state.GetAsync<TaskDetailDto>($"api/tasks/{id}") is not { } detail) return;
+
+        _selectedDate = detail.Deadline.Date;
+        _weekStart = StartOfWeek(_selectedDate);
+        await LoadWeekAsync();
+
+        if (_state.Tasks.FirstOrDefault(task => task.TaskId == id) is { } card)
+        {
+            await TaskDetailsPage.ShowAsync(Navigation, card);
+        }
     }
 
     private void Refresh()
@@ -136,6 +159,13 @@ public partial class TasksPage : ContentPage
         if (sender is not CheckBox box || box.BindingContext is not TaskItem task) return;
         if (e.Value == task.IsDone) return;
         await _state.SetTaskDoneAsync(task.Card, e.Value);
+    }
+
+    private async void OnTaskTapped(object? sender, TappedEventArgs e)
+    {
+        if ((sender as Element)?.BindingContext is not TaskItem item) return;
+
+        await TaskDetailsPage.ShowAsync(Navigation, item.Card);
     }
 
     private async void OnNewTask(object? sender, EventArgs e)

@@ -25,14 +25,14 @@ public class AccessGuardTests
         await Assert.ThrowsAsync<UnauthorizedAccessException>(
             () => f.Guard.EnsureTaskAsync(f.StrangerId, f.TaskId));
     }
-
+//----------------------------------------------------------------------------------------------------------------------//
     [Fact]
     public async Task A_missing_task_is_a_404_not_a_403()
     {
         var f = await Fixture.CreateAsync();
         await Assert.ThrowsAsync<KeyNotFoundException>(() => f.Guard.EnsureTaskAsync(f.StrangerId, 9999));
     }
-
+//----------------------------------------------------------------------------------------------------------------------//
     [Fact]
     public async Task The_board_hides_other_peoples_tasks_rather_than_refusing_the_whole_project()
     {
@@ -43,7 +43,7 @@ public class AccessGuardTests
         Assert.Empty(await tasks.BoardAsync(f.ProjectId, f.StrangerId));
         Assert.Single(await tasks.BoardAsync(f.ProjectId, f.AdminId));
     }
-
+//----------------------------------------------------------------------------------------------------------------------//
     [Fact]
     public async Task Only_the_owner_or_an_admin_may_change_the_member_roster()
     {
@@ -54,7 +54,7 @@ public class AccessGuardTests
         await Assert.ThrowsAsync<UnauthorizedAccessException>(
             () => f.Guard.EnsureProjectOwnerAsync(f.AssigneeId, f.ProjectId));
     }
-
+//----------------------------------------------------------------------------------------------------------------------//
     // One project owned by "owner", one task on it assigned to "assignee". "stranger" is on
     // nothing; "admin" holds ManageUsers.
     private sealed record Fixture(
@@ -73,7 +73,7 @@ public class AccessGuardTests
                 Role = adminRole,
                 Permission = new Permission { PermissionName = Permissions.ManageUsers },
             });
-
+//----------------------------------------------------------------------------------------------------------------------//
             var owner = new User { Role = staffRole, Email = "owner@test" };
             var assignee = new User { Role = staffRole, Email = "assignee@test" };
             var stranger = new User { Role = staffRole, Email = "stranger@test" };
@@ -105,3 +105,4 @@ public class AccessGuardTests
         }
     }
 }
+//---------------------------DDDDDDDDDDDoooooooooooooo END OF FILE DDDDDDDDDDDoooooooooooooo---------------------------//
