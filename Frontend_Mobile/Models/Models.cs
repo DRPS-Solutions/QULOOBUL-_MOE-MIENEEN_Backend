@@ -1,10 +1,11 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using Frontend_Mobile.Data;
+using QULOOBUL__MOE_MIENEEN_Shared.Collaboration;
 using QULOOBUL__MOE_MIENEEN_Shared.Notifications;
+using QULOOBUL__MOE_MIENEEN_Shared.Reports;
 using QULOOBUL__MOE_MIENEEN_Shared.Requests;
 using QULOOBUL__MOE_MIENEEN_Shared.Tasks;
-using QULOOBUL__MOE_MIENEEN_Shared.Collaboration;
 using QULOOBUL__MOE_MIENEEN_Shared.Directory;
 
 namespace Frontend_Mobile.Models;
@@ -83,6 +84,7 @@ public static class Colors
     public static readonly Color StatusDenied = Color.FromArgb("#E0435C");
     public static readonly Color AccentBlue = Color.FromArgb("#2A5CD1");
     public static readonly Color TintAccentBlue = Color.FromArgb("#EEF2FC");
+    public static readonly Color BorderSoft = Color.FromArgb("#E7E4D8");
     public static readonly Color Transparent = Microsoft.Maui.Graphics.Colors.Transparent;
 }
 
@@ -260,18 +262,85 @@ public sealed class StaffPick : Observable
     }
 }
 
+// ----- Reports (UC-09) -----
+
+public enum ReportType { TaskCompletion, Workload, ProjectProgress }
+
+public static class ReportEnums
+{
+    public static string Label(this ReportType t) => t switch
+    {
+        ReportType.TaskCompletion => "Task completion",
+        ReportType.Workload => "Staff workload",
+        _ => "Project progress"
+    };
+
+    public static IReadOnlyList<Option<ReportType>> Types { get; } =
+        Enum.GetValues<ReportType>().Select(t => new Option<ReportType>(t, t.Label())).ToList();
+}
+
+/// <summary>One project's row: same figures the web client shows in its progress table.</summary>
+public sealed record ProgressRow(ProjectProgressStat Stat)
+{
+    public string ProjectName => Stat.ProjectName;
+    public double Fraction => Stat.PercentComplete / 100.0;
+    public string SummaryText => $"{Stat.Done}/{Stat.Total} tasks \u2022 {Stat.PercentComplete:0}%";
+}
+
+// ----- Calendar (dated organisational events, UC-06) -----
+
+/// <summary>One row in the event list. Distinct from EventRow/StaffPick, which are Event
+/// Planning's (the API's Project entity) - this wraps the API's own Event entity.</summary>
+public sealed record CalendarEventRow(EventDto Dto, bool IsSelected)
+{
+    public string Title => Dto.Title;
+
+    // EventDate is a wall-clock time the organiser picked, same as a task's Deadline - no UTC conversion.
+    public string DateLabel => Dto.EventDate.ToString("ddd d MMM yyyy, h:mm tt");
+    public string LocationSuffix => string.IsNullOrEmpty(Dto.Location) ? string.Empty : $" \u2022 {Dto.Location}";
+
+    public Color RowBackground => IsSelected ? Colors.TintGreen : Microsoft.Maui.Graphics.Colors.Transparent;
+    public Color RowBorder => IsSelected ? Colors.TintGreenBorder : Colors.BorderSoft;
+}
+
+/// <summary>One attendee row in the selected event's detail panel.</summary>
+public sealed record AttendeeRow(EventAttendeeDto Dto, bool ShowRemove, bool IsSelf)
+{
+    public string FullName => Dto.FullName;
+    public string Status => Dto.Status;
+
+    public Color StatusBackground => Dto.Status switch
+    {
+        "Accepted" => Colors.TintGreen,
+        "Declined" => Colors.TintRed,
+        _ => Colors.TintAmber, // "Invited", still awaiting an answer
+    };
+
+    public Color StatusForeground => Dto.Status switch
+    {
+        "Accepted" => Colors.StatusApproved,
+        "Declined" => Colors.StatusDenied,
+        _ => Colors.StatusPending,
+    };
+
+    public string RemoveLabel => IsSelf ? "Leave" : "Remove";
+}
+
 // ----- Notifications -----
 
-public enum NotificationKind { ResourceRequest, EventAssignment, TaskAssignment, Other }
+public enum NotificationKind { ResourceRequest, EventAssignment, CalendarEvent, TaskAssignment, Other }
 
 public sealed class NotificationItem(NotificationDto dto)
 {
     public NotificationDto Dto => dto;
 
     // Notification types are open-ended names in the API (TaskAssigned,
-    // RequestReviewed, ProjectAssigned, Announcement...), grouped by prefix.
+    // RequestReviewed, ProjectAssigned, EventInvite...), grouped by prefix.
+    // EventInvite is Calendar's own type (the Event entity, not a Project), so it's
+    // pulled out ahead of the generic "Event"/"Project" prefix check below.
     public NotificationKind Kind =>
         dto.Type.StartsWith("Request") ? NotificationKind.ResourceRequest
+        : dto.Type == "EventInvite" ? NotificationKind.CalendarEvent
         : dto.Type.StartsWith("Project") || dto.Type.StartsWith("Event") ? NotificationKind.EventAssignment
         : dto.Type.StartsWith("Task") ? NotificationKind.TaskAssignment
         : NotificationKind.Other;
@@ -285,6 +354,7 @@ public sealed class NotificationItem(NotificationDto dto)
     {
         NotificationKind.ResourceRequest => "Resource Request",
         NotificationKind.EventAssignment => "Event Assignment",
+        NotificationKind.CalendarEvent => "Calendar",
         NotificationKind.TaskAssignment => "Task Assignment",
         _ => "Announcement"
     };
@@ -292,7 +362,7 @@ public sealed class NotificationItem(NotificationDto dto)
     public string Glyph => Kind switch
     {
         NotificationKind.ResourceRequest => "\U0001F4E6",
-        NotificationKind.EventAssignment => "\U0001F4C5",
+        NotificationKind.EventAssignment or NotificationKind.CalendarEvent => "\U0001F4C5",
         NotificationKind.TaskAssignment => "✅",
         _ => "\U0001F4E2"
     };

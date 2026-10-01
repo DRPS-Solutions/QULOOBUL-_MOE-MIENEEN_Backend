@@ -5,11 +5,14 @@ using System.Text.Json;
 using Frontend_Mobile.Models;
 using Microsoft.AspNetCore.SignalR.Client;
 using QULOOBUL__MOE_MIENEEN_Shared.Auth;
+using QULOOBUL__MOE_MIENEEN_Shared.Collaboration;
 using QULOOBUL__MOE_MIENEEN_Shared.Directory;
 using QULOOBUL__MOE_MIENEEN_Shared.Notifications;
+using QULOOBUL__MOE_MIENEEN_Shared.Reports;
 using QULOOBUL__MOE_MIENEEN_Shared.Requests;
 using QULOOBUL__MOE_MIENEEN_Shared.Tasks;
 using static QULOOBUL__MOE_MIENEEN_Shared.Classes.Common;
+using Permissions = QULOOBUL__MOE_MIENEEN_Shared.Classes.Common.Permissions;
 
 namespace Frontend_Mobile.Data;
 
@@ -23,15 +26,18 @@ namespace Frontend_Mobile.Data;
 /// </summary>
 public sealed class AppState : Observable
 {
-    public static AppState Current { get; } = new();
-
-    private AppState() { }
-
     // The API's https launch profile. Android's emulator reaches the host's localhost at 10.0.2.2.
     // ponytail: hard-coded dev address; a physical phone or a deployed API needs this read from config.
+    // Declared before Current: Current's own initializer constructs an AppState instance (whose
+    // _http field reads ApiBase), and static fields initialize in declaration order - ApiBase has
+    // to exist first, or _http.BaseAddress silently ends up null.
     private static readonly Uri ApiBase = new(DeviceInfo.Platform == DevicePlatform.Android
         ? "https://10.0.2.2:7272/"
         : "https://localhost:7272/");
+
+    public static AppState Current { get; } = new();
+
+    private AppState() { }
 
     private const string SessionKey = "session";
 
@@ -57,6 +63,7 @@ public sealed class AppState : Observable
             Raise(nameof(CanSeeMeetings));
             Raise(nameof(CanSeeEvents));
             Raise(nameof(CanSeeUserManagement));
+            Raise(nameof(CanSeeReports));
         }
     }
 
@@ -72,6 +79,13 @@ public sealed class AppState : Observable
     public bool CanSeeUserManagement => Role is Roles.Admin;
 
     public bool CanReviewRequests => CurrentUser?.Permissions.Contains(QULOOBUL__MOE_MIENEEN_Shared.Classes.Common.Permissions.ReviewRequests) == true;
+
+    // ReportsController is gated on the GenerateReports policy, not a role, so the drawer entry follows the same permission.
+    public bool CanSeeReports => CurrentUser?.Permissions.Contains(QULOOBUL__MOE_MIENEEN_Shared.Classes.Common.Permissions.GenerateReports) == true;
+
+    /// <summary>Generic permission check, for one-off gates (Calendar's organiser-or-admin rule)
+    /// that don't warrant their own named CanSee* property.</summary>
+    public bool HasPermission(string permission) => CurrentUser?.Permissions.Contains(permission) == true;
 
     /// <summary>Returns null on success, otherwise the message for the login form.</summary>
     public async Task<string?> LoginAsync(string email, string password)
@@ -289,6 +303,41 @@ public sealed class AppState : Observable
         CanReviewRequests
         && r.Status is "Pending" or "Escalated"
         && r.RequestedBy != CurrentUser?.UserId;
+
+    // ----- Reports (UC-09) -----
+
+    // The API recomputes the figures on every run and logs who ran it; there's nothing to cache client-side.
+    public Task<ReportDto?> BuildReportAsync(ReportRequest request) =>
+        SendAsync<ReportDto>(HttpMethod.Post, "api/reports", request);
+
+    /// <summary>Same figures as a CSV in Blob Storage; the API returns a short-lived download link.</summary>
+    public Task<ReportExportResponse?> ExportReportAsync(ReportRequest request) =>
+        SendAsync<ReportExportResponse>(HttpMethod.Post, "api/reports/export", request);
+
+    // ----- Calendar (dated organisational events, UC-06) -----
+
+    // Open to every role - unlike Requests/Reports there's no CanSeeCalendar gate. Not a shared
+    // list on AppState: nothing else in the app reads events, so CalendarPage fetches directly.
+    public Task<List<EventDto>?> ListEventsAsync(bool includePast) =>
+        GetAsync<List<EventDto>>(includePast ? "api/events" : $"api/events?from={Wall(DateTime.Today):s}");
+
+    public Task<EventDto?> GetEventAsync(int eventId) => GetAsync<EventDto>($"api/events/{eventId}");
+
+    public Task<List<EventAttendeeDto>?> GetEventAttendeesAsync(int eventId) =>
+        GetAsync<List<EventAttendeeDto>>($"api/events/{eventId}/attendees");
+
+    public Task<EventDto?> CreateEventAsync(CreateEventRequest request) =>
+        SendAsync<EventDto>(HttpMethod.Post, "api/events", request);
+
+    /// <summary>RSVP for yourself; there is no route for answering on someone else's behalf.</summary>
+    public Task<bool> RespondToEventAsync(int eventId, string status) =>
+        SendAsync(HttpMethod.Post, $"api/events/{eventId}/response", new RespondToEventRequest { Status = status });
+
+    public Task<bool> InviteToEventAsync(int eventId, int userId) =>
+        SendAsync(HttpMethod.Post, $"api/events/{eventId}/attendees", new AddEventAttendeeRequest { UserId = userId });
+
+    public Task<bool> RemoveEventAttendeeAsync(int eventId, int userId) =>
+        SendAsync(HttpMethod.Delete, $"api/events/{eventId}/attendees/{userId}");
 
     // ----- Live updates: the SignalR Observer from the architecture doc. The
     // server says what changed; refetching that list keeps one data path. -----
