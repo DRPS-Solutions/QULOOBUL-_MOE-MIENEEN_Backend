@@ -72,6 +72,24 @@ public class UseCaseGapTests
         Assert.Equal(2, await db.MeetingMinutes.CountAsync());           // the original is kept
         await Assert.ThrowsAsync<InvalidOperationException>(() =>        // stale version refused
             svc.EditAsync(v1.MinutesId, new EditMinutesRequest { MinutesText = "y" }, recorder.UserId));
+
+        // Search hits the title too, filters on the meeting's date, and returns only the latest version.
+        var day = meeting.MeetingDate.Date;
+        Assert.Equal([v2.MinutesId], (await svc.SearchAsync("AGM", day, day.AddDays(1), organiser.UserId)).Select(m => m.MinutesId));
+        Assert.Empty(await svc.SearchAsync("AGM", day.AddDays(1), day.AddDays(2), organiser.UserId));
+        Assert.Single(await svc.SearchAsync("agm", null, null, organiser.UserId));     // any case matches
+        Assert.Single(await svc.SearchAsync("CLOSED", null, null, organiser.UserId));
+        Assert.Single(await svc.SearchAsync("clsoed", null, null, organiser.UserId));   // typo
+        Assert.Single(await svc.SearchAsync("clos", null, null, organiser.UserId));     // part of a word
+        Assert.Empty(await svc.SearchAsync("zebra", null, null, organiser.UserId));
+
+        // A title hit outranks a hit that is only in another meeting's minutes.
+        var other = new Meeting { Organiser = organiser, Title = "Budget review", MeetingDate = DateTime.UtcNow };
+        db.Meetings.Add(other);
+        await db.SaveChangesAsync();
+        await svc.RecordAsync(other.MeetingId, new RecordMinutesRequest { MinutesText = "Follow-up from the AGM." }, organiser.UserId);
+        Assert.Equal([meeting.MeetingId, other.MeetingId],
+            (await svc.SearchAsync("agm", null, null, organiser.UserId)).Select(m => m.MeetingId));
     }
 //----------------------------------------------------------------------------------------------------------------------//
     [Fact]

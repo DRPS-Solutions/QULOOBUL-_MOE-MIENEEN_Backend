@@ -74,6 +74,13 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Controllers
             return NoContent();
         }
 //----------------------------------------------------------------------------------------------------------------------//
+        [HttpDelete("{id:int}"), Authorize(Policy = Permissions.ManageUsers)]
+        public async Task<IActionResult> Delete(int id)
+        {
+            await users.DeleteAsync(id, UserId());
+            return NoContent();
+        }
+//----------------------------------------------------------------------------------------------------------------------//
         // Any signed-in user: clients need the levels to offer only legal assignees.
         [HttpGet("~/api/roles")]
         public async Task<ActionResult<List<RoleDto>>> Roles() => Ok(await users.RolesAsync());

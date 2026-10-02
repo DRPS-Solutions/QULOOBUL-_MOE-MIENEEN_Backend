@@ -3,6 +3,7 @@
 @using System.ComponentModel.DataAnnotations
 @implements IDisposable
 @inject AppDataService AppData
+@inject IDialogService DialogService
 
 <PageTitle>User Management</PageTitle>
 
@@ -368,6 +369,13 @@
                                     }
                                 </div>
                             </div>
+                            @if (selectedEmployee.UserId != AppData.CurrentUser?.UserId)
+                            {
+                                <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Filled.Delete"
+                                           Style="margin-left:auto;" Disabled="@deleting" OnClick="DeleteSelected">
+                                    Delete User
+                                </MudButton>
+                            }
                         </div>
 
                         <div class="drps-stats-row">
@@ -447,8 +455,8 @@
                                         {
                                             <tr>
                                                 <td>@entry.Timestamp.ToLocalTime().ToString("d MMM yyyy HH:mm")</td>
-                                                <td>@entry.Action</td>
-                                                <td>@(entry.EntityId == 0 ? entry.EntityType : $"{entry.EntityType} #{entry.EntityId}")</td>
+                                                <td>@AuditActionLabel(entry)</td>
+                                                <td>@AuditTargetLabel(entry)</td>
                                             </tr>
                                         }
                                     </tbody>
@@ -509,6 +517,91 @@
     private IReadOnlyList<TaskCardDto> selectedTasks = [];
     private IReadOnlyList<AuditEntryDto> selectedAudit = [];
 
+    // Audit_Log stores machine keys ("task.create", or "POST /api/tasks/5" from AuditMiddleware);
+    // these turn them into what the user actually did. Unknown keys fall through unchanged.
+    private static readonly Dictionary<string, string> AuditActions = new()
+    {
+        ["auth.login"] = "Signed in",
+        ["auth.login.failed"] = "Failed sign-in attempt",
+        ["user.create"] = "Created a user account",
+        ["user.update"] = "Updated a profile",
+        ["user.deactivate"] = "Deactivated a user",
+        ["user.reactivate"] = "Reactivated a user",
+        ["user.delete"] = "Deleted a user",
+        ["user.locked"] = "Account locked",
+        ["user.anonymise"] = "Anonymised a user",
+        ["user.password.set"] = "Set their password",
+        ["user.password.reset"] = "Reset a password",
+        ["user.password.link"] = "Requested a password link",
+        ["project.create"] = "Created a project",
+        ["project.update"] = "Updated a project",
+        ["project.member.add"] = "Added a project member",
+        ["project.member.remove"] = "Removed a project member",
+        ["task.create"] = "Created a task",
+        ["task.update"] = "Updated a task",
+        ["task.assign"] = "Assigned a task",
+        ["task.unassign"] = "Unassigned a task",
+        ["task.status"] = "Changed a task's status",
+        ["schedule.create"] = "Created a recurring task",
+        ["schedule.update"] = "Updated a recurring task",
+        ["schedule.pause"] = "Paused a recurring task",
+        ["event.create"] = "Created an event",
+        ["event.attendee.add"] = "Invited someone to an event",
+        ["event.attendee.respond"] = "Responded to an event",
+        ["event.attendee.remove"] = "Removed an event attendee",
+        ["meeting.create"] = "Scheduled a meeting",
+        ["meeting.minutes.record"] = "Recorded meeting minutes",
+        ["meeting.minutes.edit"] = "Edited meeting minutes",
+        ["meeting.minutes.append"] = "Added to meeting minutes",
+        ["meeting.minutes.approve"] = "Approved meeting minutes",
+        ["request.submit"] = "Submitted a request",
+        ["request.resubmit"] = "Resubmitted a request",
+        ["request.approve"] = "Approved a request",
+        ["request.decline"] = "Declined a request",
+        ["request.complete"] = "Completed a request",
+        ["request.review.begin"] = "Started reviewing a request",
+        ["file.upload"] = "Uploaded a file",
+        ["file.recategorise"] = "Recategorised a file",
+        ["file.archive"] = "Archived a file",
+        ["file.unarchive"] = "Restored a file",
+        ["file.delete"] = "Deleted a file",
+        ["notification.preferences"] = "Changed notification settings",
+        ["notification.broadcast"] = "Sent an announcement",
+        ["email.sent"] = "Email sent",
+    };
+
+    private static readonly Dictionary<string, string> AuditEntities = new()
+    {
+        ["ProjectTask"] = "Task", ["TaskAssignment"] = "Task", ["TaskSchedule"] = "Recurring task",
+        ["ProjectMember"] = "Project", ["EventAttendee"] = "Event", ["MeetingMinutes"] = "Meeting minutes",
+        ["ResourceRequest"] = "Request", ["FileUpload"] = "File", ["NotificationPreference"] = "Notification settings",
+    };
+
+    private static string AuditActionLabel(AuditEntryDto e)
+    {
+        if (e.EntityType == "http")
+            return e.Action.Split(' ')[0] switch
+            {
+                "PUT" or "PATCH" => "Made a change",
+                "DELETE" => "Removed something",
+                _ => "Made request",
+            };
+        return AuditActions.GetValueOrDefault(e.Action, e.Action);
+    }
+
+    private static string AuditTargetLabel(AuditEntryDto e)
+    {
+        if (e.EntityType == "http")
+        {
+            // "POST /api/meeting-minutes/3/approve" -> "Meeting minutes"
+            var area = e.Action.Split('/', StringSplitOptions.RemoveEmptyEntries).ElementAtOrDefault(2) ?? ""; // [0]="POST ", [1]="api"
+            area = area.Replace('-', ' ');
+            return area.Length == 0 ? "" : char.ToUpper(area[0]) + area[1..];
+        }
+        var name = AuditEntities.GetValueOrDefault(e.EntityType, e.EntityType);
+        return e.EntityId == 0 ? name : $"{name} #{e.EntityId}";
+    }
+
     // Create user form
     private NewUserForm newUser = new();
     private bool saving;
@@ -527,6 +620,7 @@
 
     private IEnumerable<UserSummaryDto> FilteredEmployees =>
         AppData.Users
+            .Where(e => e.Status != "Anonymised") // deleted accounts
             .Where(e => string.IsNullOrWhiteSpace(searchTerm) ||
                         e.FullName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
                         e.Role.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
@@ -568,7 +662,11 @@
         await Task.WhenAll(tasksLoad, auditLoad);
         if (selectedEmployee != employee) return; // ignore a slower, older click
         selectedTasks = await tasksLoad ?? [];
-        selectedAudit = await auditLoad ?? [];
+        var audit = await auditLoad ?? [];
+        // AuditMiddleware writes a generic "http" row right after the service's own row for the same
+        // request; hide it when a specific row sits within a few seconds. Lone http rows stay.
+        selectedAudit = audit.Where(a => a.EntityType != "http" || !audit.Any(o =>
+            o.EntityType != "http" && Math.Abs((o.Timestamp - a.Timestamp).TotalSeconds) < 5)).ToList();
     }
 
     private async Task SaveUser()
@@ -590,6 +688,24 @@
         newUser = new NewUserForm();
         showCreateUserScreen = false;
         if (AppData.Users.FirstOrDefault(u => u.UserId == created.UserId) is { } user) await SelectEmployee(user);
+    }
+
+    private bool deleting;
+
+    private async Task DeleteSelected()
+    {
+        if (selectedEmployee is not { } user) return;
+        if (await DialogService.ShowMessageBoxAsync("Delete user",
+                $"Delete {user.FullName}? Their open tasks are reassigned and their personal details erased. This cannot be undone.",
+                yesText: "Delete", cancelText: "Cancel") != true) return;
+        deleting = true;
+        var ok = await AppData.SendAsync(HttpMethod.Delete, $"api/users/{user.UserId}");
+        deleting = false;
+        if (!ok) return;
+
+        await Task.WhenAll(AppData.RefreshUsersAsync(), LoadOverview());
+        selectedEmployee = null;
+        if (FilteredEmployees.FirstOrDefault() is { } first) await SelectEmployee(first);
     }
 
     private class NewUserForm

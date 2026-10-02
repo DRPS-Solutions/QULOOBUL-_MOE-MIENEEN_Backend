@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using QULOOBUL__MOE_MIENEEN_Backend.Data;
 using QULOOBUL__MOE_MIENEEN_Backend.Models.IdentityAndAccess;
+using QULOOBUL__MOE_MIENEEN_Backend.Models.NotificationsAudit;
 using QULOOBUL__MOE_MIENEEN_Shared.Directory;
 using static QULOOBUL__MOE_MIENEEN_Shared.Classes.Common;
 
@@ -14,10 +15,10 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
     {
         /// <summary>
         /// How long a deactivated account's personal details are kept before anonymise() may run.
-        /// ponytail: the architecture doc names no POPIA retention period; one year is a placeholder
+        /// ponytail: the architecture doc names no POPIA retention period; 30 days is a placeholder
         /// until the NPO sets its records policy.
         /// </summary>
-        public static readonly TimeSpan RetentionPeriod = TimeSpan.FromDays(365);
+        public static readonly TimeSpan RetentionPeriod = TimeSpan.FromDays(30);
 //----------------------------------------------------------------------------------------------------------------------//
         /// <summary>SM-03 createAccount [email is unique] / send activation email, write AuditLog.
         /// The account starts Pending Activation with no password; the user sets their own.</summary>
@@ -101,13 +102,30 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             var notices = await tasks.ReassignOpenTasksAsync(userId, actorId);
             audit.Record(actorId, "user.deactivate", nameof(User), userId);
             await db.SaveChangesAsync();
+            await SendReassignNotices(notices);
+        }
+//----------------------------------------------------------------------------------------------------------------------//
+        /// <summary>
+        /// The main admin removes an account outright, from any state: open tasks are reassigned and
+        /// personal fields scrubbed at once, skipping the retention wait anonymise() enforces. The row
+        /// stays (every FK into Users is Restrict, and AuditLog must still resolve) as Anonymised,
+        /// which the roster hides.
+        /// </summary>
+        public async Task DeleteAsync(int userId, int actorId)
+        {
+            if (userId == actorId) throw new InvalidOperationException("You cannot delete your own account.");
+            var user = await Load(userId);
+            if (user.Status == Lifecycle.UserAnonymised)
+                throw new InvalidOperationException("That account has already been deleted.");
 
-            foreach (var n in notices)
-            {
-                await notify.PushAsync(n.UserId, "taskAssigned", new { taskId = n.EntityId });
-                await email.SendAsync(n, "A task was reassigned to you");
-            }
-            if (notices.Count > 0) await notify.BroadcastAsync("boardChanged", new { });
+            var notices = await tasks.ReassignOpenTasksAsync(userId, actorId);
+            user.Status = Lifecycle.UserAnonymised; // admin override of SM-03: Pending/Locked have no path here
+            user.IsActive = false;
+            user.DeactivatedAt ??= DateTime.UtcNow;
+            Scrub(user);
+            audit.Record(actorId, "user.delete", nameof(User), userId);
+            await db.SaveChangesAsync();
+            await SendReassignNotices(notices);
         }
 //----------------------------------------------------------------------------------------------------------------------//
         /// <summary>SM-03 reactivate(admin) [MANAGE_USERS] / write AuditLog.</summary>
@@ -161,14 +179,29 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
                     $"Only an account deactivated for at least {RetentionPeriod.TotalDays:0} days can be anonymised.");
 
             Lifecycle.MoveUser(user, Lifecycle.UserAnonymised);
+            Scrub(user);
+            await audit.RecordAndSaveAsync(actorId, "user.anonymise", nameof(User), userId);
+        }
+
+        private static void Scrub(User user)
+        {
             user.FirstName = "Anonymised";
-            user.Surname = $"User {userId}";
-            user.Email = $"anonymised-{userId}@invalid.local"; // Email is unique-indexed
+            user.Surname = $"User {user.UserId}";
+            user.Email = $"anonymised-{user.UserId}@invalid.local"; // Email is unique-indexed
             user.CellNo = string.Empty;
             user.PasswordHash = string.Empty;
             user.PasswordTokenHash = null;
             user.PasswordTokenExpires = null;
-            await audit.RecordAndSaveAsync(actorId, "user.anonymise", nameof(User), userId);
+        }
+
+        private async Task SendReassignNotices(IReadOnlyCollection<Notification> notices)
+        {
+            foreach (var n in notices)
+            {
+                await notify.PushAsync(n.UserId, "taskAssigned", new { taskId = n.EntityId });
+                await email.SendAsync(n, "A task was reassigned to you");
+            }
+            if (notices.Count > 0) await notify.BroadcastAsync("boardChanged", new { });
         }
 //----------------------------------------------------------------------------------------------------------------------//
         public Task<List<RoleDto>> RolesAsync() =>

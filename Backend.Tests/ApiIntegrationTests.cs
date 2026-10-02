@@ -161,6 +161,26 @@ public class ApiIntegrationTests(ApiFactory api) : IClassFixture<ApiFactory>
     }
 //----------------------------------------------------------------------------------------------------------------------//
     [Fact]
+    public async Task Only_the_admin_deletes_a_user_and_their_details_are_erased()
+    {
+        var (admin, adminMe) = await api.SignInAsync(ApiFactory.AdminEmail);
+        var created = await (await admin.PostAsJsonAsync("/api/users", new CreateUserRequest
+        {
+            FirstName = "Del", Surname = "Me", Email = "delete-me@test.local", CellNo = "082 000 0000",
+            RoleId = (await admin.GetFromJsonAsync<List<RoleDto>>("/api/roles"))!.First(r => r.RoleName == Roles.Staff).RoleId,
+        })).Content.ReadFromJsonAsync<UserDto>();
+
+        var (staff, _) = await api.SignInAsync(ApiFactory.StaffEmail);
+        Assert.Equal(HttpStatusCode.Forbidden, (await staff.DeleteAsync($"/api/users/{created!.UserId}")).StatusCode);
+        Assert.False((await admin.DeleteAsync($"/api/users/{adminMe.UserId}")).IsSuccessStatusCode);
+
+        Assert.Equal(HttpStatusCode.NoContent, (await admin.DeleteAsync($"/api/users/{created.UserId}")).StatusCode);
+        var gone = (await admin.GetFromJsonAsync<List<UserSummaryDto>>("/api/users"))!.Single(u => u.UserId == created.UserId);
+        Assert.Equal("Anonymised", gone.Status);
+        Assert.DoesNotContain("delete-me", gone.Email);
+    }
+//----------------------------------------------------------------------------------------------------------------------//
+    [Fact]
     public async Task Only_the_organiser_or_an_admin_changes_an_events_attendees()
     {
         var (admin, adminMe) = await api.SignInAsync(ApiFactory.AdminEmail);

@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
 using QULOOBUL__MOE_MIENEEN_Backend.Data;
 using QULOOBUL__MOE_MIENEEN_Backend.Models.Collaboration;
@@ -113,19 +114,63 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             return Map(minutes);
         }
 //----------------------------------------------------------------------------------------------------------------------//
-        /// <summary>UC-03 "searchable by date or keyword", over the meetings the caller may see.</summary>
+        /// <summary>
+        /// UC-03 "searchable by date or keyword", over the meetings the caller may see. The keyword is fuzzy and
+        /// case-insensitive: each word scores against the title (weighted higher) and the minutes, best match first.
+        /// </summary>
         public async Task<List<MeetingMinutesDto>> SearchAsync(string? keyword, DateTime? from, DateTime? to, int userId)
         {
             var meetingIds = VisibleMeetings(userId, await guard.IsAdminAsync(userId)).Select(m => m.MeetingId);
-            return await db.MeetingMinutes
+            // ponytail: scored in memory, fine for an NPO's meeting count; move to SQL full-text search if it grows large
+            var candidates = await db.MeetingMinutes
                 .Where(m => meetingIds.Contains(m.MeetingId)
-                         && (keyword == null || m.MinutesText.Contains(keyword))
-                         && (from == null || m.TimeRecorded >= from)
-                         && (to == null || m.TimeRecorded <= to))
-                .OrderByDescending(m => m.TimeRecorded)
-                .Select(m => new MeetingMinutesDto(
-                    m.MinutesId, m.MeetingId, m.RecordedBy, m.TimeRecorded, m.MinutesText, m.IsAiDraft, m.ApprovedBy))
+                         && !db.MeetingMinutes.Any(x => x.MeetingId == m.MeetingId && x.MinutesId > m.MinutesId) // latest version only
+                         && (from == null || m.Meeting!.MeetingDate >= from)
+                         && (to == null || m.Meeting!.MeetingDate < to))
+                .Select(m => new { m.Meeting!.Title, Dto = new MeetingMinutesDto(
+                    m.MinutesId, m.MeetingId, m.RecordedBy, m.TimeRecorded, m.MinutesText, m.IsAiDraft, m.ApprovedBy) })
                 .ToListAsync();
+
+            var terms = Words(keyword);
+            return candidates
+                .Select(c => (c.Dto, Score: terms.Length == 0 ? 1 : Score(terms, Words(c.Title)) * 3 + Score(terms, Words(c.Dto.MinutesText))))
+                .Where(x => x.Score > 0)
+                .OrderByDescending(x => x.Score).ThenByDescending(x => x.Dto.TimeRecorded)
+                .Select(x => x.Dto)
+                .ToList();
+        }
+
+        private static string[] Words(string? text) =>
+            Regex.Matches((text ?? "").ToLowerInvariant(), @"\w+").Select(m => m.Value).Distinct().ToArray();
+
+        // Each search term counts its best match in the field.
+        private static int Score(string[] terms, string[] words) =>
+            terms.Sum(t => words.Select(w => Match(t, w)).DefaultIfEmpty(0).Max());
+
+        private static int Match(string term, string word) =>
+            word == term ? 3
+            : word.Contains(term) ? 2                                                         // "meet" → "meeting"
+            : term.Length >= 4 && Distance(term, word) <= (term.Length >= 7 ? 2 : 1) ? 1      // typo: "evnt" → "event"
+            : 0;
+
+        /// <summary>
+        /// Edit distance where a swapped pair of letters counts as one edit (optimal string alignment);
+        /// bails early when the lengths alone rule a typo out.
+        /// </summary>
+        private static int Distance(string a, string b)
+        {
+            if (Math.Abs(a.Length - b.Length) > 2) return int.MaxValue;
+            var d = new int[a.Length + 1, b.Length + 1];
+            for (var i = 0; i <= a.Length; i++) d[i, 0] = i;
+            for (var j = 0; j <= b.Length; j++) d[0, j] = j;
+            for (var i = 1; i <= a.Length; i++)
+                for (var j = 1; j <= b.Length; j++)
+                {
+                    d[i, j] = Math.Min(Math.Min(d[i - 1, j], d[i, j - 1]) + 1, d[i - 1, j - 1] + (a[i - 1] == b[j - 1] ? 0 : 1));
+                    if (i > 1 && j > 1 && a[i - 1] == b[j - 2] && a[i - 2] == b[j - 1])
+                        d[i, j] = Math.Min(d[i, j], d[i - 2, j - 2] + 1);
+                }
+            return d[a.Length, b.Length];
         }
 //----------------------------------------------------------------------------------------------------------------------//
         public IQueryable<Meeting> VisibleMeetings(int userId, bool isAdmin) =>
