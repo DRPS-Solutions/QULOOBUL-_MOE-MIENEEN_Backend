@@ -32,7 +32,8 @@ namespace Frontend_Mobile.Data;
 public sealed class AppState : Observable
 {
     // Debug: the API's https launch profile (Android's emulator reaches the host's localhost at 10.0.2.2).
-    // Release: the production App Service, so a side-loaded APK works on a real phone.
+    // Release: the production App Service, so a side-loaded APK works on a real phone;
+    // STAGING (dev-branch CI builds, -p:ApiEnvironment=Staging): the staging App Service.
     // Declared before Current: Current's own initializer constructs an AppState instance (whose
     // _http field reads ApiBase), and static fields initialize in declaration order - ApiBase has
     // to exist first, or _http.BaseAddress silently ends up null.
@@ -40,6 +41,8 @@ public sealed class AppState : Observable
     private static readonly Uri ApiBase = new(DeviceInfo.Platform == DevicePlatform.Android
         ? "https://10.0.2.2:7272/"
         : "https://localhost:7272/");
+#elif STAGING
+    private static readonly Uri ApiBase = new("https://xbcad-api-dev-bwdwgmdbesd3ctft.southafricanorth-01.azurewebsites.net/");
 #else
     private static readonly Uri ApiBase = new("https://xbcad-api-prod-e2fef0gxejcbhtd2.southafricanorth-01.azurewebsites.net/");
 #endif

@@ -17,6 +17,8 @@ jobs:
     env:
       MOBILE_PROJECT: Frontend_Mobile/Frontend_Mobile.csproj
       KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        # dev/develop builds talk to the staging API; everything else to production.
+      API_ENV: ${{ (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/develop') && 'Staging' || 'Production' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -36,7 +38,7 @@ jobs:
         run: dotnet restore "$MOBILE_PROJECT"
 
       - name: Build
-        run: dotnet build "$MOBILE_PROJECT" -f net10.0-android -c Release --no-restore -warnaserror
+        run: dotnet build "$MOBILE_PROJECT" -f net10.0-android -c Release --no-restore -warnaserror -p:ApiEnvironment="$API_ENV"
 
       - name: Decode signing keystore
         if: ${{ env.KEYSTORE_B64 != '' }}
@@ -45,7 +47,7 @@ jobs:
       - name: Publish signed APK
         if: ${{ env.KEYSTORE_B64 != '' }}
         run: |
-          dotnet publish "$MOBILE_PROJECT" -f net10.0-android -c Release -o ./apk \
+          dotnet publish "$MOBILE_PROJECT" -f net10.0-android -c Release -o ./apk -p:ApiEnvironment="$API_ENV" \
             -p:AndroidKeyStore=true \
             -p:AndroidSigningKeyStore="$RUNNER_TEMP/npo.keystore" \
             -p:AndroidSigningKeyAlias='${{ secrets.ANDROID_KEY_ALIAS }}' \
@@ -56,7 +58,7 @@ jobs:
         if: ${{ env.KEYSTORE_B64 == '' }}
         run: |
           echo "::warning::ANDROID_KEYSTORE_BASE64 is not set — producing an unsigned build."
-          dotnet publish "$MOBILE_PROJECT" -f net10.0-android -c Release -o ./apk
+          dotnet publish "$MOBILE_PROJECT" -f net10.0-android -c Release -o ./apk -p:ApiEnvironment="$API_ENV"
 
       # Side-loaded for the client demo and for marking. Play Store
       # distribution is Phase 2 and is deliberately not automated.
@@ -64,6 +66,6 @@ jobs:
       # pushes never trigger this workflow, and the 14-day retention bounds the quota.
       - uses: actions/upload-artifact@v4
         with:
-          name: npo-android-apk
+          name: npo-android-apk-${{ env.API_ENV }}
           path: ./apk/*.apk
           retention-days: 14
