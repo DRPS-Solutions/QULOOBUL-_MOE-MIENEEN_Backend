@@ -43,7 +43,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
                 throw new UnauthorizedAccessException(user.Status switch
                 {
                     Lifecycle.UserPending => "This account has not been activated. Use the link in your activation email.",
-                    Lifecycle.UserLocked => "This account is locked after too many failed sign-ins. Ask your facility manager to contact the system admin for a temporary password.",
+                    Lifecycle.UserLocked => "This account is locked after too many failed sign-ins. Use the Forgot password link to ask the system admin for a temporary password.",
                     _ => "This account is deactivated.",
                 });
             }
@@ -159,6 +159,26 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             Lifecycle.MoveUser(user, Lifecycle.UserLocked);
             audit.Record(user.UserId, "user.locked", nameof(User), user.UserId);
 
+            await NotifyAdminsAsync("UserLocked",
+                $"{user.FirstName} {user.Surname}'s account was locked after {MaxFailedLogins} failed sign-ins.",
+                user.UserId, "A user account was locked");
+        }
+//----------------------------------------------------------------------------------------------------------------------//
+        /// <summary>The login page's "Forgot password?" form: tells the admins who is asking, so they can
+        /// issue a temporary password. Answers the same whether or not the email matches an account.</summary>
+        public async Task ForgotPasswordAsync(ForgotPasswordRequest req)
+        {
+            var user = await db.Users.FirstOrDefaultAsync(u => u.Email == req.Email);
+            var who = $"{req.FirstName.Trim()} {req.Surname.Trim()} ({req.Email})";
+            await NotifyAdminsAsync("PasswordResetRequested", user is null
+                    ? $"{who} asked for a password reset, but no account uses that email."
+                    : $"{who} asked for a password reset. Use Reset Password on their account in User Management.",
+                user?.UserId ?? 0, "Password reset requested");
+        }
+//----------------------------------------------------------------------------------------------------------------------//
+        /// <summary>Notify (in-app, live push, email) every active user who can manage users. Saves the Unit of Work.</summary>
+        private async Task NotifyAdminsAsync(string typeName, string message, int userId, string subject)
+        {
             var admins = await (
                 from u in db.Users
                 join rp in db.RolePermissions on u.RoleId equals rp.RoleId
@@ -167,15 +187,14 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
                 select u.UserId).ToListAsync();
             var notices = new List<Notification>();
             foreach (var adminId in admins)
-                notices.Add(await notify.QueueAsync(adminId, "UserLocked",
-                    $"{user.FirstName} {user.Surname}'s account was locked after {MaxFailedLogins} failed sign-ins.",
-                    nameof(User), user.UserId));
+                notices.Add(await notify.QueueAsync(adminId, typeName, message, nameof(User), userId));
 
             await db.SaveChangesAsync();
             foreach (var n in notices)
             {
-                await notify.PushAsync(n.UserId, "userLocked", new { userId = user.UserId });
-                await email.SendAsync(n, "A user account was locked");
+                // "notification" is what both clients listen for to refresh their bell.
+                await notify.PushAsync(n.UserId, "notification", new { userId });
+                await email.SendAsync(n, subject);
             }
         }
 //----------------------------------------------------------------------------------------------------------------------//

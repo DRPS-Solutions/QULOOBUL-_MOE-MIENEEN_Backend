@@ -23,7 +23,7 @@
             <div class="drps-login-card">
                 <img src="images/logos/QULOOBUL MOE'MIENEEN Logo.png" alt="Company Logo" class="drps-login-logo" />
                 <MudText Typo="Typo.h5" Class="drps-login-title">QULOOBUL MOE'MIENEEN</MudText>
-                @* The emailed activation / change-password link is opened signed out, so that one page renders here. *@
+                @* The emailed activation / change-password link and "Forgot password?" are opened signed out, so those pages render here. *@
                 @if (AppData.CurrentUser is not null)
                 {
                     <ChangePasswordForm />
@@ -69,9 +69,9 @@
                            OnClick="Login">
                     @(loggingIn ? "Signing in..." : "Log In")
                 </MudButton>
-                <MudText Typo="Typo.caption" Class="drps-login-hint mt-3">
-                    Forgot your password or locked out? Ask your facility manager to contact the system admin for a temporary password.
-                </MudText>
+                <MudLink Href="forgot-password" Typo="Typo.caption" Class="drps-login-hint d-block mt-3">
+                    Forgot password?
+                </MudLink>
                 }
             </div>
         </div>
@@ -134,7 +134,8 @@ else
     private string? loginError = null;
     private bool loggingIn = false;
 
-    private bool OnSetPasswordPage => Nav.ToBaseRelativePath(Nav.Uri).StartsWith("set-password");
+    private bool OnSetPasswordPage => Nav.ToBaseRelativePath(Nav.Uri) is var path
+        && (path.StartsWith("set-password") || path.StartsWith("forgot-password"));
 
     private bool CanSeePage => AppData.CanSee(Nav.ToBaseRelativePath(Nav.Uri));
 

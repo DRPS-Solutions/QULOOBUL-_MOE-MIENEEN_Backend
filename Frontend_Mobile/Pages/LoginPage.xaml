@@ -93,10 +93,34 @@
                             Clicked="OnLogin"
                             Margin="0,20,0,0" />
 
-                    <Label Text="Forgot your password or locked out? Ask your facility manager to contact the system admin for a temporary password."
-                           Style="{StaticResource Muted}"
-                           HorizontalTextAlignment="Center"
-                           Margin="0,12,0,0" />
+                    <Button Text="Forgot password?"
+                            Style="{StaticResource OutlineButton}"
+                            Clicked="OnShowForgot"
+                            Margin="0,8,0,0" />
+                    </VerticalStackLayout>
+
+                    <!-- "Forgot password?": tells the admins who is asking, so they can issue a temporary password. -->
+                    <VerticalStackLayout x:Name="ForgotSection" IsVisible="False">
+                        <Label x:Name="ForgotIntroLabel"
+                               Text="Tell the system admin who you are, and they'll send you a temporary password."
+                               Style="{StaticResource Muted}"
+                               FontSize="14"
+                               HorizontalTextAlignment="Center"
+                               Margin="0,4,0,20" />
+                        <VerticalStackLayout x:Name="ForgotForm">
+                            <Border Style="{StaticResource FieldBox}">
+                                <Entry x:Name="ForgotNameEntry" Placeholder="Name" MaxLength="100" TextChanged="OnForgotFormChanged" />
+                            </Border>
+                            <Border Style="{StaticResource FieldBox}" Margin="0,12,0,0">
+                                <Entry x:Name="ForgotSurnameEntry" Placeholder="Surname" MaxLength="100" TextChanged="OnForgotFormChanged" />
+                            </Border>
+                            <Border Style="{StaticResource FieldBox}" Margin="0,12,0,0">
+                                <Entry x:Name="ForgotEmailEntry" Placeholder="Email" Keyboard="Email" MaxLength="256"
+                                       TextChanged="OnForgotFormChanged" Completed="OnSendForgot" />
+                            </Border>
+                            <Button x:Name="ForgotButton" Text="Send Request" IsEnabled="False" Clicked="OnSendForgot" Margin="0,20,0,0" />
+                        </VerticalStackLayout>
+                        <Button Text="Back to sign in" Style="{StaticResource OutlineButton}" Clicked="OnHideForgot" Margin="0,8,0,0" />
                     </VerticalStackLayout>
 
                 </VerticalStackLayout>

@@ -32,6 +32,17 @@ namespace QULOOBUL__MOE_MIENEEN_Shared.Auth
         public string Email { get; init; } = string.Empty;
     }
 //----------------------------------------------------------------------------------------------------------------------//
+    /// <summary>"Forgot password?": who is asking, so the admin knows which account to reset.</summary>
+    public record ForgotPasswordRequest
+    {
+        [Required, MaxLength(100)]
+        public string FirstName { get; init; } = string.Empty;
+        [Required, MaxLength(100)]
+        public string Surname { get; init; } = string.Empty;
+        [Required, EmailAddress, MaxLength(256)]
+        public string Email { get; init; } = string.Empty;
+    }
+//----------------------------------------------------------------------------------------------------------------------//
     /// <summary>SM-03 setPassword: redeems the emailed activation or reset token.</summary>
     public record SetPasswordRequest
     {

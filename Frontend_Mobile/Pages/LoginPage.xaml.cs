@@ -1,4 +1,5 @@
 using Frontend_Mobile.Data;
+using QULOOBUL__MOE_MIENEEN_Shared.Auth;
 
 namespace Frontend_Mobile.Pages;
 
@@ -100,6 +101,43 @@ public partial class LoginPage : ContentPage
     {
         await AppState.Current.LogoutAsync();
         ShowChangeForm(false);
+    }
+
+    private void OnShowForgot(object? sender, EventArgs e) => ShowForgotForm(true);
+
+    private void OnHideForgot(object? sender, EventArgs e) => ShowForgotForm(false);
+
+    private void ShowForgotForm(bool show)
+    {
+        SignInSection.IsVisible = !show;
+        ForgotSection.IsVisible = show;
+        ForgotForm.IsVisible = true;
+        ForgotIntroLabel.Text = "Tell the system admin who you are, and they'll send you a temporary password.";
+        ForgotNameEntry.Text = ForgotSurnameEntry.Text = string.Empty;
+        ForgotEmailEntry.Text = EmailEntry.Text;
+    }
+
+    private void OnForgotFormChanged(object? sender, TextChangedEventArgs e) =>
+        ForgotButton.IsEnabled = !_busy
+            && !string.IsNullOrWhiteSpace(ForgotNameEntry.Text)
+            && !string.IsNullOrWhiteSpace(ForgotSurnameEntry.Text)
+            && !string.IsNullOrWhiteSpace(ForgotEmailEntry.Text);
+
+    private async void OnSendForgot(object? sender, EventArgs e)
+    {
+        if (!ForgotButton.IsEnabled) return;
+        _busy = true;
+        ForgotButton.IsEnabled = false;
+        ForgotButton.Text = "Sending...";
+        var ok = await AppState.Current.SendAsync(HttpMethod.Post, "api/auth/forgot-password", new ForgotPasswordRequest
+        {
+            FirstName = ForgotNameEntry.Text!, Surname = ForgotSurnameEntry.Text!, Email = ForgotEmailEntry.Text!,
+        });
+        _busy = false;
+        ForgotButton.Text = "Send Request";
+        if (!ok) { OnForgotFormChanged(null, null!); return; } // AppState already showed the error
+        ForgotForm.IsVisible = false;
+        ForgotIntroLabel.Text = "Request sent. The system admin will contact you with a temporary password.";
     }
 
     private void OnToggleTheme(object? sender, EventArgs e)
