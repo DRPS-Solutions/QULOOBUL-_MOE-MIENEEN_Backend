@@ -3,6 +3,7 @@
 @using System.ComponentModel.DataAnnotations
 @implements IDisposable
 @inject AppDataService AppData
+@inject IDialogService DialogService
 
 <PageTitle>User Management</PageTitle>
 
@@ -368,6 +369,13 @@
                                     }
                                 </div>
                             </div>
+                            @if (selectedEmployee.UserId != AppData.CurrentUser?.UserId)
+                            {
+                                <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Filled.Delete"
+                                           Style="margin-left:auto;" Disabled="@deleting" OnClick="DeleteSelected">
+                                    Delete User
+                                </MudButton>
+                            }
                         </div>
 
                         <div class="drps-stats-row">
@@ -527,6 +535,7 @@
 
     private IEnumerable<UserSummaryDto> FilteredEmployees =>
         AppData.Users
+            .Where(e => e.Status != "Anonymised") // deleted accounts
             .Where(e => string.IsNullOrWhiteSpace(searchTerm) ||
                         e.FullName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
                         e.Role.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
@@ -590,6 +599,24 @@
         newUser = new NewUserForm();
         showCreateUserScreen = false;
         if (AppData.Users.FirstOrDefault(u => u.UserId == created.UserId) is { } user) await SelectEmployee(user);
+    }
+
+    private bool deleting;
+
+    private async Task DeleteSelected()
+    {
+        if (selectedEmployee is not { } user) return;
+        if (await DialogService.ShowMessageBoxAsync("Delete user",
+                $"Delete {user.FullName}? Their open tasks are reassigned and their personal details erased. This cannot be undone.",
+                yesText: "Delete", cancelText: "Cancel") != true) return;
+        deleting = true;
+        var ok = await AppData.SendAsync(HttpMethod.Delete, $"api/users/{user.UserId}");
+        deleting = false;
+        if (!ok) return;
+
+        await Task.WhenAll(AppData.RefreshUsersAsync(), LoadOverview());
+        selectedEmployee = null;
+        if (FilteredEmployees.FirstOrDefault() is { } first) await SelectEmployee(first);
     }
 
     private class NewUserForm
