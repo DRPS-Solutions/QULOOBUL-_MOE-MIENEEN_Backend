@@ -52,8 +52,8 @@ namespace Frontend_Mobile.Pages
         private void RenderRoster()
         {
             var query = SearchEntry.Text?.Trim();
-            var filtered = _state.Users.Where(user =>
-                string.IsNullOrWhiteSpace(query) ||
+            var filtered = _state.Users.Where(user => user.Status != "Anonymised") // deleted accounts
+                .Where(user => string.IsNullOrWhiteSpace(query) ||
                 user.FullName.Contains(query, StringComparison.OrdinalIgnoreCase) ||
                 user.Role.Contains(query, StringComparison.OrdinalIgnoreCase) ||
                 user.Email.Contains(query, StringComparison.OrdinalIgnoreCase))
@@ -89,6 +89,7 @@ namespace Frontend_Mobile.Pages
             DetailStatusLabel.Text = user.IsActive ? "Active" : user.Status;
             DeactivateButton.IsVisible = user.IsActive;
             ReactivateButton.IsVisible = !user.IsActive;
+            DeleteButton.IsVisible = user.UserId != _state.CurrentUser?.UserId;
 
             var tasks = await _state.GetAsync<List<TaskCardDto>>($"api/tasks?assigneeId={user.UserId}") ?? [];
 
@@ -121,18 +122,31 @@ namespace Frontend_Mobile.Pages
 
         private async void OnAnonymise(object? sender, EventArgs e) => await RunAdminAction(
             "Anonymise account", $"This permanently removes {_selectedUser?.FullName}'s personal details. This cannot be undone",
-            "anonymise", destructive: true);
+            "anonymise", accept: "Anonymise");
 
-        private async Task RunAdminAction(string title, string message, string endpoint, bool destructive = false)
+        private async void OnDelete(object? sender, EventArgs e) => await RunAdminAction(
+            "Delete user", $"Delete {_selectedUser?.FullName}? Their open tasks are reassigned and their personal details erased. This cannot be undone",
+            null, accept: "Delete");
+
+        // endpoint null = DELETE api/users/{id}; otherwise POST api/users/{id}/{endpoint}.
+        private async Task RunAdminAction(string title, string message, string? endpoint, string accept = "Confirm")
         {
             if (_selectedUser is not { } user) return;
 
-            var confirmed = await DisplayAlertAsync(title, message, destructive ? "Anonymise" : "Confirm", "Cancel");
+            var confirmed = await DisplayAlertAsync(title, message, accept, "Cancel");
 
             if (!confirmed) return;
 
-            if (await _state.SendAsync(HttpMethod.Post, $"api/users/{user.UserId}/{endpoint}"))
+            var ok = endpoint is null
+                ? await _state.SendAsync(HttpMethod.Delete, $"api/users/{user.UserId}")
+                : await _state.SendAsync(HttpMethod.Post, $"api/users/{user.UserId}/{endpoint}");
+            if (ok)
             {
+                if (endpoint is null)
+                {
+                    _selectedUser = null;
+                    DetailPanel.IsVisible = false;
+                }
                 await LoadAsync();
             }
             else

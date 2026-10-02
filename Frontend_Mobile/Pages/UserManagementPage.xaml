@@ -125,11 +125,12 @@
                     <Border Style="{StaticResource Card}">
                         <VerticalStackLayout Spacing="10">
                             <Label Text="Account actions" Style="{StaticResource TitleMedium}" />
-                            <Grid ColumnDefinitions="*,*" ColumnSpacing="8" RowDefinitions="Auto,Auto" RowSpacing="8">
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="8" RowDefinitions="Auto,Auto,Auto" RowSpacing="8">
                                 <Button x:Name="DeactivateButton" Text="Deactivate" Style="{StaticResource OutlineButton}" Clicked="OnDeactivate" />
                                 <Button x:Name="ReactivateButton" Grid.Column="1" Text="Reactivate" Style="{StaticResource OutlineButton}" Clicked="OnReactivate" IsVisible="False" />
                                 <Button Grid.Row="1" Text="Reset Password" Style="{StaticResource OutlineButton}" Clicked="OnResetPassword" />
                                 <Button Grid.Row="1" Grid.Column="1" Text="Anonymise" Style="{StaticResource OutlineButton}" Clicked="OnAnonymise" />
+                                <Button x:Name="DeleteButton" Grid.Row="2" Grid.ColumnSpan="2" Text="Delete User" BackgroundColor="#E0435C" TextColor="White" Clicked="OnDelete" />
                             </Grid>
                         </VerticalStackLayout>
                     </Border>
