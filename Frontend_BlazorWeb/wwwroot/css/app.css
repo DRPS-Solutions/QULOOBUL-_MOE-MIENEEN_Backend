@@ -162,3 +162,10 @@ code {
     background-color: rgba(255, 255, 255, 0.12) !important;
     border: 1px solid rgba(255, 255, 255, 0.5);
 }
+
+/* Date pickers on narrow inputs (Meetings/Reports filters, max-width 160-180px): the popover
+   inherits the input's width and MudBlazor clips its overflow, cutting the 310px calendar off. */
+.mud-popover:has(.mud-picker-content),
+.mud-picker-popover-paper {
+    min-width: max-content;
+}

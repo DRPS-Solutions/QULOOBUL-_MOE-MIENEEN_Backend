@@ -72,6 +72,13 @@ public class UseCaseGapTests
         Assert.Equal(2, await db.MeetingMinutes.CountAsync());           // the original is kept
         await Assert.ThrowsAsync<InvalidOperationException>(() =>        // stale version refused
             svc.EditAsync(v1.MinutesId, new EditMinutesRequest { MinutesText = "y" }, recorder.UserId));
+
+        // Search hits the title too, filters on the meeting's date, and returns only the latest version.
+        var day = meeting.MeetingDate.Date;
+        Assert.Equal([v2.MinutesId], (await svc.SearchAsync("AGM", day, day.AddDays(1), organiser.UserId)).Select(m => m.MinutesId));
+        Assert.Empty(await svc.SearchAsync("AGM", day.AddDays(1), day.AddDays(2), organiser.UserId));
+        Assert.Single(await svc.SearchAsync("agm", null, null, organiser.UserId));     // any case matches
+        Assert.Single(await svc.SearchAsync("CLOSED", null, null, organiser.UserId));
     }
 //----------------------------------------------------------------------------------------------------------------------//
     [Fact]

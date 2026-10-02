@@ -117,11 +117,13 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
         public async Task<List<MeetingMinutesDto>> SearchAsync(string? keyword, DateTime? from, DateTime? to, int userId)
         {
             var meetingIds = VisibleMeetings(userId, await guard.IsAdminAsync(userId)).Select(m => m.MeetingId);
+            keyword = keyword?.Trim().ToLower(); // case-insensitive regardless of the database collation
             return await db.MeetingMinutes
                 .Where(m => meetingIds.Contains(m.MeetingId)
-                         && (keyword == null || m.MinutesText.Contains(keyword))
-                         && (from == null || m.TimeRecorded >= from)
-                         && (to == null || m.TimeRecorded <= to))
+                         && !db.MeetingMinutes.Any(x => x.MeetingId == m.MeetingId && x.MinutesId > m.MinutesId) // latest version only
+                         && (keyword == null || m.MinutesText.ToLower().Contains(keyword) || m.Meeting!.Title.ToLower().Contains(keyword))
+                         && (from == null || m.Meeting!.MeetingDate >= from)
+                         && (to == null || m.Meeting!.MeetingDate < to))
                 .OrderByDescending(m => m.TimeRecorded)
                 .Select(m => new MeetingMinutesDto(
                     m.MinutesId, m.MeetingId, m.RecordedBy, m.TimeRecorded, m.MinutesText, m.IsAiDraft, m.ApprovedBy))
