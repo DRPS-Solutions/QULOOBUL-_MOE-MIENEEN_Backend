@@ -11,6 +11,7 @@ using QULOOBUL__MOE_MIENEEN_Shared.Files;
 using QULOOBUL__MOE_MIENEEN_Shared.Notifications;
 using QULOOBUL__MOE_MIENEEN_Shared.Reports;
 using QULOOBUL__MOE_MIENEEN_Shared.Requests;
+using QULOOBUL__MOE_MIENEEN_Shared.Search;
 using QULOOBUL__MOE_MIENEEN_Shared.Tasks;
 using static QULOOBUL__MOE_MIENEEN_Shared.Classes.Common;
 // MAUI's own Microsoft.Maui.ApplicationModel.Permissions (camera/location prompts) is brought
@@ -30,14 +31,18 @@ namespace Frontend_Mobile.Data;
 /// </summary>
 public sealed class AppState : Observable
 {
-    // The API's https launch profile. Android's emulator reaches the host's localhost at 10.0.2.2.
-    // ponytail: hard-coded dev address; a physical phone or a deployed API needs this read from config.
+    // Debug: the API's https launch profile (Android's emulator reaches the host's localhost at 10.0.2.2).
+    // Release: the production App Service, so a side-loaded APK works on a real phone.
     // Declared before Current: Current's own initializer constructs an AppState instance (whose
     // _http field reads ApiBase), and static fields initialize in declaration order - ApiBase has
     // to exist first, or _http.BaseAddress silently ends up null.
+#if DEBUG
     private static readonly Uri ApiBase = new(DeviceInfo.Platform == DevicePlatform.Android
         ? "https://10.0.2.2:7272/"
         : "https://localhost:7272/");
+#else
+    private static readonly Uri ApiBase = new("https://xbcad-api-prod-e2fef0gxejcbhtd2.southafricanorth-01.azurewebsites.net/");
+#endif
 
     public static AppState Current { get; } = new();
 
@@ -90,6 +95,24 @@ public sealed class AppState : Observable
     /// <summary>Generic permission check, for one-off gates (Calendar's organiser-or-admin rule)
     /// that don't warrant their own named CanSee* property.</summary>
     public bool HasPermission(string permission) => CurrentUser?.Permissions.Contains(permission) == true;
+
+    /// <summary>The Shell route that opens one record, by the entity type name the API uses on
+    /// notifications and search hits; null when this role has no page for it. Only Tasks and
+    /// Calendar take a deep-link id; the rest open their list page.</summary>
+    public string? LinkTo(string? entityType, int? id) => (entityType, id) switch
+    {
+        ("ProjectTask", { } t) when CanSeeTasks => $"//tasks?task={t}",
+        ("ResourceRequest", _) when CanSeeRequests => "//requests",
+        ("Project", _) when CanSeeEvents => "//events",
+        ("Event", { } e) => $"//calendar?event={e}",
+        ("Meeting", _) when CanSeeMeetings => "//meetings",
+        ("File", _) => "//files",
+        ("User", _) when CanSeeUserManagement => "//users",
+        _ => null
+    };
+
+    public Task<List<SearchResultDto>?> SearchAsync(string q) =>
+        GetAsync<List<SearchResultDto>>($"api/search?q={Uri.EscapeDataString(q.Trim())}");
 
     /// <summary>Returns null on success, otherwise the message for the login form.</summary>
     public async Task<string?> LoginAsync(string email, string password)

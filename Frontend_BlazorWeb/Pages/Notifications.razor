@@ -353,15 +353,7 @@
         if (!n.IsRead) await AppData.MarkReadAsync([n.NotificationId]);
 
         // The item itself when the notification names one; otherwise the page for its kind.
-        var destination = (n.EntityType, n.EntityId) switch
-        {
-            ("ProjectTask", { } id) => AppData.CanSeeTasks ? $"tasks?task={id}" : "",
-            ("ResourceRequest", { } id) when AppData.CanSeeRequests => $"requests?id={id}",
-            ("Project", { } id) when AppData.CanSeeEvents => $"events?project={id}",
-            ("Event", { } id) => $"calendar?event={id}",
-            ("User", _) when AppData.CanSeeUserManagement => "users",
-            _ => null
-        } ?? KindOf(n) switch
+        var destination = AppData.LinkTo(n.EntityType, n.EntityId) ?? KindOf(n) switch
         {
             Kind.ResourceRequest when AppData.CanSeeRequests => "requests",
             Kind.EventAssignment when AppData.CanSeeEvents => "events",

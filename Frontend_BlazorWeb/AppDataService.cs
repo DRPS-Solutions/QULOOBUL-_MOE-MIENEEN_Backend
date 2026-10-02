@@ -132,6 +132,20 @@ public class AppDataService(HttpClient http, ISnackbar snackbar, IDialogService 
         _ => true,
     };
 
+    /// <summary>The page that opens one record, by the entity type name the API uses on
+    /// notifications and search hits; null when this role has no page for it.</summary>
+    public string? LinkTo(string? entityType, int? id) => (entityType, id) switch
+    {
+        ("ProjectTask", { } t) when CanSeeTasks => $"tasks?task={t}",
+        ("ResourceRequest", { } r) when CanSeeRequests => $"requests?id={r}",
+        ("Project", { } p) when CanSeeEvents => $"events?project={p}",
+        ("Event", { } e) => $"calendar?event={e}",
+        ("Meeting", _) when CanSeeMeetings => "meetings",
+        ("File", _) => "files",
+        ("User", _) when CanSeeUserManagement => "users",
+        _ => null
+    };
+
     // ------------------------------------------------------------------
     // Shared lists and lookups
     // ------------------------------------------------------------------

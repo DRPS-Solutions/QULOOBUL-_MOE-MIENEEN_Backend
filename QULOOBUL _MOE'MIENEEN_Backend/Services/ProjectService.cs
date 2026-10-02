@@ -10,18 +10,16 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
         AppDbContext db, AuditService audit, NotificationService notify, AccessGuard guard, TaskAssignmentService tasks)
     {
         /// <summary>Only the projects the caller belongs to (ProjectMember: "sees only that project").</summary>
-        public async Task<List<ProjectSummaryDto>> ListAsync(int userId)
-        {
-            var q = db.Projects.AsQueryable();
-            if (!await guard.IsAdminAsync(userId))
-                q = q.Where(p => p.OwnerId == userId || p.ProjectName == DailyTasksProject
-                              || db.ProjectMembers.Any(m => m.ProjectId == p.ProjectId && m.UserId == userId));
-
-            return await q.OrderBy(p => p.ProjectName).Select(p => new ProjectSummaryDto(
+        public async Task<List<ProjectSummaryDto>> ListAsync(int userId) =>
+            await (await VisibleAsync(userId)).OrderBy(p => p.ProjectName).Select(p => new ProjectSummaryDto(
                 p.ProjectId, p.ProjectName, p.Status,
                 db.ProjectMembers.Count(m => m.ProjectId == p.ProjectId),
                 db.Tasks.Count(t => t.ProjectId == p.ProjectId && !Lifecycle.TaskFinished.Contains(t.Status)))).ToListAsync();
-        }
+//----------------------------------------------------------------------------------------------------------------------//
+        public async Task<IQueryable<Project>> VisibleAsync(int userId) =>
+            await guard.IsAdminAsync(userId) ? db.Projects : db.Projects.Where(p =>
+                p.OwnerId == userId || p.ProjectName == DailyTasksProject
+                || db.ProjectMembers.Any(m => m.ProjectId == p.ProjectId && m.UserId == userId));
 //----------------------------------------------------------------------------------------------------------------------//
         public async Task<ProjectDto> GetAsync(int id, int userId)
         {

@@ -35,6 +35,9 @@ public partial class AppShell : Shell
     private async void OnOpenNotifications(object? sender, EventArgs e) =>
         await GoToAsync("//notifications");
 
+    private async void OnOpenSearch(object? sender, EventArgs e) =>
+        await GoToAsync("//search");
+
     private void OnToggleTheme(object? sender, EventArgs e)
     {
         App.ToggleTheme();

@@ -128,7 +128,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
                 .ToListAsync();
         }
 //----------------------------------------------------------------------------------------------------------------------//
-        private IQueryable<Meeting> VisibleMeetings(int userId, bool isAdmin) =>
+        public IQueryable<Meeting> VisibleMeetings(int userId, bool isAdmin) =>
             isAdmin ? db.Meetings : db.Meetings.Where(m => m.OrganiserId == userId
                 || db.MeetingAttendees.Any(a => a.MeetingId == m.MeetingId && a.UserId == userId));
 //----------------------------------------------------------------------------------------------------------------------//
