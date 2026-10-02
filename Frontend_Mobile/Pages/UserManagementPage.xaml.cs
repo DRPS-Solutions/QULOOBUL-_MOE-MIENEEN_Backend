@@ -89,7 +89,11 @@ namespace Frontend_Mobile.Pages
             DetailStatusLabel.Text = user.IsActive ? "Active" : user.Status;
             DeactivateButton.IsVisible = user.IsActive;
             ReactivateButton.IsVisible = !user.IsActive;
-            DeleteButton.IsVisible = user.UserId != _state.CurrentUser?.UserId;
+            var self = user.UserId == _state.CurrentUser?.UserId;
+            DeleteButton.IsVisible = !self;
+            // Shares a cell with Reactivate: a role only changes on an active account, and never your own.
+            ChangeRoleButton.IsVisible = user.IsActive && !self;
+            ResetPasswordButton.IsVisible = user.Status != "Inactive";
 
             var tasks = await _state.GetAsync<List<TaskCardDto>>($"api/tasks?assigneeId={user.UserId}") ?? [];
 
@@ -117,20 +121,35 @@ namespace Frontend_Mobile.Pages
         private async void OnReactivate(object? sender, EventArgs e) => await RunAdminAction(
             "Reactivate account", $"Reactivate {_selectedUser?.FullName}?", "reactivate");
 
+        // Facility managers and up bring role and password requests to the admin directly.
+        private async void OnChangeRole(object? sender, EventArgs e)
+        {
+            if (_selectedUser is not { } user) return;
+            var roles = await _state.GetAsync<List<RoleDto>>("api/roles") ?? [];
+            var choice = await DisplayActionSheetAsync($"New role for {user.FullName}", "Cancel", null,
+                roles.Where(r => r.RoleName != user.Role).Select(r => r.RoleName).ToArray());
+            if (roles.FirstOrDefault(r => r.RoleName == choice) is not { } role) return;
+            if (!await DisplayAlertAsync("Change role",
+                    $"Make {user.FullName} {role.RoleName}? This changes which pages they see and what they may do. It applies at their next sign-in.",
+                    "Change role", "Cancel")) return;
+
+            if (await _state.SendAsync<UserDto>(HttpMethod.Patch, $"api/users/{user.UserId}",
+                    new UpdateUserRequest { RoleId = role.RoleId }) is not null)
+                await LoadAsync();
+        }
+
         private async void OnResetPassword(object? sender, EventArgs e)
         {
             if (_selectedUser is not { } user) return;
-            if (!await DisplayAlertAsync("Reset Password", $"Give {user.FullName} a temporary password?", "Reset", "Cancel")) return;
+            if (!await DisplayAlertAsync("Reset Password",
+                    $"Give {user.FullName} a temporary password? Their current password stops working, and a locked account is unlocked.",
+                    "Reset", "Cancel")) return;
 
             var result = await _state.SendAsync<QULOOBUL__MOE_MIENEEN_Shared.Auth.TemporaryPasswordDto>(
                 HttpMethod.Post, $"api/users/{user.UserId}/reset-password", null!);
-            if (result is null)
-            {
-                await DisplayAlertAsync("Could not complete that", "The server did not accept that action. Please try again", "OK");
-                return;
-            }
+            if (result is null) return; // AppState already showed the error
             await DisplayAlertAsync("Temporary password",
-                $"{result.TemporaryPassword}\n\nGive it to {user.FullName} directly. They must choose a new password on the website when they next sign in.", "Done");
+                $"{result.TemporaryPassword}\n\nGive it to {user.FullName} directly. They must choose a new password when they next sign in.", "Done");
             await LoadAsync();
         }
 

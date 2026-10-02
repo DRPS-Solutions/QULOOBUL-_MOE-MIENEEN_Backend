@@ -21,7 +21,7 @@ public partial class LoginPage : ContentPage
     protected override async void OnAppearing()
     {
         base.OnAppearing();
-        if (AppState.Current.IsLoggedIn) return;
+        if (AppState.Current.IsLoggedIn || AppState.Current.MustChangePassword) return;
         EmailEntry.Text = string.Empty;
         PasswordEntry.Text = string.Empty;
         ErrorLabel.IsVisible = false;
@@ -54,7 +54,52 @@ public partial class LoginPage : ContentPage
 
         ErrorLabel.Text = error;
         ErrorLabel.IsVisible = error is not null;
-        if (error is null) await AppShell.EnterAppAsync();
+        if (error is not null) return;
+        if (AppState.Current.MustChangePassword) ShowChangeForm(true);
+        else await AppShell.EnterAppAsync();
+    }
+
+    // The password just typed is the temporary one, so it doubles as the "current password".
+    private void ShowChangeForm(bool show)
+    {
+        SignInSection.IsVisible = !show;
+        ChangeSection.IsVisible = show;
+        NewPasswordEntry.Text = ConfirmPasswordEntry.Text = string.Empty;
+        ChangeErrorLabel.IsVisible = false;
+        if (!show) PasswordEntry.Text = string.Empty;
+    }
+
+    private void OnChangeFormChanged(object? sender, TextChangedEventArgs e)
+    {
+        // Same policy as AuthService.EnsurePolicy, so the message shows before submitting.
+        var p = NewPasswordEntry.Text ?? "";
+        var error = p.Length == 0 ? null
+            : p.Length < 8 || !p.Any(char.IsLetter) || !p.Any(char.IsDigit) ? "At least 8 characters, with a letter and a digit."
+            : !string.IsNullOrEmpty(ConfirmPasswordEntry.Text) && ConfirmPasswordEntry.Text != p ? "Passwords do not match."
+            : null;
+        ChangeErrorLabel.Text = error;
+        ChangeErrorLabel.IsVisible = error is not null;
+        ChangeButton.IsEnabled = !_busy && error is null && p.Length > 0 && ConfirmPasswordEntry.Text == p;
+    }
+
+    private async void OnChangePassword(object? sender, EventArgs e)
+    {
+        if (!ChangeButton.IsEnabled) return;
+        _busy = true;
+        ChangeButton.IsEnabled = false;
+        ChangeButton.Text = "Saving...";
+        var ok = await AppState.Current.ChangePasswordAsync(PasswordEntry.Text!, NewPasswordEntry.Text!);
+        _busy = false;
+        ChangeButton.Text = "Change Password";
+        if (!ok) { OnChangeFormChanged(null, null!); return; } // AppState already showed the error
+        ShowChangeForm(false);
+        await AppShell.EnterAppAsync();
+    }
+
+    private async void OnCancelChange(object? sender, EventArgs e)
+    {
+        await AppState.Current.LogoutAsync();
+        ShowChangeForm(false);
     }
 
     private void OnToggleTheme(object? sender, EventArgs e)

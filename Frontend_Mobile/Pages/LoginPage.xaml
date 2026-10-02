@@ -41,6 +41,26 @@
                            HorizontalTextAlignment="Center"
                            Margin="0,12,0,0" />
 
+                    <!-- Shown instead of the sign-in form after signing in with an admin's temporary password. -->
+                    <VerticalStackLayout x:Name="ChangeSection" IsVisible="False">
+                        <Label Text="You signed in with a temporary password. Choose your own to continue: at least 8 characters, with a letter and a digit."
+                               Style="{StaticResource Muted}"
+                               FontSize="14"
+                               HorizontalTextAlignment="Center"
+                               Margin="0,4,0,20" />
+                        <Border Style="{StaticResource FieldBox}">
+                            <Entry x:Name="NewPasswordEntry" Placeholder="New Password" IsPassword="True" TextChanged="OnChangeFormChanged" />
+                        </Border>
+                        <Border Style="{StaticResource FieldBox}" Margin="0,12,0,0">
+                            <Entry x:Name="ConfirmPasswordEntry" Placeholder="Confirm Password" IsPassword="True"
+                                   TextChanged="OnChangeFormChanged" Completed="OnChangePassword" />
+                        </Border>
+                        <Label x:Name="ChangeErrorLabel" IsVisible="False" TextColor="{StaticResource StatusDenied}" Margin="0,8,0,0" />
+                        <Button x:Name="ChangeButton" Text="Change Password" IsEnabled="False" Clicked="OnChangePassword" Margin="0,20,0,0" />
+                        <Button Text="Cancel" Style="{StaticResource OutlineButton}" Clicked="OnCancelChange" Margin="0,8,0,0" />
+                    </VerticalStackLayout>
+
+                    <VerticalStackLayout x:Name="SignInSection">
                     <Label Text="Sign in to continue"
                            Style="{StaticResource Muted}"
                            FontSize="14"
@@ -72,6 +92,12 @@
                             IsEnabled="False"
                             Clicked="OnLogin"
                             Margin="0,20,0,0" />
+
+                    <Label Text="Forgot your password or locked out? Ask your facility manager to contact the system admin for a temporary password."
+                           Style="{StaticResource Muted}"
+                           HorizontalTextAlignment="Center"
+                           Margin="0,12,0,0" />
+                    </VerticalStackLayout>
 
                 </VerticalStackLayout>
             </Border>
