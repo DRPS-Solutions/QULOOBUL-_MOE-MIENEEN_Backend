@@ -84,8 +84,13 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             {
                 var id = int.Parse(c.Principal!.FindFirstValue(ClaimTypes.NameIdentifier)!);
                 var db = c.HttpContext.RequestServices.GetRequiredService<AppDbContext>();
-                if (!await db.Users.AnyAsync(u => u.UserId == id && u.IsActive))
+                var user = await db.Users.Where(u => u.UserId == id && u.IsActive)
+                    .Select(u => new { u.MustChangePassword }).FirstOrDefaultAsync();
+                if (user is null)
                     c.Fail("This account is no longer active.");
+                // A temporary password unlocks only the change-password route.
+                else if (user.MustChangePassword && c.Request.Path != "/api/users/me/password")
+                    c.Fail("Change your temporary password first.");
             },
         };
     });

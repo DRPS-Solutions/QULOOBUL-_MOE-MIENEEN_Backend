@@ -43,7 +43,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
                 throw new UnauthorizedAccessException(user.Status switch
                 {
                     Lifecycle.UserPending => "This account has not been activated. Use the link in your activation email.",
-                    Lifecycle.UserLocked => "This account is locked after too many failed sign-ins. Ask an admin to reset your password.",
+                    Lifecycle.UserLocked => "This account is locked after too many failed sign-ins. Ask your facility manager to contact the system admin for a temporary password.",
                     _ => "This account is deactivated.",
                 });
             }
@@ -71,15 +71,14 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             user.FailedLoginCount = 0; // "consecutive": a success resets the count
             await audit.RecordAndSaveAsync(user.UserId, "auth.login", nameof(User), user.UserId);
             return new AuthResponse(token, expires, user.UserId,
-                $"{user.FirstName} {user.Surname}", roleName, permissions);
+                $"{user.FirstName} {user.Surname}", roleName, permissions, user.MustChangePassword);
         }
 //----------------------------------------------------------------------------------------------------------------------//
         /// <summary>SM-03 setPassword [password meets policy]: redeem an emailed one-time token.
         /// Activates a pending account; for an active one it completes an admin reset.</summary>
         public async Task SetPasswordAsync(SetPasswordRequest req)
         {
-            if (!req.Password.Any(char.IsLetter) || !req.Password.Any(char.IsDigit))
-                throw new ArgumentException("Password must be at least 8 characters with a letter and a digit.");
+            EnsurePolicy(req.Password);
 
             var hash = HashToken(req.Token);
             var user = await db.Users.FirstOrDefaultAsync(u => u.PasswordTokenHash == hash)
@@ -95,7 +94,36 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             user.PasswordTokenHash = null;
             user.PasswordTokenExpires = null;
             user.FailedLoginCount = 0;
+            user.MustChangePassword = false;
             await audit.RecordAndSaveAsync(user.UserId, "user.password.set", nameof(User), user.UserId);
+        }
+//----------------------------------------------------------------------------------------------------------------------//
+        /// <summary>A signed-in user swaps their current (possibly temporary) password for one of their own.</summary>
+        public async Task ChangePasswordAsync(int userId, ChangePasswordRequest req)
+        {
+            EnsurePolicy(req.NewPassword);
+            var user = await db.Users.FindAsync(userId) ?? throw new KeyNotFoundException($"User {userId} not found.");
+            if (Hasher.VerifyHashedPassword(user, user.PasswordHash, req.CurrentPassword) == PasswordVerificationResult.Failed)
+                throw new InvalidOperationException("Your current password is incorrect.");
+            if (req.NewPassword == req.CurrentPassword)
+                throw new InvalidOperationException("Choose a password different from your current one.");
+
+            user.PasswordHash = Hash(user, req.NewPassword);
+            user.MustChangePassword = false;
+            user.PasswordTokenHash = null;
+            user.PasswordTokenExpires = null;
+            await audit.RecordAndSaveAsync(userId, "user.password.set", nameof(User), userId);
+        }
+//----------------------------------------------------------------------------------------------------------------------//
+        /// <summary>A one-off password an admin can read out: 6 letters + 4 digits so it meets the policy,
+        /// with no look-alike characters (l/1, o/0).</summary>
+        public static string NewTemporaryPassword() =>
+            RandomNumberGenerator.GetString("abcdefghjkmnpqrstuvwxyz", 6) + RandomNumberGenerator.GetString("23456789", 4);
+
+        private static void EnsurePolicy(string password)
+        {
+            if (password.Length < 8 || !password.Any(char.IsLetter) || !password.Any(char.IsDigit))
+                throw new ArgumentException("Password must be at least 8 characters with a letter and a digit.");
         }
 //----------------------------------------------------------------------------------------------------------------------//
         /// <summary>Put a fresh one-time set-password token on <paramref name="user"/> (caller saves) and

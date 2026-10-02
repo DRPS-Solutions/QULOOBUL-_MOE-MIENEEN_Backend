@@ -65,6 +65,8 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
                 throw new UnauthorizedAccessException("You can only edit your own profile.");
             if (req.RoleId is not null && !isAdmin)
                 throw new UnauthorizedAccessException("Only an admin can change a role.");
+            if (req.RoleId is not null && userId == actorId)
+                throw new InvalidOperationException("You cannot change your own role."); // the last admin could demote themselves
 
             var user = await Load(userId);
             if (user.Status != Lifecycle.UserActive)
@@ -80,10 +82,12 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
                     throw new InvalidOperationException("An account with that email already exists.");
                 user.Email = e;
             }
-            if (req.RoleId is { } r)
-                user.RoleId = (await db.Roles.FindAsync(r) ?? throw new InvalidOperationException($"Unknown role {r}.")).RoleId;
+            var roleChanged = req.RoleId is { } r && r != user.RoleId;
+            if (roleChanged)
+                user.RoleId = (await db.Roles.FindAsync(req.RoleId!.Value)
+                    ?? throw new InvalidOperationException($"Unknown role {req.RoleId}.")).RoleId;
 
-            audit.Record(actorId, "user.update", nameof(User), userId);
+            audit.Record(actorId, roleChanged ? "user.role" : "user.update", nameof(User), userId);
             await db.SaveChangesAsync();
             return ToDto(user, await db.Roles.Where(x => x.RoleId == user.RoleId).Select(x => x.RoleName).FirstAsync());
         }
@@ -139,23 +143,23 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
         }
 //----------------------------------------------------------------------------------------------------------------------//
         /// <summary>
-        /// SM-03 resetPassword(admin) [MANAGE_USERS] / clear failure count, write AuditLog. Unlocks a
-        /// Locked account (or resets an Active one): the old password stops working and the user picks
-        /// a new one from the emailed link. On a Pending account it re-sends the activation email.
+        /// SM-03 resetPassword(admin) [MANAGE_USERS] / clear failure count, write AuditLog. Sets a temporary
+        /// password and returns it once for the admin to pass on: facility managers and up bring these
+        /// requests to the chair directly, so nothing is emailed. Unlocks a Locked account and activates a
+        /// Pending one; the user must choose their own password at their next sign-in.
         /// </summary>
-        public async Task ResetPasswordAsync(int userId, int actorId)
+        public async Task<string> ResetPasswordAsync(int userId, int actorId)
         {
             var user = await Load(userId);
-            var activation = user.Status == Lifecycle.UserPending;
-            if (!activation)
-            {
-                Lifecycle.MoveUser(user, Lifecycle.UserActive);
-                user.PasswordHash = string.Empty;
-            }
+            Lifecycle.MoveUser(user, Lifecycle.UserActive); // Pending/Locked → Active; Inactive is refused
+            var temp = AuthService.NewTemporaryPassword();
+            user.PasswordHash = auth.Hash(user, temp);
+            user.MustChangePassword = true;
             user.FailedLoginCount = 0;
-            var token = AuthService.NewPasswordToken(user);
+            user.PasswordTokenHash = null; // an outstanding emailed link stops working
+            user.PasswordTokenExpires = null;
             await audit.RecordAndSaveAsync(actorId, "user.password.reset", nameof(User), userId);
-            await auth.SendPasswordLinkAsync(user, token, activation);
+            return temp;
         }
 //----------------------------------------------------------------------------------------------------------------------//
         /// <summary>A signed-in user asks to change their own password: email them a set-password link.

@@ -1,6 +1,7 @@
 @page "/users"
 @using MudBlazor
 @using System.ComponentModel.DataAnnotations
+@using QULOOBUL__MOE_MIENEEN_Shared.Auth
 @implements IDisposable
 @inject AppDataService AppData
 @inject IDialogService DialogService
@@ -369,12 +370,33 @@
                                     }
                                 </div>
                             </div>
+                            @* Facility managers and up bring role and password requests to the admin directly. *@
                             @if (selectedEmployee.UserId != AppData.CurrentUser?.UserId)
                             {
-                                <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Filled.Delete"
-                                           Style="margin-left:auto;" Disabled="@deleting" OnClick="DeleteSelected">
-                                    Delete User
-                                </MudButton>
+                                <div class="d-flex align-center gap-2 flex-wrap" style="margin-left:auto;">
+                                    @if (selectedEmployee.IsActive)
+                                    {
+                                        <MudSelect T="int?" Label="Role" Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true"
+                                                   Value="@RoleIdOf(selectedEmployee)" ValueChanged="ChangeRole" Disabled="@busy"
+                                                   ToStringFunc="@(id => roles.FirstOrDefault(r => r.RoleId == id)?.RoleName)" Style="min-width:170px;">
+                                            @foreach (var role in roles)
+                                            {
+                                                <MudSelectItem T="int?" Value="@role.RoleId">@role.RoleName</MudSelectItem>
+                                            }
+                                        </MudSelect>
+                                    }
+                                    @if (selectedEmployee.Status != "Inactive")
+                                    {
+                                        <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.LockReset"
+                                                   Disabled="@busy" OnClick="ResetPassword">
+                                            Reset Password
+                                        </MudButton>
+                                    }
+                                    <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Filled.Delete"
+                                               Disabled="@busy" OnClick="DeleteSelected">
+                                        Delete User
+                                    </MudButton>
+                                </div>
                             }
                         </div>
 
@@ -525,6 +547,7 @@
         ["auth.login.failed"] = "Failed sign-in attempt",
         ["user.create"] = "Created a user account",
         ["user.update"] = "Updated a profile",
+        ["user.role"] = "Changed a user's role",
         ["user.deactivate"] = "Deactivated a user",
         ["user.reactivate"] = "Reactivated a user",
         ["user.delete"] = "Deleted a user",
@@ -690,7 +713,45 @@
         if (AppData.Users.FirstOrDefault(u => u.UserId == created.UserId) is { } user) await SelectEmployee(user);
     }
 
-    private bool deleting;
+    private bool busy;
+
+    // The directory carries the role name only; the role list maps it back to an id.
+    private int? RoleIdOf(UserSummaryDto user) => roles.FirstOrDefault(r => r.RoleName == user.Role)?.RoleId;
+
+    private async Task ChangeRole(int? roleId)
+    {
+        if (selectedEmployee is not { } user || roleId is null || roleId == RoleIdOf(user)) return;
+        var roleName = roles.First(r => r.RoleId == roleId).RoleName;
+        if (await DialogService.ShowMessageBoxAsync("Change role",
+                $"Make {user.FullName} {roleName}? This changes which pages they see and what they may do. It applies at their next sign-in.",
+                yesText: "Change role", cancelText: "Cancel") != true) return;
+        busy = true;
+        var saved = await AppData.SendAsync<UserDto>(HttpMethod.Patch, $"api/users/{user.UserId}", new UpdateUserRequest { RoleId = roleId });
+        busy = false;
+        if (saved is null) return;
+
+        await Task.WhenAll(AppData.RefreshUsersAsync(), LoadOverview());
+        if (AppData.Users.FirstOrDefault(u => u.UserId == user.UserId) is { } updated) await SelectEmployee(updated);
+    }
+
+    private async Task ResetPassword()
+    {
+        if (selectedEmployee is not { } user) return;
+        if (await DialogService.ShowMessageBoxAsync("Reset password",
+                $"Give {user.FullName} a temporary password? Their current password stops working, and a locked account is unlocked.",
+                yesText: "Reset", cancelText: "Cancel") != true) return;
+        busy = true;
+        var result = await AppData.SendAsync<TemporaryPasswordDto>(HttpMethod.Post, $"api/users/{user.UserId}/reset-password", null);
+        busy = false;
+        if (result is null) return;
+
+        // Shown once and never stored in the clear: the admin passes it on in person or by phone.
+        await DialogService.ShowMessageBoxAsync("Temporary password",
+            $"Temporary password for {user.FullName}: {result.TemporaryPassword} — Give it to them directly. They must choose a new password when they next sign in.",
+            yesText: "Done");
+        await Task.WhenAll(AppData.RefreshUsersAsync(), LoadOverview());
+        if (AppData.Users.FirstOrDefault(u => u.UserId == user.UserId) is { } updated) await SelectEmployee(updated);
+    }
 
     private async Task DeleteSelected()
     {
@@ -698,9 +759,9 @@
         if (await DialogService.ShowMessageBoxAsync("Delete user",
                 $"Delete {user.FullName}? Their open tasks are reassigned and their personal details erased. This cannot be undone.",
                 yesText: "Delete", cancelText: "Cancel") != true) return;
-        deleting = true;
+        busy = true;
         var ok = await AppData.SendAsync(HttpMethod.Delete, $"api/users/{user.UserId}");
-        deleting = false;
+        busy = false;
         if (!ok) return;
 
         await Task.WhenAll(AppData.RefreshUsersAsync(), LoadOverview());

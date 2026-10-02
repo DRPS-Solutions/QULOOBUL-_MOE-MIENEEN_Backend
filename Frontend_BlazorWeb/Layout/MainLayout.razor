@@ -9,7 +9,7 @@
 <MudDialogProvider />
 <MudSnackbarProvider />
 
-@if (AppData.CurrentUser is null)
+@if (AppData.CurrentUser is null or { MustChangePassword: true })
 {
     <div class="page @(isDarkMode ? "dark-mode" : "")">
         <div class="drps-login-wrap">
@@ -24,7 +24,11 @@
                 <img src="images/logos/QULOOBUL MOE'MIENEEN Logo.png" alt="Company Logo" class="drps-login-logo" />
                 <MudText Typo="Typo.h5" Class="drps-login-title">QULOOBUL MOE'MIENEEN</MudText>
                 @* The emailed activation / change-password link is opened signed out, so that one page renders here. *@
-                @if (OnSetPasswordPage)
+                @if (AppData.CurrentUser is not null)
+                {
+                    <ChangePasswordForm />
+                }
+                else if (OnSetPasswordPage)
                 {
                     @Body
                 }
@@ -65,6 +69,9 @@
                            OnClick="Login">
                     @(loggingIn ? "Signing in..." : "Log In")
                 </MudButton>
+                <MudText Typo="Typo.caption" Class="drps-login-hint mt-3">
+                    Forgot your password or locked out? Ask your facility manager to contact the system admin for a temporary password.
+                </MudText>
                 }
             </div>
         </div>

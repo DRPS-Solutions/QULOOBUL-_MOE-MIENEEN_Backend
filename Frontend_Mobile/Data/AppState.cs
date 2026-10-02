@@ -130,6 +130,8 @@ public sealed class AppState : Observable
         if (!res.IsSuccessStatusCode) return await ErrorMessage(res);
 
         var auth = (await res.Content.ReadFromJsonAsync<AuthResponse>())!;
+        // The API refuses a temporary password everywhere but its change route, which only the website offers.
+        if (auth.MustChangePassword) return "You have a temporary password. Sign in on the website to choose your own first.";
         await StartSessionAsync(auth);
 
         // The token lives in the platform keystore (Android Keystore / iOS Keychain), never a plain file.

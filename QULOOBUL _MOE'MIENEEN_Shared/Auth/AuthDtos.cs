@@ -23,7 +23,8 @@ namespace QULOOBUL__MOE_MIENEEN_Shared.Auth
         int UserId,
         string FullName,
         string Role,
-        IReadOnlyList<string> Permissions);
+        IReadOnlyList<string> Permissions,
+        bool MustChangePassword = false);
 //----------------------------------------------------------------------------------------------------------------------//
     public record PasswordResetRequest
     {
@@ -39,6 +40,18 @@ namespace QULOOBUL__MOE_MIENEEN_Shared.Auth
         [Required, MinLength(8), MaxLength(128)]
         public string Password { get; init; } = string.Empty;
     }
+//----------------------------------------------------------------------------------------------------------------------//
+    /// <summary>A signed-in user replaces their password (required after an admin's temporary one).</summary>
+    public record ChangePasswordRequest
+    {
+        [Required, MaxLength(128)]
+        public string CurrentPassword { get; init; } = string.Empty;
+        [Required, MinLength(8), MaxLength(128)]
+        public string NewPassword { get; init; } = string.Empty;
+    }
+//----------------------------------------------------------------------------------------------------------------------//
+    /// <summary>Shown once to the admin, who passes it on to the user in person or by phone.</summary>
+    public record TemporaryPasswordDto(string TemporaryPassword);
 
 }
 //---------------------------DDDDDDDDDDDoooooooooooooo END OF FILE DDDDDDDDDDDoooooooooooooo---------------------------//

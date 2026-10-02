@@ -1,12 +1,14 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using QULOOBUL__MOE_MIENEEN_Backend.Services;
+using QULOOBUL__MOE_MIENEEN_Shared.Auth;
 using QULOOBUL__MOE_MIENEEN_Shared.Directory;
 using static QULOOBUL__MOE_MIENEEN_Shared.Classes.Common;
 
 namespace QULOOBUL__MOE_MIENEEN_Backend.Controllers
 {
-    public class UsersController(StaffOverviewService staff, UserService users, AuditService audit) : ApiControllerBase
+    public class UsersController(StaffOverviewService staff, UserService users, AuditService audit, AuthService auth) : ApiControllerBase
     {
         /// <summary>Staff directory: every signed-in user needs it for names and assignee pickers.</summary>
         [HttpGet]
@@ -41,6 +43,15 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Controllers
             return NoContent();
         }
 //----------------------------------------------------------------------------------------------------------------------//
+        /// <summary>Replace the current password, e.g. an admin's temporary one. The one route a temporary
+        /// password unlocks (Program.cs); rate-limited like login since it checks a password.</summary>
+        [HttpPost("me/password"), EnableRateLimiting(AuthController.RateLimitPolicy)]
+        public async Task<IActionResult> ChangePassword(ChangePasswordRequest req)
+        {
+            await auth.ChangePasswordAsync(UserId(), req);
+            return NoContent();
+        }
+//----------------------------------------------------------------------------------------------------------------------//
         /// <summary>SM-03 updateProfile: self, or an admin (who alone may change the role).</summary>
         [HttpPatch("{id:int}")]
         public async Task<ActionResult<UserDto>> Update(int id, UpdateUserRequest req) =>
@@ -60,12 +71,10 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Controllers
             return NoContent();
         }
 //----------------------------------------------------------------------------------------------------------------------//
+        /// <summary>Returns a temporary password for the admin to hand over; the user must change it at sign-in.</summary>
         [HttpPost("{id:int}/reset-password"), Authorize(Policy = Permissions.ManageUsers)]
-        public async Task<IActionResult> ResetPassword(int id)
-        {
-            await users.ResetPasswordAsync(id, UserId());
-            return NoContent();
-        }
+        public async Task<ActionResult<TemporaryPasswordDto>> ResetPassword(int id) =>
+            Ok(new TemporaryPasswordDto(await users.ResetPasswordAsync(id, UserId())));
 //----------------------------------------------------------------------------------------------------------------------//
         [HttpPost("{id:int}/anonymise"), Authorize(Policy = Permissions.ManageUsers)]
         public async Task<IActionResult> Anonymise(int id)

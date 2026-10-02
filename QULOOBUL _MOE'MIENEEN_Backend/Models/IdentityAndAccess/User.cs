@@ -25,6 +25,8 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Models.IdentityAndAccess
         public DateTime? PasswordTokenExpires { get; set; }
         /// <summary>Start of the POPIA retention clock that gates anonymise().</summary>
         public DateTime? DeactivatedAt { get; set; }
+        /// <summary>Set when an admin issues a temporary password; the user must replace it before using the app.</summary>
+        public bool MustChangePassword { get; set; }
 
         public Role? Role { get; set; }
     }

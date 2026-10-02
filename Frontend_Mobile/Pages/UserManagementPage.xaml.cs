@@ -117,8 +117,22 @@ namespace Frontend_Mobile.Pages
         private async void OnReactivate(object? sender, EventArgs e) => await RunAdminAction(
             "Reactivate account", $"Reactivate {_selectedUser?.FullName}?", "reactivate");
 
-        private async void OnResetPassword(object? sender, EventArgs e) => await RunAdminAction(
-            "Reset Password", $"Send {_selectedUser?.FullName} a password reset?", "reset-password");
+        private async void OnResetPassword(object? sender, EventArgs e)
+        {
+            if (_selectedUser is not { } user) return;
+            if (!await DisplayAlertAsync("Reset Password", $"Give {user.FullName} a temporary password?", "Reset", "Cancel")) return;
+
+            var result = await _state.SendAsync<QULOOBUL__MOE_MIENEEN_Shared.Auth.TemporaryPasswordDto>(
+                HttpMethod.Post, $"api/users/{user.UserId}/reset-password", null!);
+            if (result is null)
+            {
+                await DisplayAlertAsync("Could not complete that", "The server did not accept that action. Please try again", "OK");
+                return;
+            }
+            await DisplayAlertAsync("Temporary password",
+                $"{result.TemporaryPassword}\n\nGive it to {user.FullName} directly. They must choose a new password on the website when they next sign in.", "Done");
+            await LoadAsync();
+        }
 
         private async void OnAnonymise(object? sender, EventArgs e) => await RunAdminAction(
             "Anonymise account", $"This permanently removes {_selectedUser?.FullName}'s personal details. This cannot be undone",
