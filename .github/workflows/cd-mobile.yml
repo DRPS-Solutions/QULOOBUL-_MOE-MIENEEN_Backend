@@ -3,6 +3,7 @@ name: CD Mobile
 # Separate deployable: a failing mobile build does not block an API or web release.
 # Path-filtered: runs only when the MAUI app or the shared library it references changes.
 on:
+  workflow_dispatch:
   push:
     branches: [main, master, develop, dev]
     paths:
@@ -59,9 +60,9 @@ jobs:
 
       # Side-loaded for the client demo and for marking. Play Store
       # distribution is Phase 2 and is deliberately not automated.
-      # Release branches only: an APK per dev push fills the artifact quota.
-      - if: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' }}
-        uses: actions/upload-artifact@v4
+      # Every run uploads: pushes to dev/release branches and manual runs. Feature-branch
+      # pushes never trigger this workflow, and the 14-day retention bounds the quota.
+      - uses: actions/upload-artifact@v4
         with:
           name: npo-android-apk
           path: ./apk/*.apk
