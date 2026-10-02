@@ -38,5 +38,13 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Controllers
             catch (UnauthorizedAccessException ex) { return StatusCode(StatusCodes.Status403Forbidden, new ErrorResponse(ex.Message)); }
             return NoContent();
         }
+
+        /// <summary>"Forgot password?": notifies the admins, who issue a temporary password.</summary>
+        [HttpPost("forgot-password"), AllowAnonymous]
+        public async Task<IActionResult> ForgotPassword(ForgotPasswordRequest req)
+        {
+            await auth.ForgotPasswordAsync(req);
+            return NoContent();
+        }
     }
 }

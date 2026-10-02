@@ -17,6 +17,7 @@ using QULOOBUL__MOE_MIENEEN_Backend.Models.Task;
 using QULOOBUL__MOE_MIENEEN_Shared.Auth;
 using QULOOBUL__MOE_MIENEEN_Shared.Collaboration;
 using QULOOBUL__MOE_MIENEEN_Shared.Directory;
+using QULOOBUL__MOE_MIENEEN_Shared.Notifications;
 using QULOOBUL__MOE_MIENEEN_Shared.Tasks;
 using static QULOOBUL__MOE_MIENEEN_Shared.Classes.Common;
 
@@ -287,6 +288,54 @@ public class ApiIntegrationTests(ApiFactory api) : IClassFixture<ApiFactory>
             .EnsureSuccessStatusCode();
 
         Assert.Equal(staffMe.UserId, (await admin.GetFromJsonAsync<TaskDetailDto>($"/api/tasks/{card.TaskId}"))!.CompletedBy);
+    }
+
+//----------------------------------------------------------------------------------------------------------------------//
+    [Fact]
+    public async Task An_admin_changes_a_role_and_issues_a_temporary_password_the_user_must_replace()
+    {
+        var (admin, adminMe) = await api.SignInAsync(ApiFactory.AdminEmail);
+        var userId = await AddStaffAsync();
+        var roles = (await admin.GetFromJsonAsync<List<RoleDto>>("/api/roles"))!;
+        var fm = roles.First(r => r.RoleName == Roles.FacilityManager).RoleId;
+
+        var promoted = await admin.PatchAsJsonAsync($"/api/users/{userId}", new UpdateUserRequest { RoleId = fm });
+        Assert.Equal(Roles.FacilityManager, (await promoted.Content.ReadFromJsonAsync<UserDto>())!.Role);
+        Assert.Equal(HttpStatusCode.BadRequest, (await admin.PatchAsJsonAsync($"/api/users/{adminMe.UserId}",
+            new UpdateUserRequest { RoleId = fm })).StatusCode); // never demote yourself
+
+        var temp = (await (await admin.PostAsync($"/api/users/{userId}/reset-password", null))
+            .Content.ReadFromJsonAsync<TemporaryPasswordDto>())!.TemporaryPassword;
+        string email;
+        using (var scope = api.Services.CreateScope()) email = (await api.Db(scope).Users.FindAsync(userId))!.Email;
+
+        var client = api.CreateClient();
+        var login = await (await client.PostAsJsonAsync("/api/auth/login", new LoginRequest { Email = email, Password = temp }))
+            .Content.ReadFromJsonAsync<AuthResponse>();
+        Assert.True(login!.MustChangePassword);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", login.Token);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/tasks")).StatusCode);
+
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync("/api/users/me/password",
+            new ChangePasswordRequest { CurrentPassword = "wrong", NewPassword = "brandnew99" })).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PostAsJsonAsync("/api/users/me/password",
+            new ChangePasswordRequest { CurrentPassword = temp, NewPassword = "brandnew99" })).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/tasks")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Forgot_password_notifies_the_admin_who_is_asking()
+    {
+        var (admin, _) = await api.SignInAsync(ApiFactory.AdminEmail);
+        var userId = await AddStaffAsync();
+        string email;
+        using (var scope = api.Services.CreateScope()) email = (await api.Db(scope).Users.FindAsync(userId))!.Email;
+
+        Assert.Equal(HttpStatusCode.NoContent, (await api.CreateClient().PostAsJsonAsync("/api/auth/forgot-password",
+            new ForgotPasswordRequest { FirstName = "Forgetful", Surname = "Person", Email = email })).StatusCode);
+
+        var notes = (await admin.GetFromJsonAsync<List<NotificationDto>>("/api/notifications"))!;
+        Assert.Contains(notes, n => n.Message.Contains($"Forgetful Person ({email})") && n.Message.Contains("Reset Password"));
     }
 
     private async Task<int> AddStaffAsync()

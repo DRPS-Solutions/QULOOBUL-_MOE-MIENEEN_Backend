@@ -130,12 +130,41 @@ public sealed class AppState : Observable
         if (!res.IsSuccessStatusCode) return await ErrorMessage(res);
 
         var auth = (await res.Content.ReadFromJsonAsync<AuthResponse>())!;
+        if (auth.MustChangePassword)
+        {
+            // The API refuses a temporary password everywhere but api/users/me/password: LoginPage asks
+            // for a new one, and ChangePasswordAsync starts the session. Not remembered until then.
+            _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth.Token);
+            _pendingAuth = auth;
+            return null;
+        }
         await StartSessionAsync(auth);
+        await RememberAsync(auth);
+        return null;
+    }
 
-        // The token lives in the platform keystore (Android Keystore / iOS Keychain), never a plain file.
+    private AuthResponse? _pendingAuth;
+
+    /// <summary>True after signing in with an admin's temporary password, until it is replaced.</summary>
+    public bool MustChangePassword => _pendingAuth is not null;
+
+    /// <summary>Replaces the temporary password and starts the session. False if the API refused it (already alerted).</summary>
+    public async Task<bool> ChangePasswordAsync(string current, string next)
+    {
+        if (_pendingAuth is not { } auth || !await SendAsync(HttpMethod.Post, "api/users/me/password",
+                new ChangePasswordRequest { CurrentPassword = current, NewPassword = next })) return false;
+        _pendingAuth = null;
+        auth = auth with { MustChangePassword = false };
+        await StartSessionAsync(auth);
+        await RememberAsync(auth);
+        return true;
+    }
+
+    // The token lives in the platform keystore (Android Keystore / iOS Keychain), never a plain file.
+    private static async Task RememberAsync(AuthResponse auth)
+    {
         try { await SecureStorage.Default.SetAsync(SessionKey, JsonSerializer.Serialize(auth)); }
         catch (Exception) { /* no secure store on this platform: the session just isn't remembered */ }
-        return null;
     }
 
     /// <summary>Resumes the last session from SecureStorage if its token hasn't expired.</summary>
@@ -166,6 +195,7 @@ public sealed class AppState : Observable
     public async Task LogoutAsync()
     {
         CurrentUser = null;
+        _pendingAuth = null;
         _http.DefaultRequestHeaders.Authorization = null;
         try { SecureStorage.Default.Remove(SessionKey); }
         catch (Exception) { /* nothing was stored */ }

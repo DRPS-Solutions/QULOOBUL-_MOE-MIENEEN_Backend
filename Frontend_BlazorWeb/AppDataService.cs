@@ -66,13 +66,34 @@ public class AppDataService(HttpClient http, ISnackbar snackbar, IDialogService 
 
         var auth = (await res.Content.ReadFromJsonAsync<AuthResponse>())!;
         http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth.Token);
+        // A temporary password unlocks only api/users/me/password: MainLayout shows the change form,
+        // and the session starts once ChangePasswordAsync succeeds.
+        if (!auth.MustChangePassword) await StartSessionAsync();
+        CurrentUser = auth;
+        Changed();
+        return null;
+    }
+
+    private async Task StartSessionAsync()
+    {
         // Load names/projects before the shell renders, so nothing shows as "User #3" first.
         await Task.WhenAll(RefreshUsersAsync(), RefreshProjectsAsync(), RefreshNotificationsAsync(),
             Refresh<RoleDto>("api/roles", l => roles = l));
-        CurrentUser = auth;
         await ConnectHubAsync();
-        Changed();
-        return null;
+    }
+
+    /// <summary>Replaces the signed-in user's password; after a temporary one, this starts the session.</summary>
+    public async Task<bool> ChangePasswordAsync(string current, string next)
+    {
+        if (!await SendAsync(HttpMethod.Post, "api/users/me/password",
+                new ChangePasswordRequest { CurrentPassword = current, NewPassword = next })) return false;
+        if (CurrentUser is { MustChangePassword: true })
+        {
+            await StartSessionAsync();
+            CurrentUser = CurrentUser with { MustChangePassword = false };
+            Changed();
+        }
+        return true;
     }
 
     public async Task LogoutAsync()
