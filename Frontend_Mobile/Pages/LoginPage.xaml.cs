@@ -140,6 +140,16 @@ public partial class LoginPage : ContentPage
         ForgotIntroLabel.Text = "Request sent. The system admin will contact you with a temporary password.";
     }
 
+    // Each eye button sits in a Grid beside the Entry it reveals.
+    private void OnTogglePassword(object? sender, EventArgs e)
+    {
+        var button = (Button)sender!;
+        var entry = (Entry)((Grid)button.Parent).Children[0];
+        entry.IsPassword = !entry.IsPassword;
+        button.Text = entry.IsPassword ? "\U0001F441" : "\U0001F648";
+        SemanticProperties.SetDescription(button, entry.IsPassword ? "Show password" : "Hide password");
+    }
+
     private void OnToggleTheme(object? sender, EventArgs e)
     {
         App.ToggleTheme();

@@ -1,4 +1,4 @@
-﻿@inherits LayoutComponentBase
+@inherits LayoutComponentBase
 @using MudBlazor
 @implements IDisposable
 @inject AppDataService AppData
@@ -49,7 +49,7 @@
                               Label="Password"
                               Variant="Variant.Outlined"
                               Margin="Margin.Dense"
-                              InputType="InputType.Password"
+                              InputType="@(showPassword ? InputType.Text : InputType.Password)" Adornment="Adornment.End" AdornmentIcon="@PasswordIcon" OnAdornmentClick="() => showPassword = !showPassword" AdornmentAriaLabel="@(showPassword ? "Hide password" : "Show password")"
                               Immediate="true"
                               @onkeydown="OnLoginKeyDown"
                               Class="mb-2" />
@@ -133,6 +133,8 @@ else
     private string passwordInput = string.Empty;
     private string? loginError = null;
     private bool loggingIn = false;
+    private bool showPassword;
+    private string PasswordIcon => showPassword ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility;
 
     private bool OnSetPasswordPage => Nav.ToBaseRelativePath(Nav.Uri) is var path
         && (path.StartsWith("set-password") || path.StartsWith("forgot-password"));
@@ -158,7 +160,7 @@ else
         loggingIn = true;
         loginError = await AppData.LoginAsync(emailInput, passwordInput);
         loggingIn = false;
-        if (loginError is null) passwordInput = string.Empty;
+        if (loginError is null) { passwordInput = string.Empty; showPassword = false; }
     }
 
     private async Task OnLoginKeyDown(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e)
@@ -170,6 +172,7 @@ else
     {
         await AppData.LogoutAsync();
         passwordInput = string.Empty;
+        showPassword = false;
         loginError = null;
     }
 

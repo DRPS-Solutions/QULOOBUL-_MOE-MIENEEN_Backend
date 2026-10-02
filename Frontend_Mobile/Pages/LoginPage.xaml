@@ -49,11 +49,17 @@
                                HorizontalTextAlignment="Center"
                                Margin="0,4,0,20" />
                         <Border Style="{StaticResource FieldBox}">
-                            <Entry x:Name="NewPasswordEntry" Placeholder="New Password" IsPassword="True" TextChanged="OnChangeFormChanged" />
+                            <Grid ColumnDefinitions="*,Auto">
+                                <Entry x:Name="NewPasswordEntry" Placeholder="New Password" IsPassword="True" TextChanged="OnChangeFormChanged" />
+                                <Button Grid.Column="1" Style="{StaticResource PasswordToggle}" Clicked="OnTogglePassword" />
+                            </Grid>
                         </Border>
                         <Border Style="{StaticResource FieldBox}" Margin="0,12,0,0">
-                            <Entry x:Name="ConfirmPasswordEntry" Placeholder="Confirm Password" IsPassword="True"
-                                   TextChanged="OnChangeFormChanged" Completed="OnChangePassword" />
+                            <Grid ColumnDefinitions="*,Auto">
+                                <Entry x:Name="ConfirmPasswordEntry" Placeholder="Confirm Password" IsPassword="True"
+                                       TextChanged="OnChangeFormChanged" Completed="OnChangePassword" />
+                                <Button Grid.Column="1" Style="{StaticResource PasswordToggle}" Clicked="OnTogglePassword" />
+                            </Grid>
                         </Border>
                         <Label x:Name="ChangeErrorLabel" IsVisible="False" TextColor="{StaticResource StatusDenied}" Margin="0,8,0,0" />
                         <Button x:Name="ChangeButton" Text="Change Password" IsEnabled="False" Clicked="OnChangePassword" Margin="0,20,0,0" />
@@ -75,11 +81,14 @@
                     </Border>
 
                     <Border Style="{StaticResource FieldBox}" Margin="0,12,0,0">
-                        <Entry x:Name="PasswordEntry"
-                               Placeholder="Password"
-                               IsPassword="True"
-                               TextChanged="OnFormChanged"
-                               Completed="OnLogin" />
+                        <Grid ColumnDefinitions="*,Auto">
+                            <Entry x:Name="PasswordEntry"
+                                   Placeholder="Password"
+                                   IsPassword="True"
+                                   TextChanged="OnFormChanged"
+                                   Completed="OnLogin" />
+                            <Button Grid.Column="1" Style="{StaticResource PasswordToggle}" Clicked="OnTogglePassword" />
+                        </Grid>
                     </Border>
 
                     <Label x:Name="ErrorLabel"
