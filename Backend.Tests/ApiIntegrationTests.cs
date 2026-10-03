@@ -335,7 +335,9 @@ public class ApiIntegrationTests(ApiFactory api) : IClassFixture<ApiFactory>
             new ForgotPasswordRequest { FirstName = "Forgetful", Surname = "Person", Email = email })).StatusCode);
 
         var notes = (await admin.GetFromJsonAsync<List<NotificationDto>>("/api/notifications"))!;
-        Assert.Contains(notes, n => n.Message.Contains($"Forgetful Person ({email})") && n.Message.Contains("Reset Password"));
+        // The account's own name is shown; the typed one only as a mismatch warning (test plan A4).
+        Assert.Contains(notes, n => n.Message.StartsWith($"Other Staff ({email})") && n.Message.Contains("Reset Password")
+            && n.Message.Contains("\"Forgetful Person\", which doesn't match"));
     }
 
     private async Task<int> AddStaffAsync()

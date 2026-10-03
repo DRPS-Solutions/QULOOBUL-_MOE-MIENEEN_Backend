@@ -50,6 +50,23 @@ public class UseCaseGapTests
     }
 //----------------------------------------------------------------------------------------------------------------------//
     [Fact]
+    public async Task Two_events_cannot_book_the_same_location_at_the_same_time()
+    {
+        using var db = NewDb();
+        var alice = User(db, "alice", 1);
+        var bob = User(db, "bob", 1);
+        var when = new DateTime(2026, 10, 1, 9, 0, 0);
+        db.Events.Add(new Event { Organiser = alice, Title = "Fete", EventDate = when, Location = "Hall" });
+        await db.SaveChangesAsync();
+
+        // A different organiser, so only the location rule can refuse it (test plan M2).
+        var events = new EventService(db, new AuditService(db), null!, new AccessGuard(db));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => events.CreateAsync(
+            new CreateEventRequest { Title = "Clash", EventDate = when, Location = " Hall " }, bob.UserId));
+        Assert.Single(db.Events);
+    }
+//----------------------------------------------------------------------------------------------------------------------//
+    [Fact]
     public async Task Minutes_append_as_a_new_version_and_only_the_permitted_may_edit()
     {
         using var db = NewDb();

@@ -169,11 +169,19 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
         public async Task ForgotPasswordAsync(ForgotPasswordRequest req)
         {
             var user = await db.Users.FirstOrDefaultAsync(u => u.Email == req.Email);
-            var who = $"{req.FirstName.Trim()} {req.Surname.Trim()} ({req.Email})";
-            await NotifyAdminsAsync("PasswordResetRequested", user is null
-                    ? $"{who} asked for a password reset, but no account uses that email."
-                    : $"{who} asked for a password reset. Use Reset Password on their account in User Management.",
-                user?.UserId ?? 0, "Password reset requested");
+            var typed = $"{req.FirstName.Trim()} {req.Surname.Trim()}";
+            string message;
+            if (user is null)
+                message = $"{typed} ({req.Email}) asked for a password reset, but no account uses that email.";
+            else
+            {
+                // The account's name, not the typed one: anyone can type any name next to someone's email.
+                var actual = $"{user.FirstName} {user.Surname}";
+                message = $"{actual} ({user.Email}) asked for a password reset. Use Reset Password on their account in User Management.";
+                if (!string.Equals(typed, actual, StringComparison.OrdinalIgnoreCase))
+                    message += $" Note: the request gave the name \"{typed}\", which doesn't match this account. Check it's really them before resetting.";
+            }
+            await NotifyAdminsAsync("PasswordResetRequested", message, user?.UserId ?? 0, "Password reset requested");
         }
 //----------------------------------------------------------------------------------------------------------------------//
         /// <summary>Notify (in-app, live push, email) every active user who can manage users. Saves the Unit of Work.</summary>
