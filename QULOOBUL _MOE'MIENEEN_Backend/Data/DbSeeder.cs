@@ -28,7 +28,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Data
         private static readonly string[] NotificationTypeSeed =
         [
             "TaskAssigned", "TaskCancelled", "DeadlineApproaching", "ProjectAssigned", "EventInvite",
-            "RequestSubmitted", "RequestReviewed", "RequestCompleted", "RequestEscalated", "UserLocked", "PasswordResetRequested", "Announcement",
+            "RequestSubmitted", "RequestReviewed", "RequestCompleted", "RequestEscalated", "UserLocked", "PasswordResetRequested", "Announcement", "ProjectCancelled",
         ];
 //----------------------------------------------------------------------------------------------------------------------//
         public static void Seed(AppDbContext db, IConfiguration config)

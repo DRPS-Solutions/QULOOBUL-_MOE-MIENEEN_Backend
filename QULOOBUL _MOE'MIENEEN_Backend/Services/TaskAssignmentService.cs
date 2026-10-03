@@ -122,6 +122,15 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
                 MoveStatus(task, Lifecycle.TaskArchived, actorId);
         }
 //----------------------------------------------------------------------------------------------------------------------//
+        /// <summary>Event cancelled: every open task SM-01 lets cancel (To Do, In Progress) is cancelled.
+        /// Blocked has no Cancelled edge in SM-01, so a blocked task is left for its owner to resolve.</summary>
+        public async Task CancelOpenTasksAsync(int projectId, int actorId)
+        {
+            foreach (var task in (await db.Tasks.Where(t => t.ProjectId == projectId).ToListAsync())
+                         .Where(t => Lifecycle.TaskCanMove(t.Status, Lifecycle.TaskCancelled)))
+                MoveStatus(task, Lifecycle.TaskCancelled, actorId);
+        }
+//----------------------------------------------------------------------------------------------------------------------//
         /// <summary>
         /// SM-03 deactivate() "/ reassign open tasks". The leaver comes off every unfinished task; a task
         /// left with nobody on it goes to its project owner, or to the deactivating admin when the owner

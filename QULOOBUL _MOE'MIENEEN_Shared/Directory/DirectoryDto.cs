@@ -68,6 +68,13 @@ namespace QULOOBUL__MOE_MIENEEN_Shared.Directory
         public int? OwnerId { get; init; }
     }
 //----------------------------------------------------------------------------------------------------------------------//
+    /// <summary>Event Cancellation. The reason goes to everyone on the event.</summary>
+    public record CancelProjectRequest
+    {
+        [MaxLength(500)]
+        public string? Reason { get; init; }
+    }
+//----------------------------------------------------------------------------------------------------------------------//
     public record UpdateProjectRequest
     {
         [MaxLength(200)]

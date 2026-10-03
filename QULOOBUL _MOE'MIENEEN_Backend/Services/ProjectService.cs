@@ -73,6 +73,33 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             return new ProjectDto(p.ProjectId, p.OwnerId, p.ProjectName, p.Status, p.Description);
         }
 //----------------------------------------------------------------------------------------------------------------------//
+        /// <summary>Event Cancellation: owner or admin. Kept, not deleted, so its history and files survive;
+        /// open tasks are cancelled and the staff on it are told why.</summary>
+        public async Task<ProjectDto> CancelAsync(int id, string? reason, int actorId)
+        {
+            await guard.EnsureProjectOwnerAsync(actorId, id);
+            var p = await db.Projects.FindAsync(id) ?? throw new KeyNotFoundException($"Project {id} not found.");
+            if (p.Status.Equals(Lifecycle.ProjectCancelled, StringComparison.OrdinalIgnoreCase)
+                || p.Status.Equals(Lifecycle.ProjectClosed, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException($"This event is already {p.Status.ToLowerInvariant()}.");
+
+            p.Status = Lifecycle.ProjectCancelled;
+            await tasks.CancelOpenTasksAsync(id, actorId);
+
+            reason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
+            var message = $"\"{p.ProjectName}\" has been cancelled." + (reason is null ? "" : $" Reason: {reason}");
+            var members = await db.ProjectMembers.Where(m => m.ProjectId == id && m.UserId != actorId)
+                .Select(m => m.UserId).ToListAsync();
+            foreach (var uid in members)
+                await notify.QueueAsync(uid, "ProjectCancelled", message, nameof(Project), id);
+            audit.Record(actorId, "project.cancel", nameof(Project), id);
+            await db.SaveChangesAsync();
+
+            foreach (var uid in members) await notify.PushAsync(uid, "notification", new { projectId = id });
+            await notify.BroadcastAsync("boardChanged", new { projectId = id });
+            return new ProjectDto(p.ProjectId, p.OwnerId, p.ProjectName, p.Status, p.Description);
+        }
+//----------------------------------------------------------------------------------------------------------------------//
         public async Task AddMemberAsync(int projectId, int userId, int actorId)
         {
             await guard.EnsureProjectOwnerAsync(actorId, projectId);

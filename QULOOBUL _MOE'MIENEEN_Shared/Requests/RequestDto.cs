@@ -40,7 +40,8 @@ namespace QULOOBUL__MOE_MIENEEN_Shared.Requests
         public string? Detail { get; init; }
     }
 //----------------------------------------------------------------------------------------------------------------------//
-    public record RequestStatusHistoryDto(string NewStatus, int ChangedBy, DateTime TimeCreated);
+    /// <summary>Note: the reviewer's reason, on an Approved or Declined row.</summary>
+    public record RequestStatusHistoryDto(string NewStatus, int ChangedBy, DateTime TimeCreated, string? Note = null);
     public record RequestCategoryDto(int CategoryId, string CategoryName);
 }
 //---------------------------DDDDDDDDDDDoooooooooooooo END OF FILE DDDDDDDDDDDoooooooooooooo---------------------------//

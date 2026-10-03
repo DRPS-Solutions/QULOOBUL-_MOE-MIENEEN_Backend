@@ -11,6 +11,8 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Models.Request
         [Key] public int HistoryId { get; set; }
         public int RequestId { get; set; }
         [MaxLength(30)] public string NewStatus { get; set; } = String.Empty;
+        /// <summary>The reviewer's reason on an approve/decline, so the requester can read it on the request.</summary>
+        [MaxLength(500)] public string? Note { get; set; }
         public int ChangedBy { get; set; }
         public DateTime TimeCreated { get; set; }
 

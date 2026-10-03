@@ -333,6 +333,10 @@
                                     <div class="drps-request-review">
                                         @req.Status by @AppData.UserName(req.ReviewedBy)@ReviewedOn(req)
                                     </div>
+                                    @if (DecisionNote(req) is { } note)
+                                    {
+                                        <div class="drps-request-review"><b>@(req.Status == "Declined" ? "Reason" : "Note"):</b> @note</div>
+                                    }
                                 }
 
                                 @* Approve/Deny only render for reviewers, only while still
@@ -456,6 +460,10 @@
         req.History.LastOrDefault(x => x.NewStatus == req.Status) is { } review
             ? $" on {AppDataService.Local(review.TimeCreated):d MMM}"
             : "";
+
+    // The reviewer's reason from the approve/decline, kept on the request rather than only in the notification.
+    private static string? DecisionNote(ResourceRequestDto req) =>
+        req.History.LastOrDefault(h => h.NewStatus is "Approved" or "Declined")?.Note;
 
     // --- Review actions (UC-05). The API notifies the requester. ---
     private async Task Review(ResourceRequestDto req, bool approve, string? note)
