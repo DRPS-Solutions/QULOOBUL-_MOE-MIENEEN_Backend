@@ -21,11 +21,12 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             return Sas(blob, BlobSasPermissions.Create | BlobSasPermissions.Write, ttl);
         }
 //----------------------------------------------------------------------------------------------------------------------//
-        /// <summary>A single-blob read SAS handed to a client that needs to download the file.</summary>
-        public async Task<Uri> CreateReadSasAsync(string container, string blobName, TimeSpan? ttl = null)
+        /// <summary>A single-blob read SAS handed to a client that needs to download the file. With a
+        /// <paramref name="downloadName"/>, the link saves the file under that name instead of opening it.</summary>
+        public async Task<Uri> CreateReadSasAsync(string container, string blobName, TimeSpan? ttl = null, string? downloadName = null)
         {
             var blob = await GetBlobClientAsync(container, blobName);
-            return Sas(blob, BlobSasPermissions.Read, ttl);
+            return Sas(blob, BlobSasPermissions.Read, ttl, downloadName);
         }
 //----------------------------------------------------------------------------------------------------------------------//
         /// <summary>Writes a file the API itself produced (a report export), never client bytes.</summary>
@@ -69,7 +70,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
         /// <param name="ttl"></param>
         /// <returns></returns>
         /// <exception cref="InvalidOperationException"></exception>
-        private static Uri Sas(BlobClient blob, BlobSasPermissions permissions, TimeSpan? ttl)
+        private static Uri Sas(BlobClient blob, BlobSasPermissions permissions, TimeSpan? ttl, string? downloadName = null)
         {
             if (!blob.CanGenerateSasUri)
                 throw new InvalidOperationException(
@@ -82,6 +83,9 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
                 BlobName = blob.Name,
                 Resource = "b",
                 ExpiresOn = DateTimeOffset.UtcNow.Add(ttl ?? DefaultTtl),
+                // Blob Storage sends this back as the response header, so the browser saves rather than previews.
+                ContentDisposition = downloadName is null ? null
+                    : new System.Net.Http.Headers.ContentDispositionHeaderValue("attachment") { FileNameStar = downloadName }.ToString(),
             };
             builder.SetPermissions(permissions);
             return blob.GenerateSasUri(builder);
