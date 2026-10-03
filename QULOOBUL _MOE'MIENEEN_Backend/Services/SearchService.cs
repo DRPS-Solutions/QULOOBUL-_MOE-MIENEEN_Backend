@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using QULOOBUL__MOE_MIENEEN_Backend.Data;
+using static QULOOBUL__MOE_MIENEEN_Shared.Classes.Common;
 using QULOOBUL__MOE_MIENEEN_Shared.Search;
 
 namespace QULOOBUL__MOE_MIENEEN_Backend.Services
@@ -56,7 +57,8 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
                 .Select(e => new SearchResultDto("Event", e.EventId, e.Title, e.Location))
                 .ToListAsync());
 
-            results.AddRange(await guard.VisibleFiles(db.FileUploads.Where(f => !f.IsArchived), userId, isAdmin)
+            results.AddRange(await guard.VisibleFiles(db.FileUploads.Where(f => !f.IsArchived), userId,
+                    await guard.HasPermissionAsync(userId, Permissions.ManageFiles))
                 .Where(f => f.FileName.Contains(q))
                 .OrderBy(f => f.FileName).Take(PerKind)
                 .Select(f => new SearchResultDto("File", f.FileId, f.FileName, f.Category!.CategoryName))

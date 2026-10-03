@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using QULOOBUL__MOE_MIENEEN_Backend.Data;
+using static QULOOBUL__MOE_MIENEEN_Shared.Classes.Common;
 using QULOOBUL__MOE_MIENEEN_Backend.Models.File;
 using QULOOBUL__MOE_MIENEEN_Shared.Files;
 
@@ -27,7 +28,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
                          && (search == null || f.FileName.Contains(search))
                          && (includeArchived || !f.IsArchived));
 
-            return await guard.VisibleFiles(q, userId, await guard.IsAdminAsync(userId))
+            return await guard.VisibleFiles(q, userId, await guard.HasPermissionAsync(userId, Permissions.ManageFiles))
                 .OrderBy(f => f.FileName)
                 .Select(f => new FileMetadataDto(
                     f.FileId, f.FileName, f.FileType, f.CategoryId, f.Category!.CategoryName,
