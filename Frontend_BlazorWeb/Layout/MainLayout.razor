@@ -3,6 +3,7 @@
 @implements IDisposable
 @inject AppDataService AppData
 @inject NavigationManager Nav
+@inject IJSRuntime JS
 
 <MudThemeProvider IsDarkMode="isDarkMode" Theme="_theme" />
 <MudPopoverProvider />
@@ -153,9 +154,18 @@ else
     private bool CanLogin =>
         !loggingIn && !string.IsNullOrWhiteSpace(emailInput) && !string.IsNullOrWhiteSpace(passwordInput);
 
-    private void ToggleDarkMode() => isDarkMode = !isDarkMode;
+    // localStorage, unlike the session: a display preference should outlive the tab.
+    private async Task ToggleDarkMode()
+    {
+        isDarkMode = !isDarkMode;
+        await JS.InvokeVoidAsync("localStorage.setItem", "darkMode", isDarkMode);
+    }
 
-    private void ToggleNavOrientation() => isVerticalNav = !isVerticalNav;
+    private async Task ToggleNavOrientation()
+    {
+        isVerticalNav = !isVerticalNav;
+        await JS.InvokeVoidAsync("localStorage.setItem", "verticalNav", isVerticalNav);
+    }
 
     // UC-01: the API checks the credentials and returns a JWT.
     private async Task Login()
@@ -189,6 +199,8 @@ else
     protected override async Task OnInitializedAsync()
     {
         AppData.OnChange += StateHasChanged;
+        isDarkMode = await JS.InvokeAsync<string?>("localStorage.getItem", "darkMode") == "true";
+        isVerticalNav = await JS.InvokeAsync<string?>("localStorage.getItem", "verticalNav") == "true";
         await AppData.RestoreSessionAsync();
         restoring = false;
     }
