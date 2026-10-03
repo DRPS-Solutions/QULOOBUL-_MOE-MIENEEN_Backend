@@ -38,6 +38,9 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
         {
             if (req.PeriodEnd < req.PeriodStart)
                 throw new ArgumentException("PeriodEnd must be on or after PeriodStart.");
+            // Beyond a year the weekly trend runs to 50+ points and the charts stop being readable.
+            if (req.PeriodEnd > req.PeriodStart.AddYears(1))
+                throw new ArgumentException("That period is longer than a year. Pick a narrower date range.");
 
             var tasks = db.Tasks.Where(t => t.Deadline >= req.PeriodStart && t.Deadline <= req.PeriodEnd);
             var doneMoves = db.TaskStatusHistory.Where(h => h.NewStatus == "Done"

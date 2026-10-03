@@ -98,6 +98,9 @@
     [CascadingParameter]
     private IMudDialogInstance MudDialog { get; set; } = default!;
 
+    // The directory is loaded at sign-in; an admin may have changed someone's role since (test plan T2).
+    protected override Task OnInitializedAsync() => AppData.RefreshUsersAsync();
+
     // --- Form state ---
     private string title = string.Empty;
     private string description = string.Empty;

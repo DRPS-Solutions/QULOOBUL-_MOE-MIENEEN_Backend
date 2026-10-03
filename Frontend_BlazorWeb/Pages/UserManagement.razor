@@ -746,8 +746,15 @@
         if (result is null) return;
 
         // Shown once and never stored in the clear: the admin passes it on in person or by phone.
-        await DialogService.ShowMessageBoxAsync("Temporary password",
-            $"Temporary password for {user.FullName}: {result.TemporaryPassword} — Give it to them directly. They must choose a new password when they next sign in.",
+        // A Copy button, since there's no getting it back once the dialog closes (test plan A3/U4).
+        var name = System.Net.WebUtility.HtmlEncode(user.FullName);
+        var temp = System.Net.WebUtility.HtmlEncode(result.TemporaryPassword);
+        await DialogService.ShowMessageBoxAsync("Temporary password", new MarkupString(
+            $"<p>Temporary password for {name}:</p>" +
+            $"<p><code style=\"font-size:1.1rem; user-select:all;\">{temp}</code> " +
+            $"<button type=\"button\" class=\"mud-button-root mud-button mud-button-outlined mud-button-outlined-primary mud-button-outlined-size-small\" data-p=\"{temp}\" " +
+            "onclick=\"navigator.clipboard.writeText(this.dataset.p).then(() => this.textContent = 'Copied')\">Copy</button></p>" +
+            "<p>Give it to them directly. They must choose a new password when they next sign in.</p>"),
             yesText: "Done");
         await Task.WhenAll(AppData.RefreshUsersAsync(), LoadOverview());
         if (AppData.Users.FirstOrDefault(u => u.UserId == user.UserId) is { } updated) await SelectEmployee(updated);

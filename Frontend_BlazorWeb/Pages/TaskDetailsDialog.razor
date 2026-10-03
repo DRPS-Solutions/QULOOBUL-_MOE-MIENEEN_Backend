@@ -148,6 +148,8 @@
 
     protected override async Task OnInitializedAsync()
     {
+        // Users too: roles may have changed since sign-in, which changes who can be assigned (test plan T2).
+        await AppData.RefreshUsersAsync();
         comments = (await AppData.GetAsync<TaskDetailDto>($"api/tasks/{Task.TaskId}"))?.Comments.ToList() ?? [];
     }
 

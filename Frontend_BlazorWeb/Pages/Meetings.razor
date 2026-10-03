@@ -188,8 +188,8 @@
                 <div class="d-flex gap-3 flex-wrap align-center">
                     <MudTextField T="string" @bind-Value="searchText" Label="Search minutes" Variant="Variant.Outlined" Margin="Margin.Dense"
                                   Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" Style="min-width:220px;" />
-                    <MudDatePicker @bind-Date="searchFrom" Label="From" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width:160px;" Clearable="true" />
-                    <MudDatePicker @bind-Date="searchTo" Label="To" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width:160px;" Clearable="true" />
+                    <div style="flex:1 1 130px; max-width:160px;"><MudDatePicker @bind-Date="searchFrom" Label="From" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true" /></div>
+                    <div style="flex:1 1 130px; max-width:160px;"><MudDatePicker @bind-Date="searchTo" Label="To" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true" /></div>
                     <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="Search">Search</MudButton>
                     @if (searchResults is not null)
                     {

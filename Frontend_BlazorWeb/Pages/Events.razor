@@ -513,7 +513,7 @@
     protected override async Task OnInitializedAsync()
     {
         AppData.OnChange += StateHasChanged;
-        await AppData.RefreshProjectsAsync();
+        await Task.WhenAll(AppData.RefreshProjectsAsync(), AppData.RefreshUsersAsync());
     }
 
     // events?project=4 (a notification's link, UC-08 step 3) opens that project's detail.

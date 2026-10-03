@@ -19,8 +19,8 @@
         </div>
 
         <div class="drps-panel d-flex gap-3 flex-wrap align-center">
-            <MudDatePicker @bind-Date="from" Label="From" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width:180px;" />
-            <MudDatePicker @bind-Date="to" Label="To" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width:180px;" />
+            <div style="flex:1 1 130px; max-width:180px;"><MudDatePicker @bind-Date="from" Label="From" Variant="Variant.Outlined" Margin="Margin.Dense" /></div>
+            <div style="flex:1 1 130px; max-width:180px;"><MudDatePicker @bind-Date="to" Label="To" Variant="Variant.Outlined" Margin="Margin.Dense" /></div>
             <MudSelect T="string" @bind-Value="reportType" Label="Report" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width:220px;">
                 <MudSelectItem T="string" Value="@("TaskCompletion")">Task completion</MudSelectItem>
                 <MudSelectItem T="string" Value="@("Workload")">Staff workload</MudSelectItem>
@@ -118,7 +118,8 @@
     // Why the chosen period can't be reported on, or null when it can.
     private string? RangeError =>
         from is null || to is null ? "Choose both a From and a To date."
-        : to < from ? "The To date must be on or after the From date."
+        : to < from ? "The To date is before the From date. Swap them, or pick a later To date."
+        : to > from.Value.AddYears(1) ? "Reports cover a year at most. Pick a narrower date range." // same cap as the API
         : null;
 
     // The API refuses a period with no data, but a run can still come back with nothing to chart.

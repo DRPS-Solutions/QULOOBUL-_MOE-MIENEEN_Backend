@@ -162,6 +162,16 @@ public class UseCaseGapTests
     }
 //----------------------------------------------------------------------------------------------------------------------//
     [Fact]
+    public async Task A_period_over_a_year_asks_for_a_narrower_range()
+    {
+        using var db = NewDb();
+        var reports = new ReportingService(db, null!);
+        var ex = await Assert.ThrowsAsync<ArgumentException>(() => reports.BuildAsync(
+            new ReportRequest { PeriodStart = new(2020, 1, 1), PeriodEnd = new(2021, 1, 2) }, 1));
+        Assert.Contains("narrower date range", ex.Message);
+    }
+//----------------------------------------------------------------------------------------------------------------------//
+    [Fact]
     public void Trend_buckets_by_day_up_to_a_month_and_counts_a_reopened_task_once_per_bucket()
     {
         var start = new DateTime(2026, 9, 1);
