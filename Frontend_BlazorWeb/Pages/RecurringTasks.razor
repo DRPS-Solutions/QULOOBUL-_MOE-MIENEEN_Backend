@@ -1,0 +1,91 @@
+@using MudBlazor
+@using QULOOBUL__MOE_MIENEEN_Shared.Tasks
+@inject AppDataService AppData
+
+@* Recurring weekly tasks (Task_Schedule, test plan T6). The API's hourly job creates the task on the
+   chosen day and notifies the assignee; like a daily task it goes strictly down the hierarchy. *@
+<div class="drps-panel mt-6">
+    <MudText Typo="Typo.h6" Class="mb-1">Recurring Tasks</MudText>
+    <div class="drps-muted mb-4">Repeats every week on the chosen day. The task is created early that day and the assignee is notified.</div>
+
+    <div class="d-flex flex-wrap gap-3 align-center mb-4">
+        <div style="flex:2 1 220px;">
+            <MudTextField T="string" @bind-Value="title" Label="Task" Variant="Variant.Outlined" Margin="Margin.Dense" MaxLength="200" Immediate="true" />
+        </div>
+        <div style="flex:1 1 140px;">
+            <MudSelect T="string" @bind-Value="day" Label="Every" Variant="Variant.Outlined" Margin="Margin.Dense">
+                @foreach (var d in Days)
+                {
+                    <MudSelectItem T="string" Value="@d">@d</MudSelectItem>
+                }
+            </MudSelect>
+        </div>
+        <div style="flex:1 1 180px;">
+            <MudSelect T="int?" @bind-Value="assigneeId" Label="Assign to" Variant="Variant.Outlined" Margin="Margin.Dense"
+                       ToStringFunc="@(id => AppData.UserName(id))">
+                @foreach (var user in AppData.DailyAssignees)
+                {
+                    <MudSelectItem T="int?" Value="@user.UserId">@user.FullName</MudSelectItem>
+                }
+            </MudSelect>
+        </div>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Repeat"
+                   Disabled="@(busy || string.IsNullOrWhiteSpace(title) || assigneeId is null)" OnClick="Create">
+            Add
+        </MudButton>
+    </div>
+
+    @if (schedules.Count == 0)
+    {
+        <div class="drps-muted">No recurring tasks yet.</div>
+    }
+    @foreach (var s in schedules)
+    {
+        <div class="d-flex align-center gap-3 py-2" style="border-top:1px solid var(--drps-border-soft);">
+            <div style="flex:1; min-width:0; @(s.IsActive ? "" : "opacity:0.55;")">
+                <div style="font-weight:500;">@s.Title</div>
+                <div class="drps-muted">Every @s.DayOfWeek · @AppData.UserName(s.AssignedTo)@(s.IsActive ? "" : " · Paused")</div>
+            </div>
+            @* The API lets the creator or an admin pause one; anyone else just sees it. *@
+            @if (s.CreatedBy == AppData.CurrentUser?.UserId || AppData.HasPermission(Permissions.ManageUsers))
+            {
+                <MudSwitch T="bool" Value="s.IsActive" ValueChanged="@((bool on) => SetActive(s, on))" Color="Color.Primary"
+                           Disabled="@busy" Label="@(s.IsActive ? "On" : "Paused")" />
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private static readonly string[] Days = Enum.GetNames<DayOfWeek>();
+    private List<TaskScheduleDto> schedules = [];
+    private string title = string.Empty;
+    private string day = DateTime.Today.DayOfWeek.ToString();
+    private int? assigneeId;
+    private bool busy;
+
+    protected override Task OnInitializedAsync() => Load();
+
+    private async Task Load() =>
+        schedules = await AppData.GetAsync<List<TaskScheduleDto>>("api/taskschedules") ?? [];
+
+    private async Task Create()
+    {
+        busy = true;
+        var created = await AppData.SendAsync<TaskScheduleDto>(HttpMethod.Post, "api/taskschedules",
+            new CreateTaskScheduleRequest { Title = title.Trim(), DayOfWeek = day, AssignedTo = assigneeId!.Value });
+        busy = false;
+        if (created is null) return;
+        title = string.Empty;
+        await Load();
+    }
+
+    private async Task SetActive(TaskScheduleDto s, bool active)
+    {
+        busy = true;
+        await AppData.SendAsync<TaskScheduleDto>(HttpMethod.Patch, $"api/taskschedules/{s.ScheduleId}",
+            new UpdateTaskScheduleRequest { IsActive = active });
+        busy = false;
+        await Load();
+    }
+}

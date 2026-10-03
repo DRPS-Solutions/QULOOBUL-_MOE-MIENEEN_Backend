@@ -19,6 +19,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.AspNetCore.SignalR.Client;
+using Microsoft.JSInterop;
 using MudBlazor;
 using QULOOBUL__MOE_MIENEEN_Shared.Auth;
 using QULOOBUL__MOE_MIENEEN_Shared.Directory;
@@ -28,8 +29,11 @@ using QULOOBUL__MOE_MIENEEN_Shared.Tasks;
 using static QULOOBUL__MOE_MIENEEN_Shared.Classes.Common;
 
 public class AppDataService(HttpClient http, ISnackbar snackbar, IDialogService dialogs,
-    Microsoft.AspNetCore.Components.NavigationManager nav)
+    Microsoft.AspNetCore.Components.NavigationManager nav, IJSRuntime js)
 {
+    // sessionStorage, not localStorage: survives a reload but not closing the tab,
+    // so a shared NPO computer doesn't stay signed in.
+    private const string SessionKey = "session";
     public event Action? OnChange;
     private void Changed() => OnChange?.Invoke();
 
@@ -70,9 +74,29 @@ public class AppDataService(HttpClient http, ISnackbar snackbar, IDialogService 
         // and the session starts once ChangePasswordAsync succeeds.
         if (!auth.MustChangePassword) await StartSessionAsync();
         CurrentUser = auth;
+        await SaveSessionAsync();
         Changed();
         return null;
     }
+
+    /// <summary>Picks the session back up after a page reload, if the token hasn't expired.</summary>
+    public async Task RestoreSessionAsync()
+    {
+        var json = await js.InvokeAsync<string?>("sessionStorage.getItem", SessionKey);
+        var auth = json is null ? null : JsonSerializer.Deserialize<AuthResponse>(json);
+        if (auth is null || auth.ExpiresAtUtc <= DateTime.UtcNow)
+        {
+            await js.InvokeVoidAsync("sessionStorage.removeItem", SessionKey);
+            return;
+        }
+        http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth.Token);
+        if (!auth.MustChangePassword) await StartSessionAsync();
+        CurrentUser = auth;
+        Changed();
+    }
+
+    private Task SaveSessionAsync() =>
+        js.InvokeVoidAsync("sessionStorage.setItem", SessionKey, JsonSerializer.Serialize(CurrentUser)).AsTask();
 
     private async Task StartSessionAsync()
     {
@@ -91,6 +115,7 @@ public class AppDataService(HttpClient http, ISnackbar snackbar, IDialogService 
         {
             await StartSessionAsync();
             CurrentUser = CurrentUser with { MustChangePassword = false };
+            await SaveSessionAsync();
             Changed();
         }
         return true;
@@ -100,6 +125,7 @@ public class AppDataService(HttpClient http, ISnackbar snackbar, IDialogService 
     {
         CurrentUser = null;
         http.DefaultRequestHeaders.Authorization = null;
+        await js.InvokeVoidAsync("sessionStorage.removeItem", SessionKey);
         Users = [];
         Projects = [];
         Tasks = [];
@@ -122,6 +148,7 @@ public class AppDataService(HttpClient http, ISnackbar snackbar, IDialogService 
         var user = await SendAsync<UserDto>(HttpMethod.Patch, $"api/users/{CurrentUser!.UserId}", req);
         if (user is null) return null;
         CurrentUser = CurrentUser with { FullName = $"{user.FirstName} {user.Surname}" };
+        await SaveSessionAsync();
         await RefreshUsersAsync(); // calls Changed()
         return user;
     }
@@ -317,7 +344,8 @@ public class AppDataService(HttpClient http, ISnackbar snackbar, IDialogService 
     {
         hub = new HubConnectionBuilder()
             .WithUrl(new Uri(http.BaseAddress!, "hubs/notifications"),
-                o => o.AccessTokenProvider = () => Task.FromResult(CurrentUser?.Token))
+                // Not CurrentUser?.Token: CurrentUser is set only after the session (and this hub) starts.
+                o => o.AccessTokenProvider = () => Task.FromResult(http.DefaultRequestHeaders.Authorization?.Parameter))
             .WithAutomaticReconnect()
             .Build();
 

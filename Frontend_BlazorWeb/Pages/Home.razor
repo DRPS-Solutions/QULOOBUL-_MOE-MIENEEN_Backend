@@ -165,6 +165,8 @@
                 <div class="drps-card">
                     <div class="d-flex align-center justify-space-between mb-4">
                         <MudText Typo="Typo.h6">Today's Active Tasks</MudText>
+                        @if (AppData.CanSeeTasks)
+                        {
                         <MudButton Variant="Variant.Text"
                                    Color="Color.Primary"
                                    Size="Size.Small"
@@ -172,6 +174,7 @@
                                    Href="tasks">
                             Open Daily Tasks
                         </MudButton>
+                        }
                     </div>
 
                     @if (!todayTasks.Any())
@@ -220,6 +223,29 @@
                         }
                     }
                 </div>
+
+                @* Staff have no Daily Tasks page, so this is where they see work assigned for later in the week. *@
+                <div class="drps-card mt-4">
+                    <MudText Typo="Typo.h6" Class="mb-4">Upcoming (next 7 days)</MudText>
+                    @if (!upcomingTasks.Any())
+                    {
+                        <div class="drps-summary-empty">Nothing coming up this week.</div>
+                    }
+                    else
+                    {
+                        @foreach (var task in upcomingTasks)
+                        {
+                            var assignees = AppData.AssigneeNames(task);
+                            <div class="task-item">
+                                <MudText Typo="Typo.body1" Style="font-weight: 500;">@task.Title</MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                    @task.Deadline.ToString("ddd d MMM")@(task.IsAllDay() ? "" : task.Deadline.ToString(", h:mm tt"))
+                                    @(assignees.Length == 0 ? "" : $" · {assignees}")
+                                </MudText>
+                            </div>
+                        }
+                    }
+                </div>
             </MudItem>
 
             <MudItem xs="12" md="4">
@@ -261,6 +287,9 @@
     private IReadOnlyList<TaskCardDto> todayTasks =>
         AppData.Tasks.Where(t => t.Deadline.Date == DateTime.Today).ToList();
 
+    private IEnumerable<TaskCardDto> upcomingTasks =>
+        AppData.Tasks.Where(t => t.Deadline.Date > DateTime.Today && !t.IsDone()).OrderBy(t => t.Deadline);
+
     // Number of today's tasks marked complete - drives the header chip.
     private int completedCount => todayTasks.Count(t => t.IsDone());
 
@@ -282,7 +311,7 @@
     protected override async Task OnInitializedAsync()
     {
         AppData.OnChange += StateHasChanged;
-        await AppData.LoadTasksAsync(DateTime.Today, DateTime.Today.AddDays(1));
+        await AppData.LoadTasksAsync(DateTime.Today, DateTime.Today.AddDays(8)); // today + the upcoming week
     }
 
     public void Dispose()

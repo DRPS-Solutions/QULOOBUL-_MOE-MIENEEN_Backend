@@ -99,16 +99,17 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
         }
 //----------------------------------------------------------------------------------------------------------------------//
         /// <summary>A file inherits the access rule of whatever it is attached to; an unattached
-        /// file (a monthly report filed against a period) is the uploader's and an admin's.</summary>
+        /// file (a monthly report filed against a period) is the uploader's. ManageFiles (Admin and
+        /// Secondary Admin) reaches every file, attached or not.</summary>
         public async Task EnsureFileAsync(int userId, int fileId)
         {
             var file = await db.FileUploads.FindAsync(fileId)
                 ?? throw new KeyNotFoundException($"File {fileId} not found.");
 
             if (file.UploadedBy == userId) return;
+            if (await HasPermissionAsync(userId, Permissions.ManageFiles)) return;
             if (file.TaskId is int taskId) { await EnsureTaskAsync(userId, taskId); return; }
             if (file.MeetingId is int meetingId) { await EnsureMeetingAsync(userId, meetingId); return; }
-            if (await IsAdminAsync(userId)) return;
 
             throw new UnauthorizedAccessException("You do not have access to this file.");
         }

@@ -50,6 +50,23 @@ public class UseCaseGapTests
     }
 //----------------------------------------------------------------------------------------------------------------------//
     [Fact]
+    public async Task Two_events_cannot_book_the_same_location_at_the_same_time()
+    {
+        using var db = NewDb();
+        var alice = User(db, "alice", 1);
+        var bob = User(db, "bob", 1);
+        var when = new DateTime(2026, 10, 1, 9, 0, 0);
+        db.Events.Add(new Event { Organiser = alice, Title = "Fete", EventDate = when, Location = "Hall" });
+        await db.SaveChangesAsync();
+
+        // A different organiser, so only the location rule can refuse it (test plan M2).
+        var events = new EventService(db, new AuditService(db), null!, new AccessGuard(db));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => events.CreateAsync(
+            new CreateEventRequest { Title = "Clash", EventDate = when, Location = " Hall " }, bob.UserId));
+        Assert.Single(db.Events);
+    }
+//----------------------------------------------------------------------------------------------------------------------//
+    [Fact]
     public async Task Minutes_append_as_a_new_version_and_only_the_permitted_may_edit()
     {
         using var db = NewDb();
@@ -142,6 +159,16 @@ public class UseCaseGapTests
             new ReportRequest { PeriodStart = new(2020, 1, 1), PeriodEnd = new(2020, 1, 31) }, 1));
         Assert.Contains("wider date range", ex.Message);
         Assert.Empty(db.Reports);
+    }
+//----------------------------------------------------------------------------------------------------------------------//
+    [Fact]
+    public async Task A_period_over_a_year_asks_for_a_narrower_range()
+    {
+        using var db = NewDb();
+        var reports = new ReportingService(db, null!);
+        var ex = await Assert.ThrowsAsync<ArgumentException>(() => reports.BuildAsync(
+            new ReportRequest { PeriodStart = new(2020, 1, 1), PeriodEnd = new(2021, 1, 2) }, 1));
+        Assert.Contains("narrower date range", ex.Message);
     }
 //----------------------------------------------------------------------------------------------------------------------//
     [Fact]

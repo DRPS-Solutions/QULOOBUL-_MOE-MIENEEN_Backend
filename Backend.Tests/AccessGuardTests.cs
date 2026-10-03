@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using QULOOBUL__MOE_MIENEEN_Backend.Data;
+using QULOOBUL__MOE_MIENEEN_Backend.Models.File;
 using QULOOBUL__MOE_MIENEEN_Backend.Models.IdentityAndAccess;
 using QULOOBUL__MOE_MIENEEN_Backend.Models.Project;
 using QULOOBUL__MOE_MIENEEN_Backend.Models.Task;
@@ -53,6 +54,33 @@ public class AccessGuardTests
         await f.Guard.EnsureProjectOwnerAsync(f.AdminId, f.ProjectId);
         await Assert.ThrowsAsync<UnauthorizedAccessException>(
             () => f.Guard.EnsureProjectOwnerAsync(f.AssigneeId, f.ProjectId));
+    }
+//----------------------------------------------------------------------------------------------------------------------//
+    [Fact]
+    public async Task ManageFiles_reaches_any_file_without_being_a_full_admin()
+    {
+        var f = await Fixture.CreateAsync();
+        // Secondary Admin: ManageFiles but not ManageUsers (test plan F2).
+        var secondary = new User
+        {
+            Role = new Role { RoleName = Roles.SecondaryAdmin, HierarchyLevel = 2 },
+            Email = "secondary@test",
+        };
+        f.Db.Users.Add(secondary);
+        f.Db.RolePermissions.Add(new RolePermission
+        {
+            Role = secondary.Role,
+            Permission = new Permission { PermissionName = Permissions.ManageFiles },
+        });
+        var onTask = new FileUpload { UploadedBy = f.OwnerId, TaskId = f.TaskId, FileName = "a.pdf" };
+        var unattached = new FileUpload { UploadedBy = f.OwnerId, FileName = "b.pdf" };
+        f.Db.FileUploads.AddRange(onTask, unattached);
+        await f.Db.SaveChangesAsync();
+
+        await f.Guard.EnsureFileAsync(secondary.UserId, onTask.FileId);
+        await f.Guard.EnsureFileAsync(secondary.UserId, unattached.FileId);
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(
+            () => f.Guard.EnsureFileAsync(f.StrangerId, unattached.FileId));
     }
 //----------------------------------------------------------------------------------------------------------------------//
     // One project owned by "owner", one task on it assigned to "assignee". "stranger" is on

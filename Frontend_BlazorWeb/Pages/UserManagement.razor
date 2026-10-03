@@ -294,7 +294,7 @@
         <div class="drps-users-header">
             <MudText Typo="Typo.h6" Style="font-weight:600;">User Management</MudText>
 
-            <div class="d-flex align-center gap-3">
+            <div class="d-flex align-center flex-wrap gap-3">
                 @if (!showCreateUserScreen)
                 {
                     <MudTextField T="string"
@@ -305,9 +305,9 @@
                                   AdornmentIcon="@Icons.Material.Filled.Search"
                                   Immediate="true"
                                   Class="drps-users-search"
-                                  Style="max-width:280px;" />
+                                  Style="max-width:280px; min-width:200px;" />
 
-                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="() => showCreateUserScreen = true">
+                    <MudButton Style="white-space:nowrap;" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="() => showCreateUserScreen = true">
                         Add New User
                     </MudButton>
                 }
@@ -390,6 +390,21 @@
                                         <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.LockReset"
                                                    Disabled="@busy" OnClick="ResetPassword">
                                             Reset Password
+                                        </MudButton>
+                                    }
+                                    @* SM-03: only Active ↔ Inactive. *@
+                                    @if (selectedEmployee.Status == "Active")
+                                    {
+                                        <MudButton Variant="Variant.Outlined" Color="Color.Warning" StartIcon="@Icons.Material.Filled.PersonOff"
+                                                   Disabled="@busy" OnClick="() => SetActive(false)">
+                                            Deactivate
+                                        </MudButton>
+                                    }
+                                    else if (selectedEmployee.Status == "Inactive")
+                                    {
+                                        <MudButton Variant="Variant.Outlined" Color="Color.Success" StartIcon="@Icons.Material.Filled.HowToReg"
+                                                   Disabled="@busy" OnClick="() => SetActive(true)">
+                                            Reactivate
                                         </MudButton>
                                     }
                                     <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Filled.Delete"
@@ -746,9 +761,31 @@
         if (result is null) return;
 
         // Shown once and never stored in the clear: the admin passes it on in person or by phone.
-        await DialogService.ShowMessageBoxAsync("Temporary password",
-            $"Temporary password for {user.FullName}: {result.TemporaryPassword} — Give it to them directly. They must choose a new password when they next sign in.",
+        // A Copy button, since there's no getting it back once the dialog closes (test plan A3/U4).
+        var name = System.Net.WebUtility.HtmlEncode(user.FullName);
+        var temp = System.Net.WebUtility.HtmlEncode(result.TemporaryPassword);
+        await DialogService.ShowMessageBoxAsync("Temporary password", new MarkupString(
+            $"<p>Temporary password for {name}:</p>" +
+            $"<p><code style=\"font-size:1.1rem; user-select:all;\">{temp}</code> " +
+            $"<button type=\"button\" class=\"mud-button-root mud-button mud-button-outlined mud-button-outlined-primary mud-button-outlined-size-small\" data-p=\"{temp}\" " +
+            "onclick=\"navigator.clipboard.writeText(this.dataset.p).then(() => this.textContent = 'Copied')\">Copy</button></p>" +
+            "<p>Give it to them directly. They must choose a new password when they next sign in.</p>"),
             yesText: "Done");
+        await Task.WhenAll(AppData.RefreshUsersAsync(), LoadOverview());
+        if (AppData.Users.FirstOrDefault(u => u.UserId == user.UserId) is { } updated) await SelectEmployee(updated);
+    }
+
+    private async Task SetActive(bool active)
+    {
+        if (selectedEmployee is not { } user) return;
+        if (!active && await DialogService.ShowMessageBoxAsync("Deactivate user",
+                $"Deactivate {user.FullName}? They can't sign in, and their open tasks are reassigned. You can reactivate them later.",
+                yesText: "Deactivate", cancelText: "Cancel") != true) return;
+        busy = true;
+        var ok = await AppData.SendAsync(HttpMethod.Post, $"api/users/{user.UserId}/{(active ? "reactivate" : "deactivate")}");
+        busy = false;
+        if (!ok) return;
+
         await Task.WhenAll(AppData.RefreshUsersAsync(), LoadOverview());
         if (AppData.Users.FirstOrDefault(u => u.UserId == user.UserId) is { } updated) await SelectEmployee(updated);
     }

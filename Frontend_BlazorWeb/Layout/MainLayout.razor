@@ -3,13 +3,18 @@
 @implements IDisposable
 @inject AppDataService AppData
 @inject NavigationManager Nav
+@inject IJSRuntime JS
 
 <MudThemeProvider IsDarkMode="isDarkMode" Theme="_theme" />
 <MudPopoverProvider />
 <MudDialogProvider />
 <MudSnackbarProvider />
 
-@if (AppData.CurrentUser is null or { MustChangePassword: true })
+@if (restoring)
+{
+    @* Blank while a saved session loads, so a reload doesn't flash the login form. *@
+}
+else if (AppData.CurrentUser is null or { MustChangePassword: true })
 {
     <div class="page @(isDarkMode ? "dark-mode" : "")">
         <div class="drps-login-wrap">
@@ -149,9 +154,18 @@ else
     private bool CanLogin =>
         !loggingIn && !string.IsNullOrWhiteSpace(emailInput) && !string.IsNullOrWhiteSpace(passwordInput);
 
-    private void ToggleDarkMode() => isDarkMode = !isDarkMode;
+    // localStorage, unlike the session: a display preference should outlive the tab.
+    private async Task ToggleDarkMode()
+    {
+        isDarkMode = !isDarkMode;
+        await JS.InvokeVoidAsync("localStorage.setItem", "darkMode", isDarkMode);
+    }
 
-    private void ToggleNavOrientation() => isVerticalNav = !isVerticalNav;
+    private async Task ToggleNavOrientation()
+    {
+        isVerticalNav = !isVerticalNav;
+        await JS.InvokeVoidAsync("localStorage.setItem", "verticalNav", isVerticalNav);
+    }
 
     // UC-01: the API checks the credentials and returns a JWT.
     private async Task Login()
@@ -182,7 +196,16 @@ else
     protected override void OnParametersSet() => pageErrors?.Recover();
 
     // Re-render when the session ends elsewhere (e.g. an expired token).
-    protected override void OnInitialized() => AppData.OnChange += StateHasChanged;
+    protected override async Task OnInitializedAsync()
+    {
+        AppData.OnChange += StateHasChanged;
+        isDarkMode = await JS.InvokeAsync<string?>("localStorage.getItem", "darkMode") == "true";
+        isVerticalNav = await JS.InvokeAsync<string?>("localStorage.getItem", "verticalNav") == "true";
+        await AppData.RestoreSessionAsync();
+        restoring = false;
+    }
+
+    private bool restoring = true;
 
     public void Dispose() => AppData.OnChange -= StateHasChanged;
 

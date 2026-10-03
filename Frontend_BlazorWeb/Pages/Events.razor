@@ -330,10 +330,34 @@
                         var project = selected;
                         <div class="drps-card-title">
                             <div class="drps-detail-title">@project.ProjectName</div>
-                            <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small" StartIcon="@Icons.Material.Filled.Edit" OnClick="StartEdit">
-                                Edit
-                            </MudButton>
+                            <div class="d-flex gap-2">
+                                @if (CanCancel(project))
+                                {
+                                    <MudButton Variant="Variant.Outlined" Color="Color.Error" Size="Size.Small" StartIcon="@Icons.Material.Filled.EventBusy"
+                                               OnClick="() => { cancelReason = string.Empty; confirmingCancel = true; }">
+                                        Cancel Event
+                                    </MudButton>
+                                }
+                                <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small" StartIcon="@Icons.Material.Filled.Edit" OnClick="StartEdit">
+                                    Edit
+                                </MudButton>
+                            </div>
                         </div>
+
+                        @if (confirmingCancel)
+                        {
+                            <MudAlert Severity="Severity.Warning" Class="mb-3">
+                                Cancel "@project.ProjectName"? Its open tasks are cancelled and the staff on it are notified. The event and its history are kept.
+                            </MudAlert>
+                            <MudTextField T="string" @bind-Value="cancelReason" Label="Reason (sent to the staff)" Variant="Variant.Outlined"
+                                          Margin="Margin.Dense" MaxLength="500" Class="mb-2" />
+                            <div class="d-flex gap-2 mb-4">
+                                <MudButton Variant="Variant.Filled" Color="Color.Error" Size="Size.Small" Disabled="@saving" OnClick="CancelEvent">
+                                    @(saving ? "Cancelling..." : "Confirm Cancellation")
+                                </MudButton>
+                                <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="() => confirmingCancel = false">Keep Event</MudButton>
+                            </div>
+                        }
 
                         <div class="drps-detail-meta">
                             <span><MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Small" /> Lead: @AppData.UserName(project.OwnerId)</span>
@@ -425,9 +449,30 @@
 
     // Clicking a roster item shows it read-only. Any in-progress
     // create/edit is discarded, same as navigating away from a form.
+    // --- Event Cancellation: the API re-checks lead-or-admin and refuses a closed/cancelled event. ---
+    private bool confirmingCancel;
+    private string cancelReason = string.Empty;
+
+    private bool CanCancel(ProjectDto p) =>
+        p.Status is not ("Cancelled" or "Closed")
+        && (p.OwnerId == AppData.CurrentUser?.UserId || AppData.HasPermission(Permissions.ManageUsers));
+
+    private async Task CancelEvent()
+    {
+        if (selected is null) return;
+        saving = true;
+        var ok = await AppData.SendAsync(HttpMethod.Post, $"api/projects/{selected.ProjectId}/cancel",
+            new CancelProjectRequest { Reason = cancelReason });
+        saving = false;
+        if (!ok) return;
+        await AppData.RefreshProjectsAsync();
+        await SelectProject(selected.ProjectId);
+    }
+
     private async Task SelectProject(int projectId)
     {
         form = null;
+        confirmingCancel = false;
         var project = AppData.GetAsync<ProjectDto>($"api/projects/{projectId}");
         var staff = AppData.GetAsync<List<ProjectMemberDto>>($"api/projects/{projectId}/members");
         var board = AppData.GetAsync<List<TaskCardDto>>($"api/projects/{projectId}/board");
@@ -513,7 +558,7 @@
     protected override async Task OnInitializedAsync()
     {
         AppData.OnChange += StateHasChanged;
-        await AppData.RefreshProjectsAsync();
+        await Task.WhenAll(AppData.RefreshProjectsAsync(), AppData.RefreshUsersAsync());
     }
 
     // events?project=4 (a notification's link, UC-08 step 3) opens that project's detail.

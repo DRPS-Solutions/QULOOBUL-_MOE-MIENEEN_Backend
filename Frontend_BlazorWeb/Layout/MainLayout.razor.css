@@ -13,7 +13,8 @@
 
     /* Vertical nav mode: the top navbar becomes a fixed-width left
    sidebar instead of a horizontal bar, and the page runs left-to-right
-   instead of top-to-bottom. */
+   instead of top-to-bottom. Desktop only, like NavMenu.razor.css. */
+@media (min-width: 900px) {
     .page.nav-vertical {
         flex-direction: row;
     }
@@ -32,6 +33,7 @@
             flex: 1;
             min-width: 0;
         }
+}
 
 main {
     flex: 1;

@@ -21,6 +21,10 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Controllers
         public async Task<ActionResult<ProjectDto>> Update(int id, UpdateProjectRequest req) =>
             Ok(await projects.UpdateAsync(id, req, UserId()));
 //----------------------------------------------------------------------------------------------------------------------//
+        [HttpPost("{id:int}/cancel")]
+        public async Task<ActionResult<ProjectDto>> Cancel(int id, CancelProjectRequest req) =>
+            Ok(await projects.CancelAsync(id, req.Reason, UserId()));
+//----------------------------------------------------------------------------------------------------------------------//
         [HttpGet("{id:int}/members")]
         public async Task<ActionResult<List<ProjectMemberDto>>> Members(int id) =>
             Ok(await projects.MembersAsync(id, UserId()));

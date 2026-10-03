@@ -35,7 +35,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
                     r.RequestId, r.RequestedBy, r.CategoryId, r.Category!.CategoryName,
                     r.Status, r.Priority, r.DateSubmitted, r.ReviewedBy,
                     db.RequestStatusHistory.Where(h => h.RequestId == r.RequestId).OrderBy(h => h.TimeCreated)
-                        .Select(h => new RequestStatusHistoryDto(h.NewStatus, h.ChangedBy, h.TimeCreated)).ToList(),
+                        .Select(h => new RequestStatusHistoryDto(h.NewStatus, h.ChangedBy, h.TimeCreated, h.Note)).ToList(),
                     r.Detail))
                 .ToListAsync();
 //----------------------------------------------------------------------------------------------------------------------//
@@ -127,7 +127,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
 
             request.Status = target;
             request.ReviewedBy = reviewerId;
-            AddHistory(requestId, target, reviewerId);
+            AddHistory(requestId, target, reviewerId, string.IsNullOrWhiteSpace(note) ? null : note.Trim());
 
             var message = $"Your resource request #{requestId} was {target.ToLowerInvariant()}." +
                           (string.IsNullOrWhiteSpace(note) ? "" : $" Note: {note}");
@@ -209,12 +209,13 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
         private Task<bool> IsFacilityManager(int userId) =>
             db.Users.AnyAsync(u => u.UserId == userId && u.IsActive && u.Role!.RoleName == Roles.FacilityManager);
 //----------------------------------------------------------------------------------------------------------------------//
-        private void AddHistory(int requestId, string newStatus, int changedBy) =>
+        private void AddHistory(int requestId, string newStatus, int changedBy, string? note = null) =>
             db.RequestStatusHistory.Add(new RequestStatusHistory
             {
                 RequestId = requestId,
                 NewStatus = newStatus,
                 ChangedBy = changedBy,
+                Note = note,
                 TimeCreated = DateTime.UtcNow,
             });
 //----------------------------------------------------------------------------------------------------------------------//

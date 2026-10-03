@@ -18,6 +18,7 @@ using QULOOBUL__MOE_MIENEEN_Shared.Auth;
 using QULOOBUL__MOE_MIENEEN_Shared.Collaboration;
 using QULOOBUL__MOE_MIENEEN_Shared.Directory;
 using QULOOBUL__MOE_MIENEEN_Shared.Notifications;
+using QULOOBUL__MOE_MIENEEN_Shared.Requests;
 using QULOOBUL__MOE_MIENEEN_Shared.Tasks;
 using static QULOOBUL__MOE_MIENEEN_Shared.Classes.Common;
 
@@ -335,9 +336,58 @@ public class ApiIntegrationTests(ApiFactory api) : IClassFixture<ApiFactory>
             new ForgotPasswordRequest { FirstName = "Forgetful", Surname = "Person", Email = email })).StatusCode);
 
         var notes = (await admin.GetFromJsonAsync<List<NotificationDto>>("/api/notifications"))!;
-        Assert.Contains(notes, n => n.Message.Contains($"Forgetful Person ({email})") && n.Message.Contains("Reset Password"));
+        // The account's own name is shown; the typed one only as a mismatch warning (test plan A4).
+        Assert.Contains(notes, n => n.Message.StartsWith($"Other Staff ({email})") && n.Message.Contains("Reset Password")
+            && n.Message.Contains("\"Forgetful Person\", which doesn't match"));
     }
 
+    [Fact]
+    public async Task Cancelling_an_event_cancels_its_open_tasks_and_tells_its_staff_why()
+    {
+        var (admin, _) = await api.SignInAsync(ApiFactory.AdminEmail);
+        var (staff, staffMe) = await api.SignInAsync(ApiFactory.StaffEmail);
+        var project = await (await admin.PostAsJsonAsync("/api/projects", new CreateProjectRequest { ProjectName = $"Fete {Guid.NewGuid():N}" }))
+            .Content.ReadFromJsonAsync<ProjectDto>();
+        (await admin.PostAsJsonAsync($"/api/projects/{project!.ProjectId}/members", new AddProjectMemberRequest { UserId = staffMe.UserId }))
+            .EnsureSuccessStatusCode();
+        var card = await (await admin.PostAsJsonAsync("/api/tasks", new CreateTaskRequest
+        {
+            ProjectId = project.ProjectId, Title = "Hire chairs", Deadline = DateTime.UtcNow.AddDays(5),
+        })).Content.ReadFromJsonAsync<TaskCardDto>();
+
+        // Staff aren't the owner: refused.
+        Assert.Equal(HttpStatusCode.Forbidden, (await staff.PostAsJsonAsync($"/api/projects/{project.ProjectId}/cancel",
+            new CancelProjectRequest())).StatusCode);
+
+        var cancelled = await (await admin.PostAsJsonAsync($"/api/projects/{project.ProjectId}/cancel",
+            new CancelProjectRequest { Reason = "Venue flooded" })).Content.ReadFromJsonAsync<ProjectDto>();
+        Assert.Equal("Cancelled", cancelled!.Status);
+        Assert.Equal("Cancelled", (await admin.GetFromJsonAsync<TaskDetailDto>($"/api/tasks/{card!.TaskId}"))!.Status);
+        Assert.Contains(await staff.GetFromJsonAsync<List<NotificationDto>>("/api/notifications") ?? [],
+            n => n.Message.Contains(project.ProjectName) && n.Message.Contains("Venue flooded"));
+
+        // Twice is refused rather than re-notifying everyone.
+        Assert.False((await admin.PostAsJsonAsync($"/api/projects/{project.ProjectId}/cancel", new CancelProjectRequest()))
+            .IsSuccessStatusCode);
+    }
+//----------------------------------------------------------------------------------------------------------------------//
+    [Fact]
+    public async Task A_decline_reason_is_kept_on_the_request_for_the_requester()
+    {
+        var (admin, _) = await api.SignInAsync(ApiFactory.AdminEmail);
+        var (staff, _) = await api.SignInAsync(ApiFactory.StaffEmail);
+        var category = (await staff.GetFromJsonAsync<List<RequestCategoryDto>>("/api/requests/categories"))!.First();
+        var id = await (await staff.PostAsJsonAsync("/api/requests", new CreateResourceRequest { CategoryId = category.CategoryId, Detail = "Projector" }))
+            .Content.ReadFromJsonAsync<int>();
+
+        (await admin.PostAsJsonAsync($"/api/requests/{id}/review", new ReviewRequestRequest { Approve = false, Note = "Borrow the hall's one" }))
+            .EnsureSuccessStatusCode();
+
+        var mine = (await staff.GetFromJsonAsync<List<ResourceRequestDto>>("/api/requests"))!.Single(r => r.RequestId == id);
+        Assert.Equal("Declined", mine.Status);
+        Assert.Equal("Borrow the hall's one", mine.History.Single(h => h.NewStatus == "Declined").Note);
+    }
+//----------------------------------------------------------------------------------------------------------------------//
     private async Task<int> AddStaffAsync()
     {
         using var scope = api.Services.CreateScope();

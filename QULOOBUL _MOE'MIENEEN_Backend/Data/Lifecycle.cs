@@ -23,6 +23,9 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Data
         /// <summary>SM-01 archive() guard: a project with this status has closed.</summary>
         public const string ProjectClosed = "Closed";
 
+        /// <summary>Event Planning's cancel: the event won't happen, so its open tasks are cancelled with it.</summary>
+        public const string ProjectCancelled = "Cancelled";
+
         /// <summary>Task statuses that no longer count as open work.</summary>
         public static readonly string[] TaskFinished = ["Done", TaskCancelled, TaskArchived];
 //----------------------------------------------------------------------------------------------------------------------//

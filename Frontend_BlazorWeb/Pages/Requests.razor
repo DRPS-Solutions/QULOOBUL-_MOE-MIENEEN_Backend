@@ -230,7 +230,7 @@
                         New Request
                     </div>
 
-                    <MudTextField T="string" @bind-Value="newRequest.Title" Label="What do you need?" Required="true" RequiredError="Say what you need." Variant="Variant.Outlined" Class="mb-3" />
+                    <MudTextField T="string" @ref="titleField" @bind-Value="newRequest.Title" Label="What do you need?" Required="true" RequiredError="Say what you need." Variant="Variant.Outlined" Class="mb-3" />
 
                     <MudSelect T="int?" Label="Category" Variant="Variant.Outlined" Required="true" RequiredError="Choose a category." @bind-Value="newRequest.CategoryId"
                                ToStringFunc="@(id => categories.FirstOrDefault(c => c.CategoryId == id)?.CategoryName)" Class="mb-3">
@@ -333,6 +333,10 @@
                                     <div class="drps-request-review">
                                         @req.Status by @AppData.UserName(req.ReviewedBy)@ReviewedOn(req)
                                     </div>
+                                    @if (DecisionNote(req) is { } note)
+                                    {
+                                        <div class="drps-request-review"><b>@(req.Status == "Declined" ? "Reason" : "Note"):</b> @note</div>
+                                    }
                                 }
 
                                 @* Approve/Deny only render for reviewers, only while still
@@ -421,7 +425,13 @@
         await AppData.RefreshRequestsAsync();
         // Keep the category, since people often submit a few similar requests in a row.
         newRequest = new RequestFormModel { CategoryId = newRequest.CategoryId };
+        // Clearing a required field that was typed in re-validates it as empty: a fresh form shouldn't show red (test plan R1).
+        StateHasChanged();
+        await Task.Yield();
+        if (titleField is not null) await titleField.ResetValidationAsync();
     }
+
+    private MudTextField<string>? titleField;
 
     // --- Status filter above the list. Null means "All". ---
     private string? activeFilter = null;
@@ -450,6 +460,10 @@
         req.History.LastOrDefault(x => x.NewStatus == req.Status) is { } review
             ? $" on {AppDataService.Local(review.TimeCreated):d MMM}"
             : "";
+
+    // The reviewer's reason from the approve/decline, kept on the request rather than only in the notification.
+    private static string? DecisionNote(ResourceRequestDto req) =>
+        req.History.LastOrDefault(h => h.NewStatus is "Approved" or "Declined")?.Note;
 
     // --- Review actions (UC-05). The API notifies the requester. ---
     private async Task Review(ResourceRequestDto req, bool approve, string? note)

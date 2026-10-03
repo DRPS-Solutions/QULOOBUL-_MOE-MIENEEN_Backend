@@ -27,6 +27,13 @@
         text-overflow: ellipsis;
     }
 
+/* On a phone the name runs under the search/bell/settings/profile icons; the logo alone has to do. */
+@media (max-width: 479.98px) {
+    .navbar-brand .brand-text {
+        display: none;
+    }
+}
+
 /*
    Grouped end-of-navbar controls (settings menu + profile menu).
    Default (mobile, collapsed-hamburger) placement: overlaid near the
@@ -109,15 +116,18 @@
     background-color: rgba(0,0,0,0.2);
 }
 
-.navbar-toggler:checked ~ .nav-scrollable {
+/* :has, not "~": the toggler sits inside .navbar, so it isn't a sibling of .nav-scrollable. */
+.nav-container:has(.navbar-toggler:checked) .nav-scrollable {
     display: block;
 }
 
 /*
    User-toggled vertical layout (from the sidebar/nav-orientation
-   button) - makes the nav a full-height left sidebar at any screen
-   width, independent of the responsive breakpoint below.
+   button) - makes the nav a full-height left sidebar. Desktop only: on a
+   phone a 260px sidebar leaves no room for the page, so it falls back to
+   the hamburger. Same 900px breakpoint as MainLayout.razor.css.
 */
+@media (min-width: 900px) {
 .nav-container.nav-vertical {
     display: flex;
     flex-direction: column;
@@ -222,6 +232,7 @@
         .nav-container.nav-vertical .nav-end > *:nth-child(3) {
             order: 1; /* profile */
         }
+}
 
 /*
    Transforms the layout into a horizontal bar on desktop views.
