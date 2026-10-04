@@ -4,8 +4,8 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
 
     <!-- Everything theme-dependent goes through AppThemeBinding, which is the
-         MAUI equivalent of Theme.kt swapping LightColors/DarkColors. The in-app
-         toggle just sets Application.Current.UserAppTheme. -->
+         MAUI equivalent of Theme.kt swapping LightColors/DarkColors. There is no
+         in-app toggle: the theme follows the phone's light/dark setting. -->
 
     <Style TargetType="Page" ApplyToDerivedTypes="True">
         <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource Background}, Dark={StaticResource BackgroundDark}}" />

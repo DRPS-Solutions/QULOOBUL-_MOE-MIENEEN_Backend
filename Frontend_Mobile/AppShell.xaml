@@ -24,10 +24,10 @@
         </Grid>
     </Shell.FlyoutHeader>
 
-    <!-- Set on the Shell so every page inherits the same bar: title, the bell
-         with its unread badge, and the dark-mode switch. -->
+    <!-- Set on the Shell so every page inherits the same bar: title, search and
+         the bell with its unread badge. Light/dark follows the phone's setting. -->
     <Shell.TitleView>
-        <Grid ColumnDefinitions="*,Auto,Auto,Auto" VerticalOptions="Fill">
+        <Grid ColumnDefinitions="*,Auto,Auto" VerticalOptions="Fill">
 
             <Label Text="QULOOBUL MOE'MIENEEN"
                    TextColor="{StaticResource White}"
@@ -72,16 +72,6 @@
                            VerticalOptions="Center" />
                 </Border>
             </Grid>
-
-            <Button Grid.Column="3"
-                    x:Name="ThemeToggle"
-                    Clicked="OnToggleTheme"
-                    BackgroundColor="Transparent"
-                    TextColor="{StaticResource White}"
-                    FontSize="18"
-                    WidthRequest="44"
-                    Padding="0"
-                    CornerRadius="0" />
 
         </Grid>
     </Shell.TitleView>

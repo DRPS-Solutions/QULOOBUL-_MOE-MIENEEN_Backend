@@ -12,7 +12,6 @@ public partial class LoginPage : ContentPage
     public LoginPage()
     {
         InitializeComponent();
-        ThemeToggle.Text = App.ThemeGlyph;
     }
 
     /// <summary>
@@ -26,7 +25,6 @@ public partial class LoginPage : ContentPage
         EmailEntry.Text = string.Empty;
         PasswordEntry.Text = string.Empty;
         ErrorLabel.IsVisible = false;
-        ThemeToggle.Text = App.ThemeGlyph;
 
         if (_restoreTried) return;
         _restoreTried = true;
@@ -148,11 +146,5 @@ public partial class LoginPage : ContentPage
         entry.IsPassword = !entry.IsPassword;
         button.Text = entry.IsPassword ? "\U0001F441" : "\U0001F648";
         SemanticProperties.SetDescription(button, entry.IsPassword ? "Show password" : "Hide password");
-    }
-
-    private void OnToggleTheme(object? sender, EventArgs e)
-    {
-        App.ToggleTheme();
-        ThemeToggle.Text = App.ThemeGlyph;
     }
 }

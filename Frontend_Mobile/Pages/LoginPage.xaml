@@ -10,18 +10,6 @@
          show, comes back from the server with the token. -->
 
     <Grid>
-        <Button
-            x:Name="ThemeToggle"
-            Clicked="OnToggleTheme"
-            HorizontalOptions="End"
-            VerticalOptions="Start"
-            Margin="16"
-            Padding="10,6"
-            CornerRadius="18"
-            BackgroundColor="Transparent"
-            FontSize="18"
-            TextColor="{AppThemeBinding Light={StaticResource TextPrimary}, Dark={StaticResource TextPrimaryDark}}" />
-
         <ScrollView>
             <Border Style="{StaticResource Card}"
                     Padding="28"

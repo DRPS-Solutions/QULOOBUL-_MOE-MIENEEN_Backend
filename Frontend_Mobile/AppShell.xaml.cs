@@ -8,7 +8,6 @@ public partial class AppShell : Shell
     {
         InitializeComponent();
         BindingContext = AppState.Current;
-        ThemeToggle.Text = App.ThemeGlyph;
     }
 
     /// <summary>
@@ -37,12 +36,6 @@ public partial class AppShell : Shell
 
     private async void OnOpenSearch(object? sender, EventArgs e) =>
         await GoToAsync("//search");
-
-    private void OnToggleTheme(object? sender, EventArgs e)
-    {
-        App.ToggleTheme();
-        ThemeToggle.Text = App.ThemeGlyph;
-    }
 
     private async void OnLogout(object? sender, EventArgs e) => await SignOutAsync();
 }
