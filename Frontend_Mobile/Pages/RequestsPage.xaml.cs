@@ -55,7 +55,8 @@ public partial class RequestsPage : ContentPage
                 _state.UserName(r.RequestedBy),
                 r.ReviewedBy is null ? null : _state.UserName(r.ReviewedBy),
                 _state.CanReview(r),
-                _state.CanResubmit(r)))
+                _state.CanResubmit(r),
+                _state.CanComplete(r)))
             .ToList();
 
     private void Refresh()
@@ -193,6 +194,13 @@ public partial class RequestsPage : ContentPage
 
         await _state.ReviewRequestAsync(request.Dto.RequestId, approve: false,
             note: string.IsNullOrWhiteSpace(reason) ? null : reason.Trim());
+    }
+
+    // SM-02 fulfil: an approved request is closed once the items are handed over.
+    private async void OnComplete(object? sender, EventArgs e)
+    {
+        if ((sender as Element)?.BindingContext is not ResourceRequest request) return;
+        await _state.CompleteRequestAsync(request.Dto.RequestId);
     }
 
     // The prompt edits the whole request text; its first line stays the title.

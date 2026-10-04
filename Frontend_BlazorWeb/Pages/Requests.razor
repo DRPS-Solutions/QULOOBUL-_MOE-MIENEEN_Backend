@@ -349,7 +349,7 @@
                                 @* Approve/Deny only render for reviewers, only while still
                                    Pending, and never on their own request (the API refuses
                                    self-review). *@
-                                @if (CanReview && (req.Status is "Pending" or "Escalated" or "Under Review") && req.RequestedBy != AppData.CurrentUser?.UserId)
+                                @if (CanReviewThis(req))
                                 {
                                     <div class="drps-request-actions">
                                         <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Success" OnClick="@(() => Review(req, true, null))">
@@ -362,7 +362,7 @@
                                 }
 
                                 @* SM-02 fulfil: an approved request is closed once the items are handed over. *@
-                                @if (CanReview && req.Status == "Approved")
+                                @if (CanCompleteThis(req))
                                 {
                                     <div class="drps-request-actions">
                                         <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" OnClick="@(() => Complete(req))">
@@ -414,6 +414,19 @@
     // The API decides who may review (and re-checks on every review);
     // this only decides whether to show the buttons.
     private bool CanReview => AppData.HasPermission(Permissions.ReviewRequests);
+    private bool IsFacilityManager => AppData.Role == Roles.FacilityManager;
+    private bool IsMe(int? userId) => userId == AppData.CurrentUser?.UserId;
+
+    // Mirrors RequestReviewService.EnsureCanReview: reviewers act on anything open; a facility manager
+    // on what was escalated to them, then on the one they claimed. Nobody reviews their own (R5).
+    private bool CanReviewThis(ResourceRequestDto req) =>
+        !IsMe(req.RequestedBy) && (
+            (CanReview && req.Status is "Pending" or "Escalated" or "Under Review")
+            || (IsFacilityManager && (req.Status == "Escalated" || (req.Status == "Under Review" && IsMe(req.ReviewedBy)))));
+
+    // The facility manager who approved an escalated request sees it through to fulfilled.
+    private bool CanCompleteThis(ResourceRequestDto req) =>
+        req.Status == "Approved" && (CanReview || (IsFacilityManager && IsMe(req.ReviewedBy)));
 
     // SM-02 statuses, in lifecycle order.
     private static readonly string[] Statuses = ["Pending", "Escalated", "Under Review", "Approved", "Declined", "Completed"];

@@ -135,6 +135,16 @@
                                                IsVisible="{Binding HasDecisionNote}"
                                                Style="{StaticResource LabelSmall}" />
 
+                                        <!-- SM-02 fulfil: reviewers, or the facility manager who approved an escalated request. -->
+                                        <Button Text="Mark fulfilled"
+                                                IsVisible="{Binding ShowComplete}"
+                                                Clicked="OnComplete"
+                                                FontSize="12"
+                                                Padding="14,8"
+                                                MinimumHeightRequest="36"
+                                                HorizontalOptions="Start"
+                                                Margin="0,8,0,0" />
+
                                         <!-- SM-02 resubmit: the requester's own declined request, within 30 days (R4). -->
                                         <Button Text="Revise &amp; resubmit"
                                                 IsVisible="{Binding ShowResubmit}"

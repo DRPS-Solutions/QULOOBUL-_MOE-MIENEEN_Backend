@@ -398,11 +398,24 @@ public sealed class AppState : Observable
         && r.History.LastOrDefault(h => h.NewStatus == "Declined") is { } declined
         && DateTime.UtcNow - declined.TimeCreated < TimeSpan.FromDays(30);
 
-    /// <summary>Reviewers act on requests still awaiting a decision, never their own.</summary>
+    /// <summary>Mirrors RequestReviewService.EnsureCanReview: reviewers act on anything still open; a
+    /// facility manager on what was escalated to them, then on the one they claimed. Never your own (R5).</summary>
     public bool CanReview(ResourceRequestDto r) =>
-        CanReviewRequests
-        && r.Status is "Pending" or "Escalated"
-        && r.RequestedBy != CurrentUser?.UserId;
+        r.RequestedBy != CurrentUser?.UserId && (
+            (CanReviewRequests && r.Status is "Pending" or "Escalated" or "Under Review")
+            || (Role == Roles.FacilityManager
+                && (r.Status == "Escalated" || (r.Status == "Under Review" && r.ReviewedBy == CurrentUser?.UserId))));
+
+    /// <summary>The facility manager who approved an escalated request sees it through to fulfilled.</summary>
+    public bool CanComplete(ResourceRequestDto r) =>
+        r.Status == "Approved"
+        && (CanReviewRequests || (Role == Roles.FacilityManager && r.ReviewedBy == CurrentUser?.UserId));
+
+    public async Task CompleteRequestAsync(int requestId)
+    {
+        if (await SendAsync(HttpMethod.Post, $"api/requests/{requestId}/complete"))
+            await RefreshRequestsAsync();
+    }
 
     // ----- Reports (UC-09) -----
 

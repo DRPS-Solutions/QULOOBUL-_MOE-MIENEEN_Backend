@@ -41,8 +41,9 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Controllers
             return NoContent();
         }
 //----------------------------------------------------------------------------------------------------------------------//
-        /// <summary>SM-02 fulfil(admin): Approved → Completed.</summary>
-        [HttpPost("{id:int}/complete"), Authorize(Policy = Permissions.ReviewRequests)]
+        /// <summary>SM-02 fulfil: Approved → Completed. No policy: the facility manager who approved an
+        /// escalated request may close it too; RequestReviewService makes that call.</summary>
+        [HttpPost("{id:int}/complete")]
         public async Task<IActionResult> Complete(int id)
         {
             await requests.CompleteAsync(id, UserId());

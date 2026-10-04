@@ -129,6 +129,34 @@ public class StateMachineGuardTests
         else await Assert.ThrowsAsync<InvalidOperationException>(resubmit);
     }
 //----------------------------------------------------------------------------------------------------------------------//
+    // R5: the facility manager who approved an escalated request closes it; another manager may not.
+    [Fact]
+    public async Task Only_the_approving_facility_manager_may_complete_an_escalated_request()
+    {
+        using var db = NewDb();
+        var managerRole = new Role { RoleName = Roles.FacilityManager, HierarchyLevel = 3 };
+        var approver = new User { Role = managerRole, Email = "fm1@test" };
+        var other = new User { Role = managerRole, Email = "fm2@test" };
+        var requester = new User { Role = new Role { RoleName = Roles.Staff }, Email = "alice@test" };
+        db.AddRange(approver, other, requester);
+        await db.SaveChangesAsync();
+        var request = new ResourceRequest
+        {
+            Requester = requester, Category = new RequestCategory { CategoryName = "Other" },
+            Status = "Approved", ReviewedBy = approver.UserId,
+        };
+        db.Add(request);
+        await db.SaveChangesAsync();
+        var requests = new RequestReviewService(db, new AuditService(db), new NotificationService(db, null!),
+            Email(db, new ConfigurationBuilder().Build()));
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => requests.CompleteAsync(request.RequestId, other.UserId));
+        // The SignalR push after the commit has no hub here; the status is saved before it runs.
+        var approved = await Record.ExceptionAsync(() => requests.CompleteAsync(request.RequestId, approver.UserId));
+        Assert.IsNotType<UnauthorizedAccessException>(approved);
+        Assert.Equal("Completed", (await db.ResourceRequests.AsNoTracking().SingleAsync()).Status);
+    }
+//----------------------------------------------------------------------------------------------------------------------//
     private static AuthService Auth(AppDbContext db)
     {
         var config = new ConfigurationBuilder().Build();

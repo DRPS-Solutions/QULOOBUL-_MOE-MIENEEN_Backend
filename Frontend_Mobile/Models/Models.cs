@@ -217,13 +217,15 @@ public static class RequestEnums
 
 public sealed class ResourceRequest
 {
-    public ResourceRequest(ResourceRequestDto dto, string requestedBy, string? reviewedBy, bool canReview, bool canResubmit)
+    public ResourceRequest(ResourceRequestDto dto, string requestedBy, string? reviewedBy,
+        bool canReview, bool canResubmit, bool canComplete)
     {
         Dto = dto;
         RequestedBy = requestedBy;
         ReviewedBy = reviewedBy;
         ShowAdminActions = canReview;
         ShowResubmit = canResubmit;
+        ShowComplete = canComplete;
 
         // A request stores one Detail text; its first line is the title (same as the web client).
         var parts = (dto.Detail ?? dto.CategoryName).Split('\n', 2);
@@ -238,6 +240,7 @@ public sealed class ResourceRequest
     public string? ReviewedBy { get; }
     public bool ShowAdminActions { get; }
     public bool ShowResubmit { get; }
+    public bool ShowComplete { get; }
 
     // The reviewer's reason from the approve/decline (same as the web client).
     public string? DecisionNote => Dto.History.LastOrDefault(h => h.NewStatus is "Approved" or "Declined")?.Note;

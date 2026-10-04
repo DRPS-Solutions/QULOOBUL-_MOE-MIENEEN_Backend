@@ -141,12 +141,14 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             return request;
         }
 //----------------------------------------------------------------------------------------------------------------------//
-        /// <summary>Mark an approved request fulfilled.</summary>
+        /// <summary>Mark an approved request fulfilled: any ReviewRequests holder, or the facility manager
+        /// who approved an escalated request (they see it through).</summary>
         public async Task<ResourceRequest> CompleteAsync(int requestId, int actorId)
         {
             var request = await db.ResourceRequests.FindAsync(requestId)
                 ?? throw new KeyNotFoundException($"Request {requestId} not found.");
-            if (!await HasPermission(actorId, ReviewPermission))
+            if (!await HasPermission(actorId, ReviewPermission)
+                && !(request.ReviewedBy == actorId && await IsFacilityManager(actorId)))
                 throw new UnauthorizedAccessException("You do not have permission to close requests.");
 
             Lifecycle.EnsureRequestMove(request.Status, "Completed");
