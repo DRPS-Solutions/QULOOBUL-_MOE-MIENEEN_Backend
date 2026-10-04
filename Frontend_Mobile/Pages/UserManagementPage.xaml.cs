@@ -148,8 +148,18 @@ namespace Frontend_Mobile.Pages
             var result = await _state.SendAsync<QULOOBUL__MOE_MIENEEN_Shared.Auth.TemporaryPasswordDto>(
                 HttpMethod.Post, $"api/users/{user.UserId}/reset-password", null!);
             if (result is null) return; // AppState already showed the error
-            await DisplayAlertAsync("Temporary password",
-                $"{result.TemporaryPassword}\n\nGive it to {user.FullName} directly. They must choose a new password when they next sign in.", "Done");
+            // Shown once (test plan A3/U4): Copy keeps the alert up, so only Done closes it.
+            var copied = false;
+            while (await DisplayAlertAsync("Temporary password",
+                       $"{result.TemporaryPassword}\n\n" +
+                       (copied ? "Copied to the clipboard.\n\n" : "") +
+                       "This password can't be shown again once you close this. " +
+                       $"Give it to {user.FullName} directly. They must choose a new password when they next sign in.",
+                       "Copy", "Done"))
+            {
+                await Clipboard.Default.SetTextAsync(result.TemporaryPassword);
+                copied = true;
+            }
             await LoadAsync();
         }
 

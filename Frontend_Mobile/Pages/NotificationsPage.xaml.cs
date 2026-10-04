@@ -26,6 +26,8 @@ public partial class NotificationsPage : ContentPage
         await _state.RefreshNotificationsAsync();
     }
 
+    private async void OnOpenSettings(object? sender, EventArgs e) => await NotificationPreferencesPage.ShowAsync(Navigation);
+
     protected override void OnDisappearing()
     {
         base.OnDisappearing();

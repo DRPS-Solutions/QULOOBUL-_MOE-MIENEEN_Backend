@@ -335,6 +335,21 @@ public sealed class AppState : Observable
         await RefreshTasksAsync();
     }
 
+    /// <summary>One SM-01 move, as a board drop does on the web. The API refuses a skipped step.</summary>
+    public async Task<bool> MoveTaskAsync(TaskCardDto task, string status)
+    {
+        var ok = await Move(task.TaskId, status);
+        await RefreshTasksAsync();
+        return ok;
+    }
+
+    public async Task<bool> SetTaskProgressAsync(TaskCardDto task, int percent)
+    {
+        var ok = await SendAsync(HttpMethod.Patch, $"api/tasks/{task.TaskId}", new UpdateTaskRequest { PercentComplete = percent });
+        await RefreshTasksAsync();
+        return ok;
+    }
+
     private static bool IsStatus(TaskCardDto task, string status) =>
         string.Equals(task.Status, status, StringComparison.OrdinalIgnoreCase);
 
@@ -357,6 +372,19 @@ public sealed class AppState : Observable
                 new ReviewRequestRequest { Approve = approve, Note = note }))
             await RefreshRequestsAsync();
     }
+
+    public async Task ResubmitRequestAsync(int requestId, string detail)
+    {
+        if (await SendAsync(HttpMethod.Post, $"api/requests/{requestId}/resubmit",
+                new ResubmitRequestRequest { Detail = detail }))
+            await RefreshRequestsAsync();
+    }
+
+    /// <summary>The requester's own declined request, within 30 days of the decline. The API re-checks.</summary>
+    public bool CanResubmit(ResourceRequestDto r) =>
+        r.Status == "Declined" && r.RequestedBy == CurrentUser?.UserId
+        && r.History.LastOrDefault(h => h.NewStatus == "Declined") is { } declined
+        && DateTime.UtcNow - declined.TimeCreated < TimeSpan.FromDays(30);
 
     /// <summary>Reviewers act on requests still awaiting a decision, never their own.</summary>
     public bool CanReview(ResourceRequestDto r) =>

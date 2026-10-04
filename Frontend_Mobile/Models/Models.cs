@@ -110,7 +110,13 @@ public sealed class TaskItem(TaskCardDto card, string? eventName, string? comple
     public Color TintColor => Priority.Tint();
     public Color AccentColor => Priority.Accent();
     public string Glyph => eventName is null ? "✅" : "\U0001F4C5";
-    public string MetaLabel => $"{ScheduledStart:h:mm tt} · {EventLabel}";
+    public string MetaLabel => $"{ScheduledStart:h:mm tt} · {StatusLabel} · {EventLabel}";
+
+    // The card's SM-01 column, so a status is visible without the web board (T3/T4).
+    public string StatusLabel =>
+        string.IsNullOrWhiteSpace(card.Status) ? "To Do"
+        : card.Status.Equals("In Progress", StringComparison.OrdinalIgnoreCase) ? $"In Progress {card.PercentComplete}%"
+        : card.Status;
     public TextDecorations Decorations => IsDone ? TextDecorations.Strikethrough : TextDecorations.None;
 
     public string? CompletedBy => completedBy;
@@ -211,12 +217,13 @@ public static class RequestEnums
 
 public sealed class ResourceRequest
 {
-    public ResourceRequest(ResourceRequestDto dto, string requestedBy, string? reviewedBy, bool canReview)
+    public ResourceRequest(ResourceRequestDto dto, string requestedBy, string? reviewedBy, bool canReview, bool canResubmit)
     {
         Dto = dto;
         RequestedBy = requestedBy;
         ReviewedBy = reviewedBy;
         ShowAdminActions = canReview;
+        ShowResubmit = canResubmit;
 
         // A request stores one Detail text; its first line is the title (same as the web client).
         var parts = (dto.Detail ?? dto.CategoryName).Split('\n', 2);
@@ -230,6 +237,12 @@ public sealed class ResourceRequest
     public string RequestedBy { get; }
     public string? ReviewedBy { get; }
     public bool ShowAdminActions { get; }
+    public bool ShowResubmit { get; }
+
+    // The reviewer's reason from the approve/decline (same as the web client).
+    public string? DecisionNote => Dto.History.LastOrDefault(h => h.NewStatus is "Approved" or "Declined")?.Note;
+    public bool HasDecisionNote => ShowReview && !string.IsNullOrWhiteSpace(DecisionNote);
+    public string DecisionNoteLabel => $"{(Status == RequestStatus.Declined ? "Reason" : "Note")}: {DecisionNote}";
 
     public RequestStatus Status =>
         Enum.TryParse<RequestStatus>(Dto.Status, true, out var s) ? s : RequestStatus.Pending;

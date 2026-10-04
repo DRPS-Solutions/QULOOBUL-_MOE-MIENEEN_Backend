@@ -131,6 +131,20 @@
                                                IsVisible="{Binding ShowReview}"
                                                Style="{StaticResource LabelSmall}"
                                                Margin="0,4,0,0" />
+                                        <Label Text="{Binding DecisionNoteLabel}"
+                                               IsVisible="{Binding HasDecisionNote}"
+                                               Style="{StaticResource LabelSmall}" />
+
+                                        <!-- SM-02 resubmit: the requester's own declined request, within 30 days (R4). -->
+                                        <Button Text="Revise &amp; resubmit"
+                                                IsVisible="{Binding ShowResubmit}"
+                                                Clicked="OnResubmit"
+                                                Style="{StaticResource OutlineButton}"
+                                                FontSize="12"
+                                                Padding="14,8"
+                                                MinimumHeightRequest="36"
+                                                HorizontalOptions="Start"
+                                                Margin="0,8,0,0" />
 
                                         <HorizontalStackLayout IsVisible="{Binding ShowAdminActions}"
                                                                Spacing="8"

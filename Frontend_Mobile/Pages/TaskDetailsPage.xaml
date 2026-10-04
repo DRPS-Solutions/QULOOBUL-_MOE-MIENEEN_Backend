@@ -17,6 +17,20 @@
             <Label x:Name="MetaLabel" Style="{StaticResource Muted}" />
             <Label x:Name="DescriptionLabel" Style="{StaticResource Muted}" />
 
+            <!-- Status (SM-01, test plan T3): the web board's columns as a picker. The API refuses
+                 a skipped step (e.g. To Do straight to Done) and the picker snaps back. -->
+            <Label Text="Status" Style="{StaticResource LabelSmall}" Margin="0,6,0,0" />
+            <Border Style="{StaticResource FieldBox}">
+                <Picker x:Name="StatusPicker" SelectedIndexChanged="OnStatusChanged" />
+            </Border>
+
+            <!-- Percent complete (T4): only while In Progress; Done sets 100 server-side. -->
+            <VerticalStackLayout x:Name="ProgressSection" Spacing="2">
+                <Label x:Name="ProgressLabel" Style="{StaticResource LabelSmall}" />
+                <Slider x:Name="ProgressSlider" Minimum="0" Maximum="100"
+                        ValueChanged="OnProgressSliding" DragCompleted="OnProgressReleased" />
+            </VerticalStackLayout>
+
             <BoxView HeightRequest="1" Color="{AppThemeBinding Light={StaticResource BorderSoft}, 
                 Dark={StaticResource BorderSoftDark}}" Margin="0,6" />
 
