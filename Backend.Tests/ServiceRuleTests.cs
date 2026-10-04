@@ -1,10 +1,12 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using QULOOBUL__MOE_MIENEEN_Backend.Data;
+using QULOOBUL__MOE_MIENEEN_Backend.Models.Collaboration;
 using QULOOBUL__MOE_MIENEEN_Backend.Models.IdentityAndAccess;
 using QULOOBUL__MOE_MIENEEN_Backend.Models.Request;
 using QULOOBUL__MOE_MIENEEN_Backend.Services;
 using Xunit;
+using static QULOOBUL__MOE_MIENEEN_Shared.Classes.Common;
 
 namespace Backend.Tests;
 
@@ -37,6 +39,48 @@ public class ServiceRuleTests
 
         Assert.Equal(2, (await requests.ListAsync(reviewer.UserId)).Count);
         Assert.Equal(new[] { alice.UserId }, (await requests.ListAsync(alice.UserId)).Select(r => r.RequestedBy));
+    }
+//----------------------------------------------------------------------------------------------------------------------//
+    // Test plan R6: facility managers read every request so the same thing isn't ordered twice.
+    [Fact]
+    public async Task Facility_managers_see_every_request()
+    {
+        using var db = NewDb();
+        var category = new RequestCategory { CategoryName = "Equipment" };
+        var managerRole = new Role { RoleName = Roles.FacilityManager, HierarchyLevel = 3 };
+        var manager = new User { Role = managerRole, Email = "fm1@test" };
+        var otherManager = new User { Role = managerRole, Email = "fm2@test" };
+        db.Users.AddRange(manager, otherManager);
+        db.ResourceRequests.Add(new ResourceRequest { Requester = otherManager, Category = category, Status = "Pending" });
+        await db.SaveChangesAsync();
+
+        var requests = new RequestReviewService(db, new AuditService(db), null!, null!);
+
+        Assert.Single(await requests.ListAsync(manager.UserId));
+    }
+//----------------------------------------------------------------------------------------------------------------------//
+    // Test plan M5: ViewAllMeetings (Secondary Admin) reads every meeting; without it, only your own.
+    [Fact]
+    public async Task ViewAllMeetings_holders_see_every_meeting_and_others_only_their_own()
+    {
+        using var db = NewDb();
+        var secondaryRole = new Role { RoleName = Roles.SecondaryAdmin, HierarchyLevel = 2 };
+        db.RolePermissions.Add(new RolePermission
+        {
+            Role = secondaryRole,
+            Permission = new Permission { PermissionName = Permissions.ViewAllMeetings },
+        });
+        var secondary = new User { Role = secondaryRole, Email = "second@test" };
+        var staff = new User { Role = new Role { RoleName = Roles.Staff, HierarchyLevel = 4 }, Email = "staff@test" };
+        var organiser = new User { Role = new Role { RoleName = Roles.Imaamat, HierarchyLevel = 2 }, Email = "org@test" };
+        db.Users.AddRange(secondary, staff, organiser);
+        db.Meetings.Add(new Meeting { Organiser = organiser, Title = "Board", MeetingDate = DateTime.UtcNow });
+        await db.SaveChangesAsync();
+
+        var meetings = new MeetingMinutesService(db, new AuditService(db), new AccessGuard(db));
+
+        Assert.Single(await meetings.ListAsync(secondary.UserId));
+        Assert.Empty(await meetings.ListAsync(staff.UserId));
     }
 //----------------------------------------------------------------------------------------------------------------------//
     // Submitting a request notifies several reviewers with a type that may not exist yet.

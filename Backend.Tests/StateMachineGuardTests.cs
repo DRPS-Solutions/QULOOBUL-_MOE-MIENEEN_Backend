@@ -80,6 +80,28 @@ public class StateMachineGuardTests
         Assert.Equal([leaver.UserId], db.TaskAssignments.Where(a => a.TaskId == finished.TaskId).Select(a => a.UserId));
     }
 //----------------------------------------------------------------------------------------------------------------------//
+    [Fact]
+    public async Task Deactivating_a_user_hands_their_recurring_schedules_to_the_creator_or_the_admin()
+    {
+        using var db = NewDb();
+        var role = new Role { RoleName = Roles.Staff, HierarchyLevel = 4 };
+        var admin = new User { Role = role, Email = "admin@test", IsActive = true };
+        var manager = new User { Role = role, Email = "manager@test", IsActive = true };
+        var leaver = new User { Role = role, Email = "leaver@test", IsActive = true };
+        db.AddRange(admin, manager, leaver);
+        await db.SaveChangesAsync();
+        var byManager = new TaskSchedule { CreatedBy = manager.UserId, AssignedTo = leaver.UserId, Title = "Sweep", DayOfWeek = "Friday" };
+        var bySelf = new TaskSchedule { CreatedBy = leaver.UserId, AssignedTo = leaver.UserId, Title = "Lock up", DayOfWeek = "Friday" };
+        db.AddRange(byManager, bySelf);
+        await db.SaveChangesAsync();
+
+        await Tasks(db).ReassignOpenTasksAsync(leaver.UserId, admin.UserId);
+        await db.SaveChangesAsync();
+
+        Assert.Equal(manager.UserId, byManager.AssignedTo);
+        Assert.Equal(admin.UserId, bySelf.AssignedTo);
+    }
+//----------------------------------------------------------------------------------------------------------------------//
     [Theory]
     [InlineData(29, true)]
     [InlineData(31, false)]
@@ -105,6 +127,34 @@ public class StateMachineGuardTests
             Assert.Equal(Lifecycle.RequestStart, request.Status);
         }
         else await Assert.ThrowsAsync<InvalidOperationException>(resubmit);
+    }
+//----------------------------------------------------------------------------------------------------------------------//
+    // R5: the facility manager who approved an escalated request closes it; another manager may not.
+    [Fact]
+    public async Task Only_the_approving_facility_manager_may_complete_an_escalated_request()
+    {
+        using var db = NewDb();
+        var managerRole = new Role { RoleName = Roles.FacilityManager, HierarchyLevel = 3 };
+        var approver = new User { Role = managerRole, Email = "fm1@test" };
+        var other = new User { Role = managerRole, Email = "fm2@test" };
+        var requester = new User { Role = new Role { RoleName = Roles.Staff }, Email = "alice@test" };
+        db.AddRange(approver, other, requester);
+        await db.SaveChangesAsync();
+        var request = new ResourceRequest
+        {
+            Requester = requester, Category = new RequestCategory { CategoryName = "Other" },
+            Status = "Approved", ReviewedBy = approver.UserId,
+        };
+        db.Add(request);
+        await db.SaveChangesAsync();
+        var requests = new RequestReviewService(db, new AuditService(db), new NotificationService(db, null!),
+            Email(db, new ConfigurationBuilder().Build()));
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => requests.CompleteAsync(request.RequestId, other.UserId));
+        // The SignalR push after the commit has no hub here; the status is saved before it runs.
+        var approved = await Record.ExceptionAsync(() => requests.CompleteAsync(request.RequestId, approver.UserId));
+        Assert.IsNotType<UnauthorizedAccessException>(approved);
+        Assert.Equal("Completed", (await db.ResourceRequests.AsNoTracking().SingleAsync()).Status);
     }
 //----------------------------------------------------------------------------------------------------------------------//
     private static AuthService Auth(AppDbContext db)

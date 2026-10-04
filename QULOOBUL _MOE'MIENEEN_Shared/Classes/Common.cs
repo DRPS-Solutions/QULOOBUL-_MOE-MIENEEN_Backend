@@ -43,6 +43,8 @@ namespace QULOOBUL__MOE_MIENEEN_Shared.Classes
             public const string GenerateReports = "GenerateReports";
             public const string ManageFiles = "ManageFiles";
             public const string ReopenTask = "ReopenTask";
+            /// <summary>Read every meeting and its minutes, not just ones organised or attended (test plan M5).</summary>
+            public const string ViewAllMeetings = "ViewAllMeetings";
         }
     }
 }

@@ -72,6 +72,11 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             throw new UnauthorizedAccessException("You do not have access to this task.");
         }
 //----------------------------------------------------------------------------------------------------------------------//
+        /// <summary>Who reads every meeting's minutes (Admin, Secondary Admin). Reading only: recording,
+        /// editing and approving keep the organiser/attendee/admin rules below.</summary>
+        public async Task<bool> CanSeeAllMeetingsAsync(int userId) =>
+            await HasPermissionAsync(userId, Permissions.ViewAllMeetings) || await IsAdminAsync(userId);
+//----------------------------------------------------------------------------------------------------------------------//
         /// <summary>A meeting is its organiser's, its attendees' and an admin's.</summary>
         public async Task EnsureMeetingAsync(int userId, int meetingId)
         {

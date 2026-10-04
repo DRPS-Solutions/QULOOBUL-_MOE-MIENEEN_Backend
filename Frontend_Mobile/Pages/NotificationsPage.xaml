@@ -26,6 +26,13 @@
                                 FontSize="12"
                                 Padding="8,6"
                                 MinimumHeightRequest="34" />
+                        <Button Text="Settings"
+                                Clicked="OnOpenSettings"
+                                BackgroundColor="Transparent"
+                                TextColor="{StaticResource White}"
+                                FontSize="12"
+                                Padding="8,6"
+                                MinimumHeightRequest="34" />
                     </HorizontalStackLayout>
                 </VerticalStackLayout>
             </Border>

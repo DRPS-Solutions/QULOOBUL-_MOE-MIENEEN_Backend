@@ -335,6 +335,33 @@ public sealed class AppState : Observable
         await RefreshTasksAsync();
     }
 
+    /// <summary>
+    /// A task card's checkbox: complete/reopen, then put the box back to the task's real state.
+    /// A CheckBox keeps whatever the user tapped, so a refused reopen (ReopenTask only) would
+    /// otherwise leave it unticked on a task that is still done (test plan T5).
+    /// </summary>
+    public async Task ToggleTaskFromCheckBoxAsync(CheckBox box, TaskCardDto task, bool done)
+    {
+        await SetTaskDoneAsync(task, done);
+        var actual = IsStatus(Tasks.FirstOrDefault(t => t.TaskId == task.TaskId) ?? task, "Done");
+        if (box.IsChecked != actual) box.IsChecked = actual; // the handlers ignore a box matching the card
+    }
+
+    /// <summary>One SM-01 move, as a board drop does on the web. The API refuses a skipped step.</summary>
+    public async Task<bool> MoveTaskAsync(TaskCardDto task, string status)
+    {
+        var ok = await Move(task.TaskId, status);
+        await RefreshTasksAsync();
+        return ok;
+    }
+
+    public async Task<bool> SetTaskProgressAsync(TaskCardDto task, int percent)
+    {
+        var ok = await SendAsync(HttpMethod.Patch, $"api/tasks/{task.TaskId}", new UpdateTaskRequest { PercentComplete = percent });
+        await RefreshTasksAsync();
+        return ok;
+    }
+
     private static bool IsStatus(TaskCardDto task, string status) =>
         string.Equals(task.Status, status, StringComparison.OrdinalIgnoreCase);
 
@@ -358,11 +385,37 @@ public sealed class AppState : Observable
             await RefreshRequestsAsync();
     }
 
-    /// <summary>Reviewers act on requests still awaiting a decision, never their own.</summary>
+    public async Task ResubmitRequestAsync(int requestId, string detail)
+    {
+        if (await SendAsync(HttpMethod.Post, $"api/requests/{requestId}/resubmit",
+                new ResubmitRequestRequest { Detail = detail }))
+            await RefreshRequestsAsync();
+    }
+
+    /// <summary>The requester's own declined request, within 30 days of the decline. The API re-checks.</summary>
+    public bool CanResubmit(ResourceRequestDto r) =>
+        r.Status == "Declined" && r.RequestedBy == CurrentUser?.UserId
+        && r.History.LastOrDefault(h => h.NewStatus == "Declined") is { } declined
+        && DateTime.UtcNow - declined.TimeCreated < TimeSpan.FromDays(30);
+
+    /// <summary>Mirrors RequestReviewService.EnsureCanReview: reviewers act on anything still open; a
+    /// facility manager on what was escalated to them, then on the one they claimed. Never your own (R5).</summary>
     public bool CanReview(ResourceRequestDto r) =>
-        CanReviewRequests
-        && r.Status is "Pending" or "Escalated"
-        && r.RequestedBy != CurrentUser?.UserId;
+        r.RequestedBy != CurrentUser?.UserId && (
+            (CanReviewRequests && r.Status is "Pending" or "Escalated" or "Under Review")
+            || (Role == Roles.FacilityManager
+                && (r.Status == "Escalated" || (r.Status == "Under Review" && r.ReviewedBy == CurrentUser?.UserId))));
+
+    /// <summary>The facility manager who approved an escalated request sees it through to fulfilled.</summary>
+    public bool CanComplete(ResourceRequestDto r) =>
+        r.Status == "Approved"
+        && (CanReviewRequests || (Role == Roles.FacilityManager && r.ReviewedBy == CurrentUser?.UserId));
+
+    public async Task CompleteRequestAsync(int requestId)
+    {
+        if (await SendAsync(HttpMethod.Post, $"api/requests/{requestId}/complete"))
+            await RefreshRequestsAsync();
+    }
 
     // ----- Reports (UC-09) -----
 

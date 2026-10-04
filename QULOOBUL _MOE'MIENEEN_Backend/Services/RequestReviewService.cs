@@ -18,15 +18,14 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
         public const string ReviewPermission = "ReviewRequests";
         public static readonly TimeSpan ResubmitWindow = TimeSpan.FromDays(30);
 //----------------------------------------------------------------------------------------------------------------------//
-        /// <summary>Reviewers see every request; a facility manager also sees what was escalated to
-        /// them; everyone else sees only their own.</summary>
+        /// <summary>Reviewers and facility managers see every request (managers read-only, so nobody
+        /// orders the same thing twice - test plan R6; acting on one is still decided in ReviewAsync and
+        /// friends). Everyone else sees only their own.</summary>
         public async Task<IQueryable<ResourceRequest>> VisibleAsync(int userId)
         {
             var q = db.ResourceRequests.AsQueryable();
-            if (await HasPermission(userId, ReviewPermission)) return q;
-            var manager = await IsFacilityManager(userId);
-            return q.Where(r => r.RequestedBy == userId
-                || (manager && (r.Status == Lifecycle.RequestEscalated || r.ReviewedBy == userId)));
+            if (await HasPermission(userId, ReviewPermission) || await IsFacilityManager(userId)) return q;
+            return q.Where(r => r.RequestedBy == userId);
         }
 //----------------------------------------------------------------------------------------------------------------------//
         public async Task<List<ResourceRequestDto>> ListAsync(int userId) =>
@@ -142,12 +141,14 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             return request;
         }
 //----------------------------------------------------------------------------------------------------------------------//
-        /// <summary>Mark an approved request fulfilled.</summary>
+        /// <summary>Mark an approved request fulfilled: any ReviewRequests holder, or the facility manager
+        /// who approved an escalated request (they see it through).</summary>
         public async Task<ResourceRequest> CompleteAsync(int requestId, int actorId)
         {
             var request = await db.ResourceRequests.FindAsync(requestId)
                 ?? throw new KeyNotFoundException($"Request {requestId} not found.");
-            if (!await HasPermission(actorId, ReviewPermission))
+            if (!await HasPermission(actorId, ReviewPermission)
+                && !(request.ReviewedBy == actorId && await IsFacilityManager(actorId)))
                 throw new UnauthorizedAccessException("You do not have permission to close requests.");
 
             Lifecycle.EnsureRequestMove(request.Status, "Completed");

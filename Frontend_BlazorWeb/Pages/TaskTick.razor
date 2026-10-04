@@ -1,0 +1,44 @@
+@* The complete/reopen tick on task cards (Home, Tasks). Drawn from the task's real status every
+   render, unlike MudCheckBox, which keeps its own checked state: a refused reopen or a cancelled
+   "who completed it?" left the box flipped while the task hadn't changed (test plan T5).
+   A done task is only clickable for ReopenTask holders, the API's rule. *@
+@using MudBlazor
+@inject AppDataService AppData
+
+<span @onclick:stopPropagation="true">
+    <MudTooltip Text="@Hint">
+        @if (Card.IsDone() && !CanReopen)
+        {
+            @* Not a button: a disabled one would grey out the very tick that says "done". *@
+            <MudIcon Icon="@Icons.Material.Filled.CheckBox" Color="Color.Success" Size="Size.Small" Class="ma-2" aria-label="@Hint" />
+        }
+        else
+        {
+            <MudIconButton Icon="@(Card.IsDone() ? Icons.Material.Filled.CheckBox : Icons.Material.Filled.CheckBoxOutlineBlank)"
+                           Color="@(Card.IsDone() ? Color.Success : Color.Default)"
+                           Size="Size.Small"
+                           Disabled="@busy"
+                           aria-label="@Hint"
+                           OnClick="Toggle" />
+        }
+    </MudTooltip>
+</span>
+
+@code {
+    [Parameter, EditorRequired] public TaskCardDto Card { get; set; } = default!;
+
+    private bool busy;
+    private bool CanReopen => AppData.HasPermission(Permissions.ReopenTask);
+
+    private string Hint =>
+        !Card.IsDone() ? "Mark complete"
+        : CanReopen ? "Completed - click to reopen"
+        : "Completed";
+
+    private async Task Toggle()
+    {
+        busy = true;
+        await AppData.SetTaskDoneAsync(Card, !Card.IsDone());
+        busy = false;
+    }
+}

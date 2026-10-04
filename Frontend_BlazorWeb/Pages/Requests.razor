@@ -3,6 +3,7 @@
 @implements IDisposable
 @inject IDialogService DialogService
 @inject AppDataService AppData
+@inject ISnackbar Snackbar
 
 <PageTitle>Resource Requests</PageTitle>
 
@@ -100,6 +101,11 @@
         border-radius: 12px;
         padding: 14px 16px;
         margin-bottom: 12px;
+        overflow-wrap: anywhere; /* long notes/titles wrap instead of pushing the page wide (R3) */
+    }
+
+    .drps-request-top > div:first-child {
+        min-width: 0;
     }
 
     .drps-request-item:last-child {
@@ -271,7 +277,8 @@
                         </MudSelect>
                     }
 
-                    <MudTextField T="string" @bind-Value="newRequest.Notes" Label="Justification / notes" Variant="Variant.Outlined" Lines="3" Class="mb-4" />
+                    <MudTextField T="string" @bind-Value="newRequest.Notes" Label="Justification / notes (optional)" Variant="Variant.Outlined" Lines="3" Class="mb-4"
+                                  MaxLength="500" Counter="500" Immediate="true" />
 
                     <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" Disabled="@(!CanSubmit)" OnClick="SubmitRequest">
                         @(submitting ? "Submitting..." : "Submit Request")
@@ -284,7 +291,7 @@
                 <div class="drps-card">
                     <div class="drps-card-title">
                         <MudIcon Icon="@Icons.Material.Filled.Inbox" Size="Size.Small" />
-                        @(CanReview ? "All Requests" : "My Requests")
+                        @(CanReview || AppData.Role == Roles.FacilityManager ? "All Requests" : "My Requests")
                     </div>
 
                     @* Status filter - "All" plus one chip per SM-02 status. *@
@@ -342,7 +349,7 @@
                                 @* Approve/Deny only render for reviewers, only while still
                                    Pending, and never on their own request (the API refuses
                                    self-review). *@
-                                @if (CanReview && (req.Status is "Pending" or "Escalated" or "Under Review") && req.RequestedBy != AppData.CurrentUser?.UserId)
+                                @if (CanReviewThis(req))
                                 {
                                     <div class="drps-request-actions">
                                         <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Success" OnClick="@(() => Review(req, true, null))">
@@ -355,13 +362,40 @@
                                 }
 
                                 @* SM-02 fulfil: an approved request is closed once the items are handed over. *@
-                                @if (CanReview && req.Status == "Approved")
+                                @if (CanCompleteThis(req))
                                 {
                                     <div class="drps-request-actions">
                                         <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" OnClick="@(() => Complete(req))">
                                             Mark fulfilled
                                         </MudButton>
                                     </div>
+                                }
+
+                                @* SM-02 resubmit: the requester may revise a declined request within 30 days (R4). *@
+                                @if (CanResubmit(req))
+                                {
+                                    @if (resubmittingId == req.RequestId)
+                                    {
+                                        <MudTextField T="string" @bind-Value="resubmitDetail" Label="Request (first line is the title)" Variant="Variant.Outlined"
+                                                      Lines="4" MaxLength="1000" Counter="1000" Immediate="true" Class="mt-3"
+                                                      HelperText="Change what the reviewer asked about, then send it back." />
+                                        <div class="drps-request-actions">
+                                            <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary"
+                                                       Disabled="@(resubmitBusy || string.IsNullOrWhiteSpace(resubmitDetail))" OnClick="@(() => Resubmit(req))">
+                                                @(resubmitBusy ? "Sending..." : "Send for review")
+                                            </MudButton>
+                                            <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="() => resubmittingId = null">Cancel</MudButton>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="drps-request-actions">
+                                            <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Replay"
+                                                       OnClick="@(() => { resubmittingId = req.RequestId; resubmitDetail = req.Detail ?? string.Empty; })">
+                                                Revise &amp; resubmit
+                                            </MudButton>
+                                        </div>
+                                    }
                                 }
                             </div>
                         }
@@ -380,6 +414,19 @@
     // The API decides who may review (and re-checks on every review);
     // this only decides whether to show the buttons.
     private bool CanReview => AppData.HasPermission(Permissions.ReviewRequests);
+    private bool IsFacilityManager => AppData.Role == Roles.FacilityManager;
+    private bool IsMe(int? userId) => userId == AppData.CurrentUser?.UserId;
+
+    // Mirrors RequestReviewService.EnsureCanReview: reviewers act on anything open; a facility manager
+    // on what was escalated to them, then on the one they claimed. Nobody reviews their own (R5).
+    private bool CanReviewThis(ResourceRequestDto req) =>
+        !IsMe(req.RequestedBy) && (
+            (CanReview && req.Status is "Pending" or "Escalated" or "Under Review")
+            || (IsFacilityManager && (req.Status == "Escalated" || (req.Status == "Under Review" && IsMe(req.ReviewedBy)))));
+
+    // The facility manager who approved an escalated request sees it through to fulfilled.
+    private bool CanCompleteThis(ResourceRequestDto req) =>
+        req.Status == "Approved" && (CanReview || (IsFacilityManager && IsMe(req.ReviewedBy)));
 
     // SM-02 statuses, in lifecycle order.
     private static readonly string[] Statuses = ["Pending", "Escalated", "Under Review", "Approved", "Declined", "Completed"];
@@ -447,6 +494,28 @@
     {
         if (await AppData.SendAsync(HttpMethod.Post, $"api/requests/{req.RequestId}/complete"))
             await AppData.RefreshRequestsAsync();
+    }
+
+    // --- Resubmit (SM-02). The API re-checks owner, status and the 30-day window. ---
+    private int? resubmittingId;
+    private string resubmitDetail = string.Empty;
+    private bool resubmitBusy;
+
+    private bool CanResubmit(ResourceRequestDto req) =>
+        req.Status == "Declined" && req.RequestedBy == AppData.CurrentUser?.UserId
+        && req.History.LastOrDefault(h => h.NewStatus == "Declined") is { } declined
+        && DateTime.UtcNow - declined.TimeCreated < TimeSpan.FromDays(30);
+
+    private async Task Resubmit(ResourceRequestDto req)
+    {
+        resubmitBusy = true;
+        var ok = await AppData.SendAsync(HttpMethod.Post, $"api/requests/{req.RequestId}/resubmit",
+            new ResubmitRequestRequest { Detail = resubmitDetail.Trim() });
+        resubmitBusy = false;
+        if (!ok) return;
+        resubmittingId = null;
+        await AppData.RefreshRequestsAsync();
+        Snackbar.Add("Request sent back for review.", Severity.Success);
     }
 
     private static (string Title, string? Notes) SplitDetail(ResourceRequestDto req)

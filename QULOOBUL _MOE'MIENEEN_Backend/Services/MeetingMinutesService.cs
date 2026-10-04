@@ -11,10 +11,10 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
     {
         /// <summary>
         /// The caller's meetings, newest first, with the latest minutes (edits append a new record).
-        /// Organised-by or invited-to only, per the anti-IDOR NFR; an admin sees all of them.
+        /// Organised-by or invited-to only, per the anti-IDOR NFR; ViewAllMeetings (Admin, Secondary Admin) sees all.
         /// </summary>
         public async Task<List<MeetingDto>> ListAsync(int userId) =>
-            await VisibleMeetings(userId, await guard.IsAdminAsync(userId))
+            await VisibleMeetings(userId, await guard.CanSeeAllMeetingsAsync(userId))
                 .OrderByDescending(m => m.MeetingDate).Select(m => new MeetingDto(
                 m.MeetingId, m.OrganiserId, m.Title, m.MeetingDate,
                 db.MeetingAttendees.Where(a => a.MeetingId == m.MeetingId).Select(a => a.UserId).ToList(),
@@ -120,7 +120,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
         /// </summary>
         public async Task<List<MeetingMinutesDto>> SearchAsync(string? keyword, DateTime? from, DateTime? to, int userId)
         {
-            var meetingIds = VisibleMeetings(userId, await guard.IsAdminAsync(userId)).Select(m => m.MeetingId);
+            var meetingIds = VisibleMeetings(userId, await guard.CanSeeAllMeetingsAsync(userId)).Select(m => m.MeetingId);
             // ponytail: scored in memory, fine for an NPO's meeting count; move to SQL full-text search if it grows large
             var candidates = await db.MeetingMinutes
                 .Where(m => meetingIds.Contains(m.MeetingId)
@@ -173,8 +173,8 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             return d[a.Length, b.Length];
         }
 //----------------------------------------------------------------------------------------------------------------------//
-        public IQueryable<Meeting> VisibleMeetings(int userId, bool isAdmin) =>
-            isAdmin ? db.Meetings : db.Meetings.Where(m => m.OrganiserId == userId
+        public IQueryable<Meeting> VisibleMeetings(int userId, bool seeAll) =>
+            seeAll ? db.Meetings : db.Meetings.Where(m => m.OrganiserId == userId
                 || db.MeetingAttendees.Any(a => a.MeetingId == m.MeetingId && a.UserId == userId));
 //----------------------------------------------------------------------------------------------------------------------//
         private static MeetingMinutesDto Map(MeetingMinutes m) => new(

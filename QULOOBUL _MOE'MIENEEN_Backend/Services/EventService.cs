@@ -10,9 +10,9 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
     /// double-booking is rejected server-side, on top of the unique (EventId, UserId) constraint the
     /// database already carries.
     ///
-    /// ponytail: Event has a single EventDate and no duration, so a clash is an exact-timestamp
-    /// collision. Add a duration column and switch these two checks to an interval overlap if the
-    /// client starts booking overlapping half-day events.
+    /// ponytail: Event and Meeting have a start time but no duration, so every booking is treated as a
+    /// one-hour Slot: two bookings clash when their starts are under an hour apart (test plan M2). Add
+    /// a duration column and switch these checks to a true interval overlap if longer events matter.
     /// </summary>
     public class EventService(AppDbContext db, AuditService audit, NotificationService notify, AccessGuard guard)
     {
@@ -104,13 +104,16 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             await db.SaveChangesAsync();
         }
 //----------------------------------------------------------------------------------------------------------------------//
+        public static readonly TimeSpan Slot = TimeSpan.FromHours(1);
+
         /// <summary>One event per location per slot.</summary>
         private async Task EnsureLocationFreeAsync(string location, DateTime when, int? ignoreEventId)
         {
             if (string.IsNullOrWhiteSpace(location)) return;   // an event with no venue cannot clash on one
             var trimmed = location.Trim();
+            DateTime lo = when - Slot, hi = when + Slot;
             if (await db.Events.AnyAsync(e => e.EventId != ignoreEventId
-                    && e.EventDate == when && e.Location == trimmed))
+                    && e.EventDate > lo && e.EventDate < hi && e.Location == trimmed))
                 throw new InvalidOperationException($"\"{trimmed}\" is already booked at that time.");
         }
 //----------------------------------------------------------------------------------------------------------------------//
@@ -118,10 +121,11 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
         /// Static so MeetingMinutesService runs the same rule when a meeting is booked.</summary>
         public static async Task EnsureUserFreeAsync(AppDbContext db, int userId, DateTime when, int? ignoreEventId = null)
         {
-            var clashingEvent = await db.Events.AnyAsync(e => e.EventId != ignoreEventId && e.EventDate == when
+            DateTime lo = when - Slot, hi = when + Slot;
+            var clashingEvent = await db.Events.AnyAsync(e => e.EventId != ignoreEventId && e.EventDate > lo && e.EventDate < hi
                     && (e.OrganiserId == userId
                         || db.EventAttendees.Any(a => a.EventId == e.EventId && a.UserId == userId)))
-                || await db.Meetings.AnyAsync(m => m.MeetingDate == when
+                || await db.Meetings.AnyAsync(m => m.MeetingDate > lo && m.MeetingDate < hi
                     && (m.OrganiserId == userId
                         || db.MeetingAttendees.Any(a => a.MeetingId == m.MeetingId && a.UserId == userId)));
 

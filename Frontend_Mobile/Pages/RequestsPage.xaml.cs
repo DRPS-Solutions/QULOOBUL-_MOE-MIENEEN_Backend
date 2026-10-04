@@ -54,7 +54,9 @@ public partial class RequestsPage : ContentPage
                 r,
                 _state.UserName(r.RequestedBy),
                 r.ReviewedBy is null ? null : _state.UserName(r.ReviewedBy),
-                _state.CanReview(r)))
+                _state.CanReview(r),
+                _state.CanResubmit(r),
+                _state.CanComplete(r)))
             .ToList();
 
     private void Refresh()
@@ -185,11 +187,36 @@ public partial class RequestsPage : ContentPage
             request.Title,
             accept: "Deny request",
             cancel: "Cancel",
-            placeholder: "Reason (optional)");
+            placeholder: "Reason (optional)",
+            maxLength: 500); // the API's limit (R3)
 
         if (reason is null) return;
 
         await _state.ReviewRequestAsync(request.Dto.RequestId, approve: false,
             note: string.IsNullOrWhiteSpace(reason) ? null : reason.Trim());
+    }
+
+    // SM-02 fulfil: an approved request is closed once the items are handed over.
+    private async void OnComplete(object? sender, EventArgs e)
+    {
+        if ((sender as Element)?.BindingContext is not ResourceRequest request) return;
+        await _state.CompleteRequestAsync(request.Dto.RequestId);
+    }
+
+    // The prompt edits the whole request text; its first line stays the title.
+    private async void OnResubmit(object? sender, EventArgs e)
+    {
+        if ((sender as Element)?.BindingContext is not ResourceRequest request) return;
+
+        var detail = await DisplayPromptAsync(
+            "Revise & resubmit",
+            "Change what the reviewer asked about, then send it back. The first line is the title.",
+            accept: "Send for review",
+            cancel: "Cancel",
+            maxLength: 1000,
+            initialValue: request.Dto.Detail ?? string.Empty);
+
+        if (string.IsNullOrWhiteSpace(detail)) return;
+        await _state.ResubmitRequestAsync(request.Dto.RequestId, detail.Trim());
     }
 }

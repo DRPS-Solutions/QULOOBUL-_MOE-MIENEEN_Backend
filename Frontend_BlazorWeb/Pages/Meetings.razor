@@ -273,13 +273,20 @@
                                OnClick="DownloadDocx">
                         Download .docx
                     </MudButton>
-                    <MudButton Variant="Variant.Filled"
-                               Color="Color.Success"
-                               StartIcon="@Icons.Material.Filled.Check"
-                               Disabled="@(!CanSave)"
-                               OnClick="SaveMeeting">
-                        @(saving ? "Saving..." : active.MeetingId is null ? "Finish Meeting" : "Save Minutes")
-                    </MudButton>
+                    @if (ViewOnly)
+                    {
+                        <MudChip T="string" Color="Color.Default" Icon="@Icons.Material.Filled.Visibility">View only</MudChip>
+                    }
+                    else
+                    {
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Success"
+                                   StartIcon="@Icons.Material.Filled.Check"
+                                   Disabled="@(!CanSave)"
+                                   OnClick="SaveMeeting">
+                            @(saving ? "Saving..." : active.MeetingId is null ? "Finish Meeting" : "Save Minutes")
+                        </MudButton>
+                    }
                 </div>
             </div>
 
@@ -290,6 +297,7 @@
                             <MudIcon Icon="@Icons.Material.Filled.Description" Size="Size.Small" />
                             Meeting Minutes
                             <MudButton Variant="@(recording ? Variant.Filled : Variant.Outlined)"
+                                       Disabled="@ViewOnly"
                                        Color="@(recording ? Color.Error : Color.Primary)"
                                        Size="Size.Small"
                                        Class="ml-auto"
@@ -303,10 +311,13 @@
                                       Placeholder="Type meeting minutes here as the discussion happens..."
                                       Variant="Variant.Outlined"
                                       Lines="16"
+                                      ReadOnly="@ViewOnly"
                                       FullWidth="true" />
                     </div>
                 </MudItem>
 
+                @if (!ViewOnly)
+                {
                 <MudItem xs="12" md="5">
                     <div class="drps-card">
                         <div class="drps-card-title">
@@ -356,6 +367,7 @@
                         </div>
                     </div>
                 </MudItem>
+                }
             </MudGrid>
         }
 
@@ -430,8 +442,16 @@
         MinutesText = meeting.Minutes?.MinutesText ?? string.Empty,
         MeetingDate = meeting.MeetingDate,
         OrganiserId = meeting.OrganiserId,
+        AttendeeIds = meeting.AttendeeIds,
         Minutes = meeting.Minutes,
     });
+
+    // ViewAllMeetings (Secondary Admin) lists every meeting, but only the organiser, an attendee or an
+    // admin may record minutes on one (the API's rule), so anyone else gets a read-only view (M5).
+    private bool ViewOnly => active is { MeetingId: not null } m
+        && m.OrganiserId != AppData.CurrentUser?.UserId
+        && !m.AttendeeIds.Contains(AppData.CurrentUser?.UserId ?? 0)
+        && !AppData.HasPermission(Permissions.ManageUsers);
 
     // The minutes as on screen (unsaved notes included) in a new Word document:
     // a minimal .docx is just three XML parts in a zip.
@@ -593,6 +613,7 @@
         public string MinutesText { get; set; } = string.Empty;
         public DateTime MeetingDate { get; init; } = DateTime.Now;
         public int? OrganiserId { get; init; }
+        public IReadOnlyList<int> AttendeeIds { get; init; } = [];
         public MeetingMinutesDto? Minutes { get; set; }  // the saved version, for approval
     }
 }

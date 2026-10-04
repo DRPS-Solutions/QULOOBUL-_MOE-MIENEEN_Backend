@@ -16,6 +16,7 @@ public class LifecycleTests
     [InlineData("To Do", "Blocked", false)]   // only a started task can be blocked
     [InlineData("To Do", "Cancelled", true)]
     [InlineData("In Progress", "Cancelled", true)]
+    [InlineData("Blocked", "Cancelled", true)]   // event cancellation (test plan M3)
     [InlineData("In Progress", "Done", true)]
     [InlineData("Done", "In Progress", true)] // reopen allowed
     [InlineData("Done", "Archived", true)]

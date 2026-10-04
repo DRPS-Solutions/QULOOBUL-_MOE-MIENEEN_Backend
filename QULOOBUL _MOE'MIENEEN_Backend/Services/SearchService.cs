@@ -43,7 +43,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
                 .ToListAsync());
 
             // A meeting matches on its title or on any version of its minutes.
-            results.AddRange(await meetings.VisibleMeetings(userId, isAdmin)
+            results.AddRange(await meetings.VisibleMeetings(userId, await guard.CanSeeAllMeetingsAsync(userId))
                 .Where(m => m.Title.Contains(q)
                          || db.MeetingMinutes.Any(x => x.MeetingId == m.MeetingId && x.MinutesText.Contains(q)))
                 .OrderByDescending(m => m.MeetingDate).Take(PerKind)
