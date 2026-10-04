@@ -88,8 +88,10 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
 
             reason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
             var message = $"\"{p.ProjectName}\" has been cancelled." + (reason is null ? "" : $" Reason: {reason}");
-            var members = await db.ProjectMembers.Where(m => m.ProjectId == id && m.UserId != actorId)
-                .Select(m => m.UserId).ToListAsync();
+            // "Staff on it" = Staff Helping members plus anyone assigned a task on the event, who may not be a member.
+            var members = await db.ProjectMembers.Where(m => m.ProjectId == id).Select(m => m.UserId)
+                .Union(db.TaskAssignments.Where(a => a.Task!.ProjectId == id).Select(a => a.UserId))
+                .Where(uid => uid != actorId).ToListAsync();
             foreach (var uid in members)
                 await notify.QueueAsync(uid, "ProjectCancelled", message, nameof(Project), id);
             audit.Record(actorId, "project.cancel", nameof(Project), id);

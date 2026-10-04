@@ -156,6 +156,9 @@
         margin-top: 2px;
         font-size: 0.84rem;
         color: var(--drps-text-muted);
+        /* A decline reason can be up to 500 characters with no spaces; break it inside the box. */
+        overflow-wrap: anywhere;
+        white-space: pre-line;
     }
 
     .drps-notif-meta {

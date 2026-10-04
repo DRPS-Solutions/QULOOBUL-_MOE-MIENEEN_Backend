@@ -1,7 +1,10 @@
+using System.Reflection;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using QULOOBUL__MOE_MIENEEN_Backend.Data;
+using QULOOBUL__MOE_MIENEEN_Backend.Hubs;
 using QULOOBUL__MOE_MIENEEN_Backend.Models.IdentityAndAccess;
 using QULOOBUL__MOE_MIENEEN_Backend.Models.Project;
 using QULOOBUL__MOE_MIENEEN_Backend.Models.Request;
@@ -155,6 +158,42 @@ public class StateMachineGuardTests
         var approved = await Record.ExceptionAsync(() => requests.CompleteAsync(request.RequestId, approver.UserId));
         Assert.IsNotType<UnauthorizedAccessException>(approved);
         Assert.Equal("Completed", (await db.ResourceRequests.AsNoTracking().SingleAsync()).Status);
+    }
+//----------------------------------------------------------------------------------------------------------------------//
+    // QA v3: staff with a task on the event but not in "Staff Helping" got no ProjectCancelled notification.
+    [Fact]
+    public async Task Cancelling_an_event_notifies_members_and_task_assignees_but_not_the_canceller()
+    {
+        using var db = NewDb();
+        var role = new Role { RoleName = Roles.Staff, HierarchyLevel = 4 };
+        User owner = new() { Role = role, Email = "o@test", IsActive = true },
+             member = new() { Role = role, Email = "m@test", IsActive = true },
+             assignee = new() { Role = role, Email = "a@test", IsActive = true };
+        var project = new Project { Owner = owner, ProjectName = "Fete", Status = "Active" };
+        var task = new ProjectTask { Project = project, Creator = owner, Status = "To Do" };
+        db.AddRange(owner, member, assignee, project, task,
+            new ProjectMember { Project = project, User = member },
+            new TaskAssignment { Task = task, User = assignee });
+        await db.SaveChangesAsync();
+
+        var notify = new NotificationService(db, NoopHub());
+        var projects = new ProjectService(db, new AuditService(db), notify, new AccessGuard(db),
+            new TaskAssignmentService(db, new AuditService(db), notify, Email(db, new ConfigurationBuilder().Build()), new AccessGuard(db)));
+        await projects.CancelAsync(project.ProjectId, "rain", owner.UserId);
+
+        var told = await db.Notifications.Where(n => n.Type!.TypeName == "ProjectCancelled").Select(n => n.UserId).ToListAsync();
+        Assert.Equal(new[] { assignee.UserId, member.UserId }.Order(), told.Order());
+        Assert.Equal(Lifecycle.TaskCancelled, task.Status);
+    }
+//----------------------------------------------------------------------------------------------------------------------//
+    /// <summary>A hub whose every send is a completed no-op, for paths that push after committing.</summary>
+    private static IHubContext<NotificationHub> NoopHub() => (IHubContext<NotificationHub>)NoopProxy.For(typeof(IHubContext<NotificationHub>));
+
+    public class NoopProxy : DispatchProxy
+    {
+        public static object For(Type t) => DispatchProxy.Create(t, typeof(NoopProxy));
+        protected override object? Invoke(MethodInfo? m, object?[]? args) =>
+            m!.ReturnType == typeof(Task) ? Task.CompletedTask : m.ReturnType.IsInterface ? For(m.ReturnType) : null;
     }
 //----------------------------------------------------------------------------------------------------------------------//
     private static AuthService Auth(AppDbContext db)
