@@ -7,6 +7,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Data
     /// inside the owning use-case service (architecture doc, "State machine as guarded transitions").
     /// A class per state would add six types to express a two-column rule, so it is a table.
     /// Guards that need data (assignee present, permission held, 30-day window) live in the services.
+    /// Reference: Satzinger, J.W., Jackson, R.B. and Burd, S.D. (2016) Systems analysis and design in a changing world. 7th edn. Boston: Cengage Learning.
     /// </summary>
     public static class Lifecycle
     {

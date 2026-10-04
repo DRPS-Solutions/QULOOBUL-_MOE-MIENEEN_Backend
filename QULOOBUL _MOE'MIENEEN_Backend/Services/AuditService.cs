@@ -10,6 +10,8 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
     /// (architecture doc, "Audit_Log: an append-only record").
     /// The row is added to the caller's Unit of Work and committed by the caller's
     /// SaveChanges, so the audit entry lands in the same transaction as the change it records.
+    /// Reference: Fowler, M. (2003) Patterns of enterprise application architecture. Boston: Addison-Wesley.
+    /// Reference: OWASP Foundation (2025) OWASP Top 10:2025. Available at: https://owasp.org/Top10/2025/ (Accessed: 8 August 2026).
     /// </summary>
     public class AuditService(AppDbContext db)
     {

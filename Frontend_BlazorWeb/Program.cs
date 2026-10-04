@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using MudBlazor.Services;
 
+// Blazor WebAssembly: the app runs in the browser and talks to the API over HTTP.
+// Reference: Microsoft (2026) ASP.NET Core Blazor hosting models. Available at: https://learn.microsoft.com/en-us/aspnet/core/blazor/hosting-models?view=aspnetcore-10.0 (Accessed: 8 August 2026).
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
@@ -11,6 +13,7 @@ builder.RootComponents.Add<HeadOutlet>("head::after");
 var apiBaseUrl = builder.Configuration["ApiBaseUrl"]
     ?? throw new InvalidOperationException("Set ApiBaseUrl in wwwroot/appsettings.json.");
 builder.Services.AddScoped(_ => new HttpClient { BaseAddress = new Uri(apiBaseUrl) });
+// Reference: MudBlazor (2026) Installation - MudBlazor. Available at: https://mudblazor.com/getting-started/installation (Accessed: 4 October 2026).
 builder.Services.AddMudServices();
 builder.Services.AddScoped<AppDataService>();
 

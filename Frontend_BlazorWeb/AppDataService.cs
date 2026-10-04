@@ -11,6 +11,9 @@
 // Scoped - in Blazor WebAssembly that means one instance per browser
 // tab. Pages subscribe to OnChange and call StateHasChanged.
 //
+// Reference: Microsoft (2026) ASP.NET Core Blazor state management. Available at: https://learn.microsoft.com/en-us/aspnet/core/blazor/state-management (Accessed: 4 October 2026).
+// Reference: Microsoft (2026) Call a web API from ASP.NET Core Blazor. Available at: https://learn.microsoft.com/en-us/aspnet/core/blazor/call-web-api (Accessed: 4 October 2026).
+//
 // No namespace declared here on purpose - same convention as
 // NewTaskResult.cs - so every page sees this without an extra @using.
 
@@ -33,6 +36,8 @@ public class AppDataService(HttpClient http, ISnackbar snackbar, IDialogService 
 {
     // sessionStorage, not localStorage: survives a reload but not closing the tab,
     // so a shared NPO computer doesn't stay signed in.
+    // Reference: MDN Web Docs (2026) Window: sessionStorage property. Available at: https://developer.mozilla.org/en-US/docs/Web/API/Window/sessionStorage (Accessed: 4 October 2026).
+    // Reference: Microsoft (2026) Call JavaScript functions from .NET methods in ASP.NET Core Blazor. Available at: https://learn.microsoft.com/en-us/aspnet/core/blazor/javascript-interoperability/call-javascript-from-dotnet (Accessed: 4 October 2026).
     private const string SessionKey = "session";
     public event Action? OnChange;
     private void Changed() => OnChange?.Invoke();
@@ -354,6 +359,8 @@ public class AppDataService(HttpClient http, ISnackbar snackbar, IDialogService 
     // ------------------------------------------------------------------
     // Live updates: the SignalR Observer from the architecture doc. The
     // server says what changed; refetching that list keeps one data path.
+    // Reference: Microsoft (2026) ASP.NET Core SignalR .NET Client. Available at: https://learn.microsoft.com/en-us/aspnet/core/signalr/dotnet-client (Accessed: 4 October 2026).
+    // Reference: Microsoft (2026) Authentication and authorization in ASP.NET Core SignalR. Available at: https://learn.microsoft.com/en-us/aspnet/core/signalr/authn-and-authz (Accessed: 4 October 2026).
     // ------------------------------------------------------------------
 
     private async Task ConnectHubAsync()

@@ -28,6 +28,8 @@ namespace Backend.Tests;
 /// The real pipeline (routing, JWT, policies, EF Core) against a real SQL Server database that is
 /// migrated from empty and dropped afterwards. Locally that is LocalDB; CI points TEST_SQL_CONNECTION
 /// at a SQL Server service container. The database name is always generated, never the dev one.
+/// Reference: Microsoft (2026) Integration tests in ASP.NET Core. Available at: https://learn.microsoft.com/en-us/aspnet/core/test/integration-tests?view=aspnetcore-10.0 (Accessed: 8 August 2026).
+/// Reference: xUnit.net (2026) Shared context between tests. Available at: https://xunit.net/docs/shared-context (Accessed: 4 October 2026).
 /// </summary>
 public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {

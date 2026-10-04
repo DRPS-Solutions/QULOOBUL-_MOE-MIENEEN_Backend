@@ -10,6 +10,8 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
     /// The one place that turns a domain event into a stored Notification row and a live
     /// SignalR push (architecture doc, "Observer"). Callers Queue during their Unit of Work,
     /// SaveChanges, then Push once the commit has succeeded.
+    /// Reference: Gamma, E., Helm, R., Johnson, R. and Vlissides, J. (2016) Design patterns: elements of reusable object-oriented software. Boston: Addison-Wesley.
+    /// Reference: Microsoft (2026) Send messages from outside a hub. Available at: https://learn.microsoft.com/en-us/aspnet/core/signalr/hubcontext (Accessed: 4 October 2026).
     /// </summary>
     public class NotificationService(AppDbContext db, IHubContext<NotificationHub> hub)
     {

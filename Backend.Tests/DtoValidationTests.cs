@@ -8,6 +8,7 @@ namespace Backend.Tests;
 
 // [Required] on a non-nullable int or DateTime never fails, so the DTOs pair it with a Range.
 // These pin that the unset defaults (0, 0001-01-01) and free-text priorities are rejected.
+// Reference: Microsoft (2026) Model validation in ASP.NET Core MVC and Razor Pages. Available at: https://learn.microsoft.com/en-us/aspnet/core/mvc/models/validation (Accessed: 4 October 2026).
 public class DtoValidationTests
 {
     private static bool Valid(object dto) =>

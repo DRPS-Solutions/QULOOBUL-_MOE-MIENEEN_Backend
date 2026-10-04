@@ -211,6 +211,7 @@ public class StateMachineGuardTests
     private static EmailService Email(AppDbContext db, IConfiguration config) =>
         new(config, db, NullLogger<EmailService>.Instance);
 //----------------------------------------------------------------------------------------------------------------------//
+    // Reference: Microsoft (2026) Testing without your production database system - EF Core. Available at: https://learn.microsoft.com/en-us/ef/core/testing/testing-without-the-database (Accessed: 4 October 2026).
     private static AppDbContext NewDb() => new(new DbContextOptionsBuilder<AppDbContext>()
         .UseInMemoryDatabase(Guid.NewGuid().ToString()).Options);
 }

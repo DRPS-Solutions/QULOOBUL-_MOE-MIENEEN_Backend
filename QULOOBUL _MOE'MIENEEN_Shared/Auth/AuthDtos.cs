@@ -5,6 +5,11 @@ using System.ComponentModel.DataAnnotations;
 
 namespace QULOOBUL__MOE_MIENEEN_Shared.Auth
 {
+    /// <summary>
+    /// Request/response contracts for UC-01. The data annotations are validated by [ApiController]
+    /// before an action runs, and by the clients' forms before a request is sent.
+    /// Reference: Microsoft (2026) Model validation in ASP.NET Core MVC and Razor Pages. Available at: https://learn.microsoft.com/en-us/aspnet/core/mvc/models/validation (Accessed: 4 October 2026).
+    /// </summary>
     internal class AuthDtos
     {
     }

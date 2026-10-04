@@ -7,6 +7,8 @@ namespace Frontend_Mobile.Controls;
 /// equivalent to MudBlazor's MudChart, since no charting package is referenced. Deliberately
 /// minimal (no gridlines beyond a baseline, no animation): matching MudChart's three chart
 /// types (Line / StackedBar / Bar) mattered more here than matching its polish.
+/// Reference: Microsoft (2026) Draw graphical objects - .NET MAUI. Available at: https://learn.microsoft.com/en-us/dotnet/maui/user-interface/graphics/draw (Accessed: 4 October 2026).
+/// Reference: MudBlazor (2026) Charts - MudBlazor. Available at: https://mudblazor.com/components/chart (Accessed: 4 October 2026).
 /// </summary>
 internal static class ChartMath
 {

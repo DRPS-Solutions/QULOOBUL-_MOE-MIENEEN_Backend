@@ -12,11 +12,16 @@ using static QULOOBUL__MOE_MIENEEN_Shared.Classes.Common;
 namespace QULOOBUL__MOE_MIENEEN_Backend.Services
 {
     /// <summary>UC-01: validate credentials, issue a JWT carrying role + permission claims.
-    /// Owns SM-03's login-driven transitions: Active → Locked and Pending Activation → Active.</summary>
+    /// Owns SM-03's login-driven transitions: Active → Locked and Pending Activation → Active.
+    /// Reference: OWASP Foundation (2025) OWASP Top 10:2025. Available at: https://owasp.org/Top10/2025/ (Accessed: 8 August 2026).
+    /// Reference: Jones, M., Bradley, J. and Sakimura, N. (2015) RFC 7519: JSON Web Token (JWT). Internet Engineering Task Force. Available at: https://www.rfc-editor.org/info/rfc7519 (Accessed: 8 August 2026).
+    /// </summary>
     public class AuthService(
         AppDbContext db, JwtTokenFactory tokens, AuditService audit, NotificationService notify,
         EmailService email, IConfiguration config, ILogger<AuthService> log)
     {
+        // Salted PBKDF2 hashes; the plaintext password is never stored.
+        // Reference: Microsoft (2026) PasswordHasher<TUser> Class. Available at: https://learn.microsoft.com/en-us/dotnet/api/microsoft.aspnetcore.identity.passwordhasher-1 (Accessed: 4 October 2026).
         private static readonly PasswordHasher<User> Hasher = new();
 
         public const string FailedAction = "auth.login.failed";
@@ -116,7 +121,9 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
         }
 //----------------------------------------------------------------------------------------------------------------------//
         /// <summary>A one-off password an admin can read out: 6 letters + 4 digits so it meets the policy,
-        /// with no look-alike characters (l/1, o/0).</summary>
+        /// with no look-alike characters (l/1, o/0).
+        /// Reference: Microsoft (2026) RandomNumberGenerator Class. Available at: https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.randomnumbergenerator (Accessed: 4 October 2026).
+        /// </summary>
         public static string NewTemporaryPassword() =>
             RandomNumberGenerator.GetString("abcdefghjkmnpqrstuvwxyz", 6) + RandomNumberGenerator.GetString("23456789", 4);
 

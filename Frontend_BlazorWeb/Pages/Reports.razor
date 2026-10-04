@@ -171,6 +171,7 @@
             if (await AppData.SendAsync<ReportExportResponse>(HttpMethod.Post, "api/reports/export", Request) is not { } file)
                 return; // AppDataService has already shown why
             // window.open returns null when a pop-up blocker stops it.
+            // Reference: MDN Web Docs (2026) Window: open() method. Available at: https://developer.mozilla.org/en-US/docs/Web/API/Window/open (Accessed: 4 October 2026).
             await using var tab = await JS.InvokeAsync<IJSObjectReference?>("open", file.DownloadUrl, "_blank");
             if (tab is null)
                 Snackbar.Add("The report was exported, but the browser blocked the download tab. Allow pop-ups for this site and export again.", Severity.Warning);

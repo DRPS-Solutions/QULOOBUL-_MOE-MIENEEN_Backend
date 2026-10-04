@@ -156,6 +156,7 @@ else
 
     // localStorage, unlike the session: a display preference should outlive the tab. Keyed per user so
     // two accounts on one browser don't share them (test plan X1); signed out uses the ":" key.
+    // Reference: MDN Web Docs (2026) Window: localStorage property. Available at: https://developer.mozilla.org/en-US/docs/Web/API/Window/localStorage (Accessed: 4 October 2026).
     private int? prefsUser;
     private string PrefKey(string name) => $"{name}:{AppData.CurrentUser?.UserId}";
 

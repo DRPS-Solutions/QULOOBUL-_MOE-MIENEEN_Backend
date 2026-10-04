@@ -4,7 +4,11 @@ using static QULOOBUL__MOE_MIENEEN_Shared.Classes.Common;
 
 namespace QULOOBUL__MOE_MIENEEN_Backend.SharedClasses.Middleware
 {
-    /// <summary>Last link in the pipeline: turns service exceptions into a single ErrorResponse shape.</summary>
+    /// <summary>
+    /// Last link in the pipeline: turns service exceptions into a single ErrorResponse shape.
+    /// Reference: Microsoft (2026) Handle errors in ASP.NET Core. Available at: https://learn.microsoft.com/en-us/aspnet/core/fundamentals/error-handling (Accessed: 4 October 2026).
+    /// Reference: Microsoft (2026) ASP.NET Core middleware. Available at: https://learn.microsoft.com/en-us/aspnet/core/fundamentals/middleware/?view=aspnetcore-10.0 (Accessed: 8 August 2026).
+    /// </summary>
     public class ExceptionHandlingMiddleware(RequestDelegate next, ILogger<ExceptionHandlingMiddleware> log)
     {
         public async Task Invoke(HttpContext ctx)
@@ -26,6 +30,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.SharedClasses.Middleware
                     InvalidOperationException or ArgumentException => (StatusCodes.Status400BadRequest, ex.Message),
                     BadHttpRequestException or System.Text.Json.JsonException =>
                         (StatusCodes.Status400BadRequest, "The request was not in the expected format."),
+                    // Reference: Microsoft (2026) Handling concurrency conflicts - EF Core. Available at: https://learn.microsoft.com/en-us/ef/core/saving/concurrency (Accessed: 4 October 2026).
                     DbUpdateConcurrencyException =>
                         (StatusCodes.Status409Conflict, "Someone else changed this at the same time. Refresh and try again."),
                     DbUpdateException =>

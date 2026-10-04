@@ -13,6 +13,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
     ///
     /// No connection string configured (local dev, CI, tests) means this is a no-op — the platform
     /// runs without it rather than failing every write that raises a notification.
+    /// Reference: Microsoft (2026) Quickstart: How to send an email using Azure Communication Services. Available at: https://learn.microsoft.com/en-us/azure/communication-services/quickstarts/email/send-email (Accessed: 4 October 2026).
     /// </summary>
     public class EmailService(IConfiguration config, AppDbContext db, ILogger<EmailService> log)
     {
@@ -88,6 +89,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             var from = config["Email:From"] ?? throw new InvalidOperationException("Email:From is not set.");
             // The message carries user-entered text (task titles, request details), so it is
             // encoded rather than interpolated into the markup.
+            // Reference: OWASP Foundation (2026) Cross Site Scripting Prevention Cheat Sheet. Available at: https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html (Accessed: 4 October 2026).
             var html = $"<p>{System.Net.WebUtility.HtmlEncode(message)}</p>";
             try
             {
