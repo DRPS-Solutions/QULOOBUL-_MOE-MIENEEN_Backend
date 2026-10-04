@@ -291,7 +291,7 @@
                 <div class="drps-card">
                     <div class="drps-card-title">
                         <MudIcon Icon="@Icons.Material.Filled.Inbox" Size="Size.Small" />
-                        @(CanReview ? "All Requests" : "My Requests")
+                        @(CanReview || AppData.Role == Roles.FacilityManager ? "All Requests" : "My Requests")
                     </div>
 
                     @* Status filter - "All" plus one chip per SM-02 status. *@

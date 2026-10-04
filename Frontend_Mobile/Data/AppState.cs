@@ -335,6 +335,18 @@ public sealed class AppState : Observable
         await RefreshTasksAsync();
     }
 
+    /// <summary>
+    /// A task card's checkbox: complete/reopen, then put the box back to the task's real state.
+    /// A CheckBox keeps whatever the user tapped, so a refused reopen (ReopenTask only) would
+    /// otherwise leave it unticked on a task that is still done (test plan T5).
+    /// </summary>
+    public async Task ToggleTaskFromCheckBoxAsync(CheckBox box, TaskCardDto task, bool done)
+    {
+        await SetTaskDoneAsync(task, done);
+        var actual = IsStatus(Tasks.FirstOrDefault(t => t.TaskId == task.TaskId) ?? task, "Done");
+        if (box.IsChecked != actual) box.IsChecked = actual; // the handlers ignore a box matching the card
+    }
+
     /// <summary>One SM-01 move, as a board drop does on the web. The API refuses a skipped step.</summary>
     public async Task<bool> MoveTaskAsync(TaskCardDto task, string status)
     {

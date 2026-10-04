@@ -18,15 +18,14 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
         public const string ReviewPermission = "ReviewRequests";
         public static readonly TimeSpan ResubmitWindow = TimeSpan.FromDays(30);
 //----------------------------------------------------------------------------------------------------------------------//
-        /// <summary>Reviewers see every request; a facility manager also sees what was escalated to
-        /// them; everyone else sees only their own.</summary>
+        /// <summary>Reviewers and facility managers see every request (managers read-only, so nobody
+        /// orders the same thing twice - test plan R6; acting on one is still decided in ReviewAsync and
+        /// friends). Everyone else sees only their own.</summary>
         public async Task<IQueryable<ResourceRequest>> VisibleAsync(int userId)
         {
             var q = db.ResourceRequests.AsQueryable();
-            if (await HasPermission(userId, ReviewPermission)) return q;
-            var manager = await IsFacilityManager(userId);
-            return q.Where(r => r.RequestedBy == userId
-                || (manager && (r.Status == Lifecycle.RequestEscalated || r.ReviewedBy == userId)));
+            if (await HasPermission(userId, ReviewPermission) || await IsFacilityManager(userId)) return q;
+            return q.Where(r => r.RequestedBy == userId);
         }
 //----------------------------------------------------------------------------------------------------------------------//
         public async Task<List<ResourceRequestDto>> ListAsync(int userId) =>

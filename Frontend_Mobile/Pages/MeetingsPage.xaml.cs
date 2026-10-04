@@ -63,6 +63,7 @@ namespace Frontend_Mobile.Pages
             Title = meeting.Title,
             MinutesText = meeting.Minutes?.MinutesText ?? string.Empty,
             OrganiserId = meeting.OrganiserId,
+            AttendeeIds = meeting.AttendeeIds,
             Minutes = meeting.Minutes
         });
 
@@ -74,11 +75,20 @@ namespace Frontend_Mobile.Pages
             MeetingTitleEntry.Text = meeting.Title;
             MeetingTitleEntry.IsEnabled = meeting.MeetingId is null;
             MinutesEditor.Text = meeting.MinutesText;
+            MinutesEditor.IsReadOnly = ViewOnly;
+            SaveButton.IsVisible = !ViewOnly;
 
             RefreshDetailState();
             ListSection.IsVisible = false;
             DetailSection.IsVisible = true;
         }
+
+        // ViewAllMeetings (Secondary Admin) lists every meeting, but only the organiser, an attendee or an
+        // admin may record minutes on one (the API's rule), so anyone else gets a read-only view (M5).
+        private bool ViewOnly => _active is { MeetingId: not null } m
+            && m.OrganiserId != _state.CurrentUser?.UserId
+            && !m.AttendeeIds.Contains(_state.CurrentUser?.UserId ?? 0)
+            && _state.CurrentUser?.Permissions.Contains(Common.Permissions.ManageUsers) != true;
 
         private void OnBackToList(object? sender, EventArgs e)
         {
@@ -172,6 +182,7 @@ namespace Frontend_Mobile.Pages
             public string Title { get; set; } = string.Empty;
             public string MinutesText { get; set; } = string.Empty;
             public int? OrganiserId { get; init; }
+            public IReadOnlyList<int> AttendeeIds { get; init; } = [];
             public MeetingMinutesDto? Minutes { get; set; }
         }
     }

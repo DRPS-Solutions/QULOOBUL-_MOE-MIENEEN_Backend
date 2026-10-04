@@ -606,16 +606,9 @@
                                 <div class="drps-task-completed-by">Completed by @AppData.UserName(task.CompletedBy)</div>
                             }
                         </div>
-                        @* Same completion flow as the hourly cards. stopPropagation
-                           keeps a checkbox click from also opening the details
-                           dialog underneath it. *@
-                        <div @onclick:stopPropagation="true">
-                            <MudCheckBox T="bool"
-                                         Value="task.IsDone()"
-                                         ValueChanged="@((bool done) => AppData.SetTaskDoneAsync(task, done))"
-                                         Color="Color.Primary"
-                                         Size="Size.Small" />
-                        </div>
+                        @* Same completion flow as the hourly cards; TaskTick stops the
+                           click from also opening the details dialog underneath it. *@
+                        <TaskTick Card="task" />
                     </div>
                 }
             </div>
@@ -672,17 +665,8 @@
                                             <div class="drps-task-completed-by">Completed by @AppData.UserName(task.CompletedBy)</div>
                                         }
                                     </div>
-                                    @* Ticking completes the task as the signed-in user;
-                                       unticking reopens it. stopPropagation keeps a
-                                       checkbox click from also opening the details
-                                       dialog underneath it. *@
-                                    <div @onclick:stopPropagation="true">
-                                        <MudCheckBox T="bool"
-                                                     Value="task.IsDone()"
-                                                     ValueChanged="@((bool done) => AppData.SetTaskDoneAsync(task, done))"
-                                                     Color="Color.Primary"
-                                                     Size="Size.Small" />
-                                    </div>
+                                    @* Ticking completes the task; unticking reopens it (ReopenTask only). *@
+                                    <TaskTick Card="task" />
                                 </div>
                             }
                         }

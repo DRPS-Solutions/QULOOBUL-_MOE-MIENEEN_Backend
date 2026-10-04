@@ -55,6 +55,6 @@ public partial class HomePage : ContentPage
     {
         if (sender is not CheckBox box || box.BindingContext is not TaskItem task) return;
         if (e.Value == task.IsDone) return;
-        await _state.SetTaskDoneAsync(task.Card, e.Value);
+        await _state.ToggleTaskFromCheckBoxAsync(box, task.Card, e.Value);
     }
 }

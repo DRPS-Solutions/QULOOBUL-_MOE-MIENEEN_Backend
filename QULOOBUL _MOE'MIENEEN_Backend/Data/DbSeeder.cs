@@ -18,8 +18,8 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Data
         // Lower HierarchyLevel = more authority (TaskAssignmentService: assign down or sideways, never up).
         private static readonly (string Name, int Level, string[] Granted)[] RoleSeed =
         [
-            (Roles.Admin, 1, [Permissions.ManageUsers, Permissions.ReviewRequests, Permissions.GenerateReports, Permissions.ManageFiles, Permissions.ReopenTask]),
-            (Roles.SecondaryAdmin, 2, [Permissions.ReviewRequests, Permissions.GenerateReports, Permissions.ManageFiles, Permissions.ReopenTask]),
+            (Roles.Admin, 1, [Permissions.ManageUsers, Permissions.ReviewRequests, Permissions.GenerateReports, Permissions.ManageFiles, Permissions.ReopenTask, Permissions.ViewAllMeetings]),
+            (Roles.SecondaryAdmin, 2, [Permissions.ReviewRequests, Permissions.GenerateReports, Permissions.ManageFiles, Permissions.ReopenTask, Permissions.ViewAllMeetings]),
             (Roles.Imaamat, 2, []),
             (Roles.FacilityManager, 3, []),
             (Roles.Staff, 4, []),
