@@ -9,6 +9,24 @@ four migrations, 12 controllers and 21 services. The web and MAUI clients both s
 `AuthController`, read and write through the controllers using the `Shared` DTOs, and take
 live updates from the SignalR hub. See [What's not built yet](#whats-not-built-yet).
 
+## Contents
+
+- [Solution layout](#solution-layout)
+- [Stack](#stack)
+- [Running it](#running-it)
+  - [Database](#database)
+  - [Seed accounts](#seed-accounts)
+  - [Clients](#clients)
+- [Data model](#data-model)
+- [API](#api)
+- [Services](#services)
+  - [Rules worth knowing](#rules-worth-knowing)
+- [Clients](#clients-1)
+  - [`Frontend_BlazorWeb` - Blazor WebAssembly](#frontend_blazorweb---blazor-webassembly)
+  - [`Frontend_Mobile` - .NET MAUI](#frontend_mobile---net-maui)
+- [CI/CD](#cicd)
+- [References](#references)
+
 ## Solution layout
 
 | Project | What it is |
@@ -329,3 +347,14 @@ Required repository config:
 Deploy jobs are skipped while `vars.AZURE_WEBAPP_NAME` / `AZURE_WEBAPP_NAME_PROD` are unset.
 Mobile builds unsigned and warns when the keystore secret is absent. Play Store distribution
 is deliberately not automated - Phase 1 side-loads the APK.
+
+## References
+
+References are kept in the code, not in this README. Each one is a comment next to the code it
+supports (C#, Razor, Bicep and JavaScript files), in IEEE style:
+
+```
+// Reference: Microsoft, "Integration tests in ASP.NET Core." Accessed: Aug. 08, 2026. [Online]. Available: https://learn.microsoft.com/...
+```
+
+To list them all, search the solution for `Reference:`.
