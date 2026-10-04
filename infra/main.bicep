@@ -5,6 +5,11 @@
 //   az deployment group create -g XBCAD -f infra/main.bicep -p env=prod sqlAdminPassword=... jwtSigningKey=... alertEmail=...
 //
 // The deployer needs Owner (or User Access Administrator) on the group: it grants the apps Key Vault access.
+//
+// Reference: Microsoft, "What is Bicep?" Accessed: Oct. 04, 2026. [Online]. Available: https://learn.microsoft.com/en-us/azure/azure-resource-manager/bicep/overview
+// Reference: Microsoft, "What are Azure regions?" Accessed: Aug. 08, 2026. [Online]. Available: https://learn.microsoft.com/en-us/azure/reliability/regions-overview
+// Reference: T. Fisher, "Data residency: What is it and why is it important?" IBM. Accessed: Aug. 13, 2026. [Online]. Available: https://www.ibm.com/think/insights/data-residency-why-is-it-important
+// Reference: Republic of South Africa, "Protection of Personal Information Act 4 of 2013," Government Gazette, no. 37067, Cape Town, South Africa, Nov. 2013.
 
 @allowed(['staging', 'prod'])
 param env string
@@ -31,6 +36,7 @@ var secretsUserRole = subscriptionResourceId('Microsoft.Authorization/roleDefini
 
 // ------------------------------------------------ Compute ------------------------------------------------
 // P0v3: the cheapest tier with deployment slots, which cd-production.yml's swap needs.
+// Reference: Microsoft, "Pricing - App Service for Linux." Accessed: Aug. 12, 2026. [Online]. Available: https://azure.microsoft.com/en-us/pricing/details/app-service/linux/
 resource plan 'Microsoft.Web/serverfarms@2023-12-01' = {
   name: 'asp-${name}'
   location: location
@@ -39,6 +45,8 @@ resource plan 'Microsoft.Web/serverfarms@2023-12-01' = {
   properties: { reserved: true }
 }
 
+// Reference: Microsoft, "Configure an App Service app." Accessed: Oct. 04, 2026. [Online]. Available: https://learn.microsoft.com/en-us/azure/app-service/configure-common
+// Reference: Microsoft, "Monitor App Service instances by using Health check." Accessed: Oct. 04, 2026. [Online]. Available: https://learn.microsoft.com/en-us/azure/app-service/monitor-instances-health-check
 var siteConfig = {
   linuxFxVersion: 'DOTNETCORE|10.0'
   alwaysOn: true              // MaintenanceJobs is an in-process timer; an idle-unloaded app never sweeps
@@ -49,6 +57,7 @@ var siteConfig = {
   http20Enabled: true
 }
 
+// Reference: Microsoft, "Use Key Vault references as app settings in Azure App Service." Accessed: Oct. 04, 2026. [Online]. Available: https://learn.microsoft.com/en-us/azure/app-service/app-service-key-vault-references
 func kvRef(vault string, secret string) string => '@Microsoft.KeyVault(VaultName=${vault};SecretName=${secret})'
 
 var webOrigin = 'https://${web.properties.defaultHostname}'
@@ -80,6 +89,7 @@ resource app 'Microsoft.Web/sites@2023-12-01' = {
 }
 
 // Production releases land here, get smoke-tested, then swap. Staging deploys straight to its app.
+// Reference: Microsoft, "Set Up Staging Environments - Azure App Service." Accessed: Aug. 08, 2026. [Online]. Available: https://learn.microsoft.com/en-us/azure/app-service/deploy-staging-slots
 resource slot 'Microsoft.Web/sites/slots@2023-12-01' = if (isProd) {
   parent: app
   name: 'staging'
@@ -102,6 +112,8 @@ resource sticky 'Microsoft.Web/sites/config@2023-12-01' = if (isProd) {
   properties: { appSettingNames: ['Jobs__Enabled'] }
 }
 
+// Reference: Microsoft, "What is Azure Static Web Apps?" Accessed: Aug. 08, 2026. [Online]. Available: https://learn.microsoft.com/en-us/azure/static-web-apps/overview
+// Reference: Microsoft, "Pricing - Static Web Apps." Accessed: Aug. 13, 2026. [Online]. Available: https://azure.microsoft.com/en-us/pricing/details/app-service/static/
 resource web 'Microsoft.Web/staticSites@2023-12-01' = {
   name: 'stapp-${name}-${env}'
   location: staticWebAppLocation
@@ -110,6 +122,7 @@ resource web 'Microsoft.Web/staticSites@2023-12-01' = {
 }
 
 // ------------------------------------------------ Data ---------------------------------------------------
+// Reference: Microsoft, "Security Overview - Azure SQL Database & Azure SQL Managed Instance & Azure Synapse Analytics." Accessed: Aug. 08, 2026. [Online]. Available: https://learn.microsoft.com/en-us/azure/azure-sql/database/security-overview?view=azuresql
 resource sql 'Microsoft.Sql/servers@2023-08-01-preview' = {
   name: 'sql-${name}-${env}-${suffix}'
   location: location
@@ -121,6 +134,9 @@ resource sql 'Microsoft.Sql/servers@2023-08-01-preview' = {
 }
 
 // Provisioned, never serverless (the doc's 24/7 requirement rules out auto-pause).
+// Reference: Microsoft, "DTU-Based Purchasing Model - Azure SQL Database." Accessed: Aug. 08, 2026. [Online]. Available: https://learn.microsoft.com/en-us/azure/azure-sql/database/service-tiers-dtu?view=azuresql
+// Reference: Microsoft, "Serverless compute tier - Azure SQL Database." Accessed: Aug. 08, 2026. [Online]. Available: https://learn.microsoft.com/en-us/azure/azure-sql/database/serverless-tier-overview?view=azuresql
+// Reference: Microsoft, "Pricing - Azure SQL Database Single Database." Accessed: Aug. 12, 2026. [Online]. Available: https://azure.microsoft.com/en-us/pricing/details/azure-sql-database/single/
 resource db 'Microsoft.Sql/servers/databases@2023-08-01-preview' = {
   parent: sql
   name: 'sqldb-${name}-${env}'
@@ -129,6 +145,7 @@ resource db 'Microsoft.Sql/servers/databases@2023-08-01-preview' = {
 }
 
 // SQL admits only the App Service outbound IPs and named developer IPs; CD opens a rule per run.
+// Reference: Microsoft, "Inbound and outbound IP addresses in Azure App Service." Accessed: Oct. 04, 2026. [Online]. Available: https://learn.microsoft.com/en-us/azure/app-service/overview-inbound-outbound-ips
 module sqlFirewall 'sqlFirewall.bicep' = {
   name: 'sql-firewall-${env}'
   params: {
@@ -137,6 +154,8 @@ module sqlFirewall 'sqlFirewall.bicep' = {
   }
 }
 
+// Reference: Microsoft, "Security recommendations for Blob storage." Accessed: Oct. 04, 2026. [Online]. Available: https://learn.microsoft.com/en-us/azure/storage/blobs/security-recommendations
+// Reference: Microsoft, "Azure Blob Storage pricing." Accessed: Aug. 12, 2026. [Online]. Available: https://azure.microsoft.com/en-us/pricing/details/storage/blobs/
 resource storage 'Microsoft.Storage/storageAccounts@2023-05-01' = {
   name: 'st${name}${env}${suffix}'
   location: location
@@ -151,6 +170,9 @@ resource storage 'Microsoft.Storage/storageAccounts@2023-05-01' = {
 
 // Soft delete is the undo for FileUploadService.DeleteBlobAsync. CORS lets the browser PUT/GET
 // straight to a SAS URL; the bytes never pass through the API. Containers are created by the API.
+// Reference: Microsoft, "Soft delete for blobs." Accessed: Oct. 04, 2026. [Online]. Available: https://learn.microsoft.com/en-us/azure/storage/blobs/soft-delete-blob-overview
+// Reference: Microsoft, "Cross-Origin Resource Sharing (CORS) support for Azure Storage." Accessed: Oct. 04, 2026. [Online]. Available: https://learn.microsoft.com/en-us/rest/api/storageservices/cross-origin-resource-sharing--cors--support-for-the-azure-storage-services
+// Reference: Microsoft, "Grant limited access to data with shared access signatures (SAS)." Accessed: Aug. 08, 2026. [Online]. Available: https://learn.microsoft.com/en-us/azure/storage/common/storage-sas-overview
 resource blobs 'Microsoft.Storage/storageAccounts/blobServices@2023-05-01' = {
   parent: storage
   name: 'default'
@@ -170,6 +192,8 @@ resource blobs 'Microsoft.Storage/storageAccounts/blobServices@2023-05-01' = {
 }
 
 // Free tier caps at 20 concurrent client connections; move to Standard_S1 if clients are refused.
+// Reference: Microsoft, "What is Azure SignalR Service?" Accessed: Oct. 04, 2026. [Online]. Available: https://learn.microsoft.com/en-us/azure/azure-signalr/signalr-overview
+// Reference: Microsoft, "Azure SignalR Service Pricing." Accessed: Aug. 12, 2026. [Online]. Available: https://azure.microsoft.com/en-us/pricing/details/signalr-service/
 resource signalR 'Microsoft.SignalRService/signalR@2024-03-01' = if (isProd) {
   name: 'sigr-${name}-${suffix}'
   location: location
@@ -182,6 +206,8 @@ resource signalR 'Microsoft.SignalRService/signalR@2024-03-01' = if (isProd) {
 
 // Email: an Azure-managed sender domain (<guid>.azurecomm.net) needs no DNS. Once the NPO owns a
 // domain, add it as a CustomerManaged domain here, link it, and point Email__From at it.
+// Reference: Microsoft, "Email in Azure Communication Services." Accessed: Oct. 04, 2026. [Online]. Available: https://learn.microsoft.com/en-us/azure/communication-services/concepts/email/email-overview
+// Reference: Microsoft, "Azure Communication Services pricing." Accessed: Aug. 12, 2026. [Online]. Available: https://azure.microsoft.com/en-us/pricing/details/communication-services/
 resource emailService 'Microsoft.Communication/emailServices@2023-04-01' = {
   name: 'ecs-${name}-${env}'
   location: 'global'
@@ -204,6 +230,8 @@ resource acs 'Microsoft.Communication/communicationServices@2023-04-01' = {
 // ------------------------------------------------ Secrets ------------------------------------------------
 // Read by the apps' system-assigned identities through Key Vault references: no key in any app setting.
 // Shared by both environments, hence the env prefix on every secret name.
+// Reference: Microsoft, "Authenticate to Azure Key Vault." Accessed: Aug. 08, 2026. [Online]. Available: https://learn.microsoft.com/en-us/azure/key-vault/general/authentication
+// Reference: Microsoft, "Pricing - Key Vault." Accessed: Aug. 12, 2026. [Online]. Available: https://azure.microsoft.com/en-us/pricing/details/key-vault/
 resource kv 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
   name: keyVaultName
 }
@@ -240,6 +268,7 @@ resource signalRSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if (isPr
 }
 
 // Granted per secret rather than on the shared vault, so staging cannot read prod's secrets.
+// Reference: Microsoft, "Provide access to Key Vault keys, certificates, and secrets with Azure role-based access control." Accessed: Oct. 04, 2026. [Online]. Available: https://learn.microsoft.com/en-us/azure/key-vault/general/rbac-guide
 var secretNames = concat(['sql-connection', 'blob-connection', 'jwt-signing-key', 'acs-connection'], isProd ? ['signalr-connection'] : [])
 resource envSecrets 'Microsoft.KeyVault/vaults/secrets@2023-07-01' existing = [for s in secretNames: {
   parent: kv
@@ -261,6 +290,8 @@ resource slotCanRead 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for
 }]
 
 // ------------------------------------------------ Monitoring ---------------------------------------------
+// Reference: Microsoft, "Azure App Service Quotas and Metrics." Accessed: Aug. 08, 2026. [Online]. Available: https://learn.microsoft.com/en-us/azure/app-service/web-sites-monitor
+// Reference: Microsoft, "Application Insights overview." Accessed: Oct. 04, 2026. [Online]. Available: https://learn.microsoft.com/en-us/azure/azure-monitor/app/app-insights-overview
 resource logs 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
   name: 'log-${name}-${env}'
   location: location
@@ -275,6 +306,8 @@ resource appi 'Microsoft.Insights/components@2020-02-02' = {
 }
 
 // The doc's 24/7 requirement: a /health availability test, plus the 80% DTU scale-up trigger.
+// Reference: Microsoft, "Application Insights availability tests." Accessed: Oct. 04, 2026. [Online]. Available: https://learn.microsoft.com/en-us/azure/azure-monitor/app/availability
+// Reference: Microsoft, "Understand how metric alerts work in Azure Monitor." Accessed: Oct. 04, 2026. [Online]. Available: https://learn.microsoft.com/en-us/azure/azure-monitor/alerts/alerts-metric-overview
 resource ping 'Microsoft.Insights/webtests@2022-06-15' = if (isProd) {
   name: 'health-${name}-${env}'
   location: location
@@ -348,6 +381,7 @@ resource dtuHigh 'Microsoft.Insights/metricAlerts@2018-03-01' = if (isProd) {
 }
 
 // ------------------------------------------------ For GitHub ---------------------------------------------
+// Reference: GitHub, "GitHub Actions documentation." Accessed: Aug. 08, 2026. [Online]. Available: https://docs.github.com/en/actions
 output AZURE_WEBAPP_NAME string = app.name
 output AZURE_SQL_SERVER string = sql.name
 output AZURE_STATIC_WEB_APP string = web.name

@@ -219,6 +219,7 @@ public class UseCaseGapTests
         return u;
     }
 //----------------------------------------------------------------------------------------------------------------------//
+    // Reference: Microsoft, "Testing without your production database system - EF Core." Accessed: Oct. 04, 2026. [Online]. Available: https://learn.microsoft.com/en-us/ef/core/testing/testing-without-the-database
     private static AppDbContext NewDb() => new(new DbContextOptionsBuilder<AppDbContext>()
         .UseInMemoryDatabase(Guid.NewGuid().ToString()).Options);
 }

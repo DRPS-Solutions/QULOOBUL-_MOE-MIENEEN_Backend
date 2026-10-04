@@ -12,11 +12,16 @@ using static QULOOBUL__MOE_MIENEEN_Shared.Classes.Common;
 namespace QULOOBUL__MOE_MIENEEN_Backend.Services
 {
     /// <summary>UC-01: validate credentials, issue a JWT carrying role + permission claims.
-    /// Owns SM-03's login-driven transitions: Active → Locked and Pending Activation → Active.</summary>
+    /// Owns SM-03's login-driven transitions: Active → Locked and Pending Activation → Active.
+    /// Reference: OWASP Foundation, "OWASP Top 10:2025." Accessed: Aug. 08, 2026. [Online]. Available: https://owasp.org/Top10/2025/
+    /// Reference: M. Jones, J. Bradley, and N. Sakimura, "JSON Web Token (JWT)," Internet Engineering Task Force (IETF), RFC 7519, May 2015. Accessed: Aug. 08, 2026. [Online]. Available: https://www.rfc-editor.org/info/rfc7519
+    /// </summary>
     public class AuthService(
         AppDbContext db, JwtTokenFactory tokens, AuditService audit, NotificationService notify,
         EmailService email, IConfiguration config, ILogger<AuthService> log)
     {
+        // Salted PBKDF2 hashes; the plaintext password is never stored.
+        // Reference: Microsoft, "PasswordHasher<TUser> Class." Accessed: Oct. 04, 2026. [Online]. Available: https://learn.microsoft.com/en-us/dotnet/api/microsoft.aspnetcore.identity.passwordhasher-1
         private static readonly PasswordHasher<User> Hasher = new();
 
         public const string FailedAction = "auth.login.failed";
@@ -116,7 +121,9 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
         }
 //----------------------------------------------------------------------------------------------------------------------//
         /// <summary>A one-off password an admin can read out: 6 letters + 4 digits so it meets the policy,
-        /// with no look-alike characters (l/1, o/0).</summary>
+        /// with no look-alike characters (l/1, o/0).
+        /// Reference: Microsoft, "RandomNumberGenerator Class." Accessed: Oct. 04, 2026. [Online]. Available: https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.randomnumbergenerator
+        /// </summary>
         public static string NewTemporaryPassword() =>
             RandomNumberGenerator.GetString("abcdefghjkmnpqrstuvwxyz", 6) + RandomNumberGenerator.GetString("23456789", 4);
 

@@ -1,6 +1,6 @@
 # QULOOBUL _MOE'MIENEEN_Backend
 
-ASP.NET Core Web API for the Quloobul Moe'mieneen NPO platform — projects, tasks,
+ASP.NET Core Web API for the Quloobul Moe'mieneen NPO platform - projects, tasks,
 resource requests, meetings and file storage for one organisation's staff and volunteers.
 Serves both clients in this solution: a Blazor WebAssembly web app and a .NET MAUI app.
 
@@ -9,13 +9,31 @@ four migrations, 12 controllers and 21 services. The web and MAUI clients both s
 `AuthController`, read and write through the controllers using the `Shared` DTOs, and take
 live updates from the SignalR hub. See [What's not built yet](#whats-not-built-yet).
 
+## Contents
+
+- [Solution layout](#solution-layout)
+- [Stack](#stack)
+- [Running it](#running-it)
+  - [Database](#database)
+  - [Seed accounts](#seed-accounts)
+  - [Clients](#clients)
+- [Data model](#data-model)
+- [API](#api)
+- [Services](#services)
+  - [Rules worth knowing](#rules-worth-knowing)
+- [Clients](#clients-1)
+  - [`Frontend_BlazorWeb` - Blazor WebAssembly](#frontend_blazorweb---blazor-webassembly)
+  - [`Frontend_Mobile` - .NET MAUI](#frontend_mobile---net-maui)
+- [CI/CD](#cicd)
+- [References](#references)
+
 ## Solution layout
 
 | Project | What it is |
 |---|---|
 | `QULOOBUL _MOE'MIENEEN_Backend/` | The Web API. Controllers → services → EF Core. |
 | `QULOOBUL _MOE'MIENEEN_Shared/` | DTOs both clients and the API compile against. `net10.0`. |
-| `Frontend_BlazorWeb/` | Blazor **WebAssembly** SPA. Not Blazor Server — see note below. |
+| `Frontend_BlazorWeb/` | Blazor **WebAssembly** SPA. Not Blazor Server - see note below. |
 | `Frontend_Mobile/` | .NET MAUI app (Android / iOS / MacCatalyst / Windows). |
 | `Backend.Tests/` | xUnit unit and integration tests for the service rules, state machines and API. |
 | `infra/` | Bicep for one Azure environment (`main.bicep`), deployed once for staging and once for prod. |
@@ -32,7 +50,7 @@ the client-side SignalR pattern. Don't "fix" it to Server.
 | Data | EF Core 10, SQL Server provider |
 | Auth | JWT bearer + 4 permission-claim policies (`ManageUsers`, `ReviewRequests`, `GenerateReports`, `ManageFiles`) |
 | Realtime | SignalR `NotificationHub` at `/hubs/notifications`, groups `user-{id}` |
-| Files | Azure Blob Storage — Azurite for local development |
+| Files | Azure Blob Storage - Azurite for local development |
 | Email | Azure Communication Services (`EmailService`) |
 | API docs | OpenAPI (`Microsoft.AspNetCore.OpenApi`), dev environment only |
 | Container | Linux, `mcr.microsoft.com/dotnet/aspnet:10.0` |
@@ -41,7 +59,7 @@ the client-side SignalR pattern. Don't "fix" it to Server.
 
 ## Running it
 
-The project name contains a space and an apostrophe — quote every path you pass to `dotnet`.
+The project name contains a space and an apostrophe - quote every path you pass to `dotnet`.
 
 ```bash
 dotnet run --project "QULOOBUL _MOE'MIENEEN_Backend/QULOOBUL _MOE'MIENEEN_Backend.csproj"
@@ -129,16 +147,16 @@ before `dotnet test` or `dotnet ef`: it locks the build output.
 
 Six modelling decisions carry business rules and shouldn't be "tidied away":
 
-- **`ProjectTask`, not `Task`** — avoids colliding with `System.Threading.Tasks.Task`.
+- **`ProjectTask`, not `Task`** - avoids colliding with `System.Threading.Tasks.Task`.
   The table stays `Task`.
-- **`Role.HierarchyLevel`** — lower number is higher authority. Tasks may be assigned
+- **`Role.HierarchyLevel`** - lower number is higher authority. Tasks may be assigned
   down the hierarchy, never up. The rule needs an ordering to compare against.
-- **`ProjectTask.PercentComplete`** — 0–100. Progress is partial, not done/not-done.
-- **`MeetingMinutes.IsAiDraft` / `ApprovedBy`** — AI-generated minutes are a draft until
+- **`ProjectTask.PercentComplete`** - 0–100. Progress is partial, not done/not-done.
+- **`MeetingMinutes.IsAiDraft` / `ApprovedBy`** - AI-generated minutes are a draft until
   a person approves them. The approval step is in the schema so procedure can't skip it.
-- **`ProjectMember`** — project-scoped visibility. A user allocated to one project sees
+- **`ProjectMember`** - project-scoped visibility. A user allocated to one project sees
   only that project; this is the table the authorisation check reads.
-- **`RequestStatusHistory.Note`** — the reviewer's reason on an approve or decline. It lives on
+- **`RequestStatusHistory.Note`** - the reviewer's reason on an approve or decline. It lives on
   the history row, so the requester can read why on the request itself, not only in a notification.
 
 Delete behaviour is set per relationship: `Cascade` for rows meaningless without their parent
@@ -158,7 +176,7 @@ Four migrations: `InitialCreate`, `SecurityAndIndexes`, `TemporaryPassword`, `Re
 
 ## API
 
-12 controllers, all delegating to a service — no logic in the controller, per the architecture
+12 controllers, all delegating to a service - no logic in the controller, per the architecture
 doc's layering: `Api.Controller` → `Api.Services` → `Api.DataAccess`.
 
 `Auth`, `Tasks`, `TaskSchedules`, `Projects`, `Requests`, `Meetings`, `Events`, `Notifications`,
@@ -178,7 +196,7 @@ case; the `DbContext` is the unit of work, one `SaveChanges` per operation.
 | Cross-cutting | `AuditService`, `MaintenanceJobs` |
 
 `MaintenanceJobs` is the one `IHostedService`: SM-02's 48-hour escalation, SM-01's deadline
-reminders, and `Task_Schedule`'s recurring-task generation — the transitions driven by a clock
+reminders, and `Task_Schedule`'s recurring-task generation - the transitions driven by a clock
 rather than a user action. It sweeps hourly; each sweep is idempotent.
 
 `AccessGuard` is the object-level authorisation check (the anti-IDOR requirement), called from
@@ -216,7 +234,7 @@ State machines SM-01 (`ProjectTask`), SM-02 (`ResourceRequest`) and SM-03 (`User
 Both front ends authenticate against `AuthController` and keep no data of their own: every
 list is fetched from the API, and a SignalR push tells them which list to refetch.
 
-### `Frontend_BlazorWeb` — Blazor WebAssembly
+### `Frontend_BlazorWeb` - Blazor WebAssembly
 
 Ported from the Blazor Server + MudBlazor prototype; the `@rendermode InteractiveServer`
 directives were stripped, since they're meaningless in standalone WASM. `AppDataService.cs` is
@@ -228,7 +246,7 @@ one error path, and listens on the hub. It is scoped, which in WASM means one in
 | Shell, login, change-password gate, theme | `Layout/MainLayout.razor` |
 | Role-gated nav, bell, settings and account menus | `Layout/NavMenu.razor` |
 | Role matrix (which pages a role sees) | `AppDataService.CanSee*` |
-| Pages | `Pages/` — Home, Daily Tasks (with Recurring Tasks), Resource Requests, Meetings, User Management, Event Planning, Calendar, Files, Reports, Notifications, Search, Profile, Set/Forgot Password |
+| Pages | `Pages/` - Home, Daily Tasks (with Recurring Tasks), Resource Requests, Meetings, User Management, Event Planning, Calendar, Files, Reports, Notifications, Search, Profile, Set/Forgot Password |
 
 What it keeps in the browser, and why:
 
@@ -241,7 +259,7 @@ What it keeps in the browser, and why:
 The hub connection takes its token from the `HttpClient`'s auth header, not `CurrentUser`:
 `CurrentUser` is only set after the session (and the hub) has started.
 
-### `Frontend_Mobile` — .NET MAUI
+### `Frontend_Mobile` - .NET MAUI
 
 Ported from the standalone MAUI app at `C:\3rdYear\XBCAD\Mobile`, which was itself a port of
 the Kotlin/Compose Android prototype, itself a port of the Blazor/MudBlazor original. Same
@@ -250,7 +268,7 @@ screens, same palette, same role gating at each step.
 | Piece | Where |
 |---|---|
 | Navigation shell, role-gated flyout, unread-count bell, dark-mode toggle | `AppShell.xaml` |
-| Screens | `Pages/` — Login, Home, Tasks, TaskDetails, CreateTask, Requests, Events, Meetings, Calendar, Files, Reports, Notifications, Search, UserManagement |
+| Screens | `Pages/` - Login, Home, Tasks, TaskDetails, CreateTask, Requests, Events, Meetings, Calendar, Files, Reports, Notifications, Search, UserManagement |
 | Session, API calls, SignalR hub connection (the web client's `AppDataService`, ported) | `Data/AppState.cs` |
 | Read-only view models over the `Shared` DTOs, with display-formatting properties (so the XAML needs no converters) | `Models/Models.cs` |
 | Palette and styles, light/dark via `AppThemeBinding` | `Resources/Styles/` |
@@ -328,4 +346,15 @@ Required repository config:
 
 Deploy jobs are skipped while `vars.AZURE_WEBAPP_NAME` / `AZURE_WEBAPP_NAME_PROD` are unset.
 Mobile builds unsigned and warns when the keystore secret is absent. Play Store distribution
-is deliberately not automated — Phase 1 side-loads the APK.
+is deliberately not automated - Phase 1 side-loads the APK.
+
+## References
+
+References are kept in the code, not in this README. Each one is a comment next to the code it
+supports (C#, Razor, Bicep and JavaScript files), in IEEE style:
+
+```
+// Reference: Microsoft, "Integration tests in ASP.NET Core." Accessed: Aug. 08, 2026. [Online]. Available: https://learn.microsoft.com/...
+```
+
+To list them all, search the solution for `Reference:`.

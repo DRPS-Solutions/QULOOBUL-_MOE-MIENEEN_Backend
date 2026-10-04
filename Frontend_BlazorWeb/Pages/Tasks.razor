@@ -830,6 +830,7 @@
         string.IsNullOrWhiteSpace(t.Status) ? "To Do"
         : BoardColumns.FirstOrDefault(c => string.Equals(c, t.Status, StringComparison.OrdinalIgnoreCase));
 
+    // Reference: MudBlazor, "Drop Zone - MudBlazor." Accessed: Oct. 04, 2026. [Online]. Available: https://mudblazor.com/components/dropzone
     private async Task OnCardDropped(MudItemDropInfo<TaskCardDto> drop)
     {
         if (drop.Item is { } task && drop.DropzoneIdentifier != ColumnOf(task))

@@ -34,26 +34,34 @@ builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 
 // UseSeeding runs after `dotnet ef database update` (and Migrate/EnsureCreated).
+// Reference: Microsoft, "Implementing the infrastructure persistence layer with Entity Framework Core." Accessed: Aug. 08, 2026. [Online]. Available: https://learn.microsoft.com/en-us/dotnet/architecture/microservices/microservice-ddd-cqrs-patterns/infrastructure-persistence-layer-implementation-entity-framework-core
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddDbContext<AppDbContext>((sp, o) => o
     // Retries ride out an Azure SQL serverless database resuming from auto-pause (error 40613).
+    // Reference: Microsoft, "Connection resiliency - EF Core." Accessed: Oct. 04, 2026. [Online]. Available: https://learn.microsoft.com/en-us/ef/core/miscellaneous/connection-resiliency
+    // Reference: Microsoft, "Serverless compute tier - Azure SQL Database." Accessed: Aug. 08, 2026. [Online]. Available: https://learn.microsoft.com/en-us/azure/azure-sql/database/serverless-tier-overview?view=azuresql
     .UseSqlServer(builder.Configuration.GetConnectionString("Default"), sql => sql.EnableRetryOnFailure())
     .AddInterceptors(new SessionContextInterceptor(sp.GetRequiredService<IHttpContextAccessor>()))
     .UseSeeding((db, _) => DbSeeder.Seed((AppDbContext)db, builder.Configuration)));
 
 // Azure SignalR Service is the backplane in Azure (infra/main.bicep sets the connection string);
 // locally and in tests there is none, so the hub runs in-process.
+// Reference: Microsoft, "Overview of ASP.NET Core SignalR." Accessed: Aug. 08, 2026. [Online]. Available: https://learn.microsoft.com/en-us/aspnet/core/signalr/introduction?view=aspnetcore-10.0
 var signalR = builder.Services.AddSignalR();
 if (builder.Configuration["Azure:SignalR:ConnectionString"] is not null) signalR.AddAzureSignalR();
 // Application Insights: traces, dependencies and exceptions, only where App Service provides the key.
+// Reference: Microsoft, "Enable Azure Monitor OpenTelemetry for .NET applications." Accessed: Oct. 04, 2026. [Online]. Available: https://learn.microsoft.com/en-us/azure/azure-monitor/app/opentelemetry-enable
 if (builder.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"] is not null)
     builder.Services.AddOpenTelemetry().UseAzureMonitor();
 
 // UC-07 needs this: BlobStorageService cannot resolve without it. Locally it points at Azurite
 // ("UseDevelopmentStorage=true"); in production the connection string comes from Key Vault.
+// Reference: Microsoft, "Azure Key Vault configuration provider in ASP.NET Core." Accessed: Aug. 08, 2026. [Online]. Available: https://learn.microsoft.com/en-us/aspnet/core/security/key-vault-configuration?view=aspnetcore-10.0
 builder.Services.AddSingleton(_ => new BlobServiceClient(
     builder.Configuration.GetConnectionString("BlobStorage") ?? "UseDevelopmentStorage=true"));
 // ------------------------------------------------------- Auth ---------------------------------------------------------------
+// Reference: M. Jones, J. Bradley, and N. Sakimura, "JSON Web Token (JWT)," Internet Engineering Task Force (IETF), RFC 7519, May 2015. Accessed: Aug. 08, 2026. [Online]. Available: https://www.rfc-editor.org/info/rfc7519
+// Reference: Microsoft, "Configure JWT bearer authentication in ASP.NET Core." Accessed: Oct. 04, 2026. [Online]. Available: https://learn.microsoft.com/en-us/aspnet/core/security/authentication/configure-jwt-bearer-authentication
 var jwt = builder.Configuration.GetSection("Jwt");
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(o =>
@@ -69,6 +77,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateLifetime = true,
         };
         // let SignalR read the token from the query string
+        // Reference: Microsoft, "Authentication and authorization in ASP.NET Core SignalR." Accessed: Oct. 04, 2026. [Online]. Available: https://learn.microsoft.com/en-us/aspnet/core/signalr/authn-and-authz
         o.Events = new JwtBearerEvents
         {
             OnMessageReceived = c =>
@@ -95,6 +104,9 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
     });
 
+// Permission claims checked as named policies (OWASP A01 Broken Access Control).
+// Reference: Microsoft, "Policy-based authorization in ASP.NET Core." Accessed: Oct. 04, 2026. [Online]. Available: https://learn.microsoft.com/en-us/aspnet/core/security/authorization/policies
+// Reference: OWASP Foundation, "OWASP Top 10:2025." Accessed: Aug. 08, 2026. [Online]. Available: https://owasp.org/Top10/2025/
 builder.Services.AddAuthorization(o =>
 {
     o.AddPolicy(Permissions.ReviewRequests, p => p.RequireClaim("perm", Permissions.ReviewRequests));
@@ -103,12 +115,14 @@ builder.Services.AddAuthorization(o =>
     o.AddPolicy(Permissions.ManageFiles, p => p.RequireClaim("perm", Permissions.ManageFiles));
 });
 
+// Reference: Microsoft, "Enable Cross-Origin Requests (CORS) in ASP.NET Core." Accessed: Oct. 04, 2026. [Online]. Available: https://learn.microsoft.com/en-us/aspnet/core/security/cors
 builder.Services.AddCors(o => o.AddDefaultPolicy(p => p
     .WithOrigins(builder.Configuration.GetSection("Cors:Origins").Get<string[]>() ?? [])
     .AllowAnyHeader().AllowAnyMethod().AllowCredentials()));
 
 // Denial-of-service resilience: a per-caller budget (user id, else IP) for the whole API, and a much
 // tighter one on the anonymous credential routes so passwords and set-password tokens cannot be sprayed.
+// Reference: Microsoft, "Rate limiting middleware in ASP.NET Core." Accessed: Oct. 04, 2026. [Online]. Available: https://learn.microsoft.com/en-us/aspnet/core/performance/rate-limit
 builder.Services.AddRateLimiter(o =>
 {
     o.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -129,6 +143,8 @@ builder.Services.AddRateLimiter(o =>
 });
 
 // ------------------------------------------------------ Use-case services -------------------------------------------------
+// Request-scoped, like the DbContext they share, so one request is one Unit of Work.
+// Reference: Microsoft, "Dependency injection in ASP.NET Core." Accessed: Aug. 08, 2026. [Online]. Available: https://learn.microsoft.com/en-us/aspnet/core/fundamentals/dependency-injection?view=aspnetcore-10.0
 builder.Services.AddScoped<JwtTokenFactory>();
 builder.Services.AddScoped<AuditService>();
 builder.Services.AddScoped<AccessGuard>();
@@ -155,6 +171,7 @@ builder.Services.AddScoped<SearchService>();
 // generation: the transitions the doc drives from a clock rather than from a user action.
 // Off in the staging slot (a slot-sticky Jobs__Enabled=false): it shares the production database,
 // and after a swap it runs the previous build, which must not sweep a migrated schema.
+// Reference: Microsoft, "Set up staging environments in Azure App Service." Accessed: Aug. 08, 2026. [Online]. Available: https://learn.microsoft.com/en-us/azure/app-service/deploy-staging-slots
 if (builder.Configuration.GetValue("Jobs:Enabled", true))
     builder.Services.AddHostedService<MaintenanceJobs>();
 
@@ -165,12 +182,15 @@ if (app.Environment.IsDevelopment()) app.MapOpenApi();
 app.UseHttpsRedirection();
 // The API only ever returns JSON, so it may load nothing and be framed by nobody. The web client's
 // own CSP lives in Frontend_BlazorWeb/wwwroot/staticwebapp.config.json.
+// Reference: MDN Web Docs, "Content-Security-Policy." Accessed: Oct. 04, 2026. [Online]. Available: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Security-Policy
 app.Use((c, next) =>
 {
     c.Response.Headers.ContentSecurityPolicy = "default-src 'none'; frame-ancestors 'none'";
     c.Response.Headers.XContentTypeOptions = "nosniff";
     return next(c);
 });
+// Middleware order matters: each component sees only what the ones before it let through.
+// Reference: Microsoft, "ASP.NET Core middleware." Accessed: Aug. 08, 2026. [Online]. Available: https://learn.microsoft.com/en-us/aspnet/core/fundamentals/middleware/?view=aspnetcore-10.0
 app.UseCors();
 app.UseAuthentication();
 app.UseMiddleware<ExceptionHandlingMiddleware>();

@@ -147,7 +147,10 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
         }
 //----------------------------------------------------------------------------------------------------------------------//
         /// <summary>Quoted, and a leading = + - @ neutralised so a user-entered name cannot run as a
-        /// spreadsheet formula when an admin opens the export (CSV injection).</summary>
+        /// spreadsheet formula when an admin opens the export (CSV injection).
+        /// Reference: OWASP Foundation, "CSV Injection." Accessed: Oct. 04, 2026. [Online]. Available: https://owasp.org/www-community/attacks/CSV_Injection
+        /// Reference: Y. Shafranovich, "Common Format and MIME Type for Comma-Separated Values (CSV) Files," Internet Engineering Task Force (IETF), RFC 4180, Oct. 2005. Accessed: Oct. 04, 2026. [Online]. Available: https://www.rfc-editor.org/rfc/rfc4180
+        /// </summary>
         public static string Cell(string? value)
         {
             var v = value ?? string.Empty;

@@ -13,6 +13,8 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
     /// SignalR event. All writes commit in a single Unit of Work (one SaveChanges); the push
     /// happens only after the commit succeeds.
     /// Also owns the ProjectTask lifecycle guard (SM-01).
+    /// Reference: M. Fowler, Patterns of Enterprise Application Architecture. Boston, MA, USA: Addison-Wesley, 2003.
+    /// Reference: E. Evans, Domain-Driven Design: Tackling Complexity in the Heart of Software. Boston, MA, USA: Addison-Wesley, 2007.
     /// </summary>
     public class TaskAssignmentService(
         AppDbContext db, AuditService audit, NotificationService notify, EmailService email, AccessGuard guard)

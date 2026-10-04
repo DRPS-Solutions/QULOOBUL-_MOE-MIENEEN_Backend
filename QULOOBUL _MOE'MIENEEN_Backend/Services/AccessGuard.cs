@@ -14,6 +14,8 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
     /// The rule: a user holding ManageUsers sees everything; otherwise a project is visible to its
     /// owner and its members, and a task is visible to anyone who can see its project plus its
     /// creator and its assignees (ProjectMember: "a member allocated to a project sees only that project").
+    /// Reference: OWASP Foundation, "OWASP Top 10:2025." Accessed: Aug. 08, 2026. [Online]. Available: https://owasp.org/Top10/2025/
+    /// Reference: Microsoft, "Resource-based authorization in ASP.NET Core." Accessed: Oct. 04, 2026. [Online]. Available: https://learn.microsoft.com/en-us/aspnet/core/security/authorization/resourcebased
     /// </summary>
     public class AccessGuard(AppDbContext db)
     {

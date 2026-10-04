@@ -7,6 +7,7 @@ namespace Backend.Tests;
 // The SM-01 / SM-02 / SM-03 guard tables are the branchy security-path logic behind
 // TaskAssignmentService, RequestReviewService and UserService. If a transition opens up by
 // accident, these fail.
+// Reference: J. W. Satzinger, R. B. Jackson, and S. D. Burd, Systems Analysis and Design in a Changing World, 7th ed. Boston, MA, USA: Cengage Learning, 2016.
 public class LifecycleTests
 {
     [Theory]

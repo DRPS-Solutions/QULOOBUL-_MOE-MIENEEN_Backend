@@ -17,6 +17,8 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
         /// How long a deactivated account's personal details are kept before anonymise() may run.
         /// ponytail: the architecture doc names no POPIA retention period; 30 days is a placeholder
         /// until the NPO sets its records policy.
+        /// Reference: Republic of South Africa, "Protection of Personal Information Act 4 of 2013," Government Gazette, no. 37067, Cape Town, South Africa, Nov. 2013.
+        /// Reference: Experian, "What is data minimisation?" Accessed: Aug. 13, 2026. [Online]. Available: https://www.experian.co.uk/business/glossary/data-minimisation/index
         /// </summary>
         public static readonly TimeSpan RetentionPeriod = TimeSpan.FromDays(30);
 //----------------------------------------------------------------------------------------------------------------------//

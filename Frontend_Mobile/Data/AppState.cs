@@ -28,10 +28,13 @@ namespace Frontend_Mobile.Data;
 /// something changes server-side. Every HTTP call goes through Send, so failures
 /// look the same on every page (an alert) and an expired token signs the user out.
 /// Pages subscribe to <see cref="Changed"/> while they're on screen.
+/// Reference: Microsoft, ".NET Multi-platform App UI documentation." Accessed: Aug. 08, 2026. [Online]. Available: https://learn.microsoft.com/en-us/dotnet/maui/?view=net-maui-10.0
+/// Reference: Microsoft, "Consume a REST-based web service - .NET MAUI." Accessed: Oct. 04, 2026. [Online]. Available: https://learn.microsoft.com/en-us/dotnet/maui/data-cloud/rest
 /// </summary>
 public sealed class AppState : Observable
 {
     // Debug: the API's https launch profile (Android's emulator reaches the host's localhost at 10.0.2.2).
+    // Reference: Microsoft, "Connect to local web services from Android emulators and iOS simulators." Accessed: Oct. 04, 2026. [Online]. Available: https://learn.microsoft.com/en-us/dotnet/maui/data-cloud/local-web-services
     // Release: the production App Service, so a side-loaded APK works on a real phone;
     // STAGING (dev-branch CI builds, -p:ApiEnvironment=Staging): the staging App Service.
     // Declared before Current: Current's own initializer constructs an AppState instance (whose
@@ -164,6 +167,7 @@ public sealed class AppState : Observable
     }
 
     // The token lives in the platform keystore (Android Keystore / iOS Keychain), never a plain file.
+    // Reference: Microsoft, "Secure storage - .NET MAUI." Accessed: Oct. 04, 2026. [Online]. Available: https://learn.microsoft.com/en-us/dotnet/maui/platform-integration/storage/secure-storage
     private static async Task RememberAsync(AuthResponse auth)
     {
         try { await SecureStorage.Default.SetAsync(SessionKey, JsonSerializer.Serialize(auth)); }
@@ -484,6 +488,7 @@ public sealed class AppState : Observable
 
     // ----- Live updates: the SignalR Observer from the architecture doc. The
     // server says what changed; refetching that list keeps one data path. -----
+    // Reference: Microsoft, "ASP.NET Core SignalR .NET Client." Accessed: Oct. 04, 2026. [Online]. Available: https://learn.microsoft.com/en-us/aspnet/core/signalr/dotnet-client
 
     private async Task ConnectHubAsync()
     {

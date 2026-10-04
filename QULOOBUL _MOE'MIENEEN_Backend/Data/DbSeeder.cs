@@ -12,6 +12,8 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Data
     /// Reference data and the first admin account. Wired to EF's UseSeeding hook in Program.cs, so it
     /// runs straight after `dotnet ef database update` (the CD migration step). Each block only fills
     /// an empty table, so re-running it is harmless.
+    /// Reference: Microsoft, "Data seeding - EF Core." Accessed: Oct. 04, 2026. [Online]. Available: https://learn.microsoft.com/en-us/ef/core/modeling/data-seeding
+    /// Reference: Microsoft, "Migrations overview - EF Core." Accessed: Aug. 08, 2026. [Online]. Available: https://learn.microsoft.com/en-us/ef/core/managing-schemas/migrations/
     /// </summary>
     public static class DbSeeder
     {
