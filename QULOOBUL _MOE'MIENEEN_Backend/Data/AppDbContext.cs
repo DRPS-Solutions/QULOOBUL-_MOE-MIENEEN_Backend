@@ -14,8 +14,8 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Data
     /// The single Unit of Work for the platform. Every DbSet is a Repository and
     /// SaveChanges() commits every tracked change in one transaction (see architecture doc,
     /// "Repository and Unit of Work"). Registered request-scoped in Program.cs.
-    /// Reference: Fowler, M. (2003) Patterns of enterprise application architecture. Boston: Addison-Wesley.
-    /// Reference: Microsoft (2026) Implementing the infrastructure persistence layer with Entity Framework Core. Available at: https://learn.microsoft.com/en-us/dotnet/architecture/microservices/microservice-ddd-cqrs-patterns/infrastructure-persistence-layer-implementation-entity-framework-core (Accessed: 8 August 2026).
+    /// Reference: M. Fowler, Patterns of Enterprise Application Architecture. Boston, MA, USA: Addison-Wesley, 2003.
+    /// Reference: Microsoft, "Implementing the infrastructure persistence layer with Entity Framework Core." Accessed: Aug. 08, 2026. [Online]. Available: https://learn.microsoft.com/en-us/dotnet/architecture/microservices/microservice-ddd-cqrs-patterns/infrastructure-persistence-layer-implementation-entity-framework-core
     /// </summary>
     public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
     {
@@ -70,7 +70,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Data
             // be cascaded away, and 22 relationships point at User (architecture doc,
             // "Deactivation rather than deletion of user"). Also avoids SQL Server's
             // multiple-cascade-path error without hand-writing every relationship.
-            // Reference: Microsoft (2026) Cascade delete - EF Core. Available at: https://learn.microsoft.com/en-us/ef/core/saving/cascade-delete (Accessed: 4 October 2026).
+            // Reference: Microsoft, "Cascade delete - EF Core." Accessed: Oct. 04, 2026. [Online]. Available: https://learn.microsoft.com/en-us/ef/core/saving/cascade-delete
             foreach (var fk in b.Model.GetEntityTypes().SelectMany(t => t.GetForeignKeys()))
                 fk.DeleteBehavior = DeleteBehavior.Restrict;
 
@@ -86,20 +86,20 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Data
             b.Entity<FileUpload>().HasOne(x => x.Meeting).WithMany().HasForeignKey(x => x.MeetingId).OnDelete(DeleteBehavior.SetNull);
 
             // The access paths the use cases hit directly (architecture doc, "Indexing"); User.Email is below.
-            // Reference: Microsoft (2026) Indexes - EF Core. Available at: https://learn.microsoft.com/en-us/ef/core/modeling/indexes (Accessed: 4 October 2026).
-            // Reference: Connolly, T.M. and Begg, C.E. (2010) Database systems: a practical approach to design, implementation, and management. Boston: Addison-Wesley.
+            // Reference: Microsoft, "Indexes - EF Core." Accessed: Oct. 04, 2026. [Online]. Available: https://learn.microsoft.com/en-us/ef/core/modeling/indexes
+            // Reference: T. M. Connolly and C. E. Begg, Database Systems: A Practical Approach to Design, Implementation, and Management. Boston, MA, USA: Addison-Wesley, 2010.
             b.Entity<ProjectTask>().HasIndex(x => new { x.ProjectId, x.Status });   // the task board
             b.Entity<Notification>().HasIndex(x => new { x.UserId, x.IsRead });     // the unread badge
             b.Entity<AuditLog>().HasIndex(x => x.Timestamp);                        // time-ranged audit queries
 
             // Staff directory reads a view that has no credential columns (defence in depth); created in
             // the SecurityAndIndexes migration alongside the Notification row-level security policy.
-            // Reference: Microsoft (2026) Keyless entity types - EF Core. Available at: https://learn.microsoft.com/en-us/ef/core/modeling/keyless-entity-types (Accessed: 4 October 2026).
+            // Reference: Microsoft, "Keyless entity types - EF Core." Accessed: Oct. 04, 2026. [Online]. Available: https://learn.microsoft.com/en-us/ef/core/modeling/keyless-entity-types
             b.Entity<UserDirectoryEntry>().HasNoKey().ToView("vw_UserDirectory");
 
             // Junction tables reject duplicate pairs (architecture doc, "Junction tables carry
             // their own surrogate key ... with a unique constraint on the pair").
-            // Reference: Chen, P.P.-S. (1976) 'The entity-relationship model - toward a unified view of data', ACM Transactions on Database Systems, 1(1), pp. 9-36. doi: 10.1145/320434.320440.
+            // Reference: P. P.-S. Chen, "The entity-relationship model - toward a unified view of data," ACM Trans. Database Syst., vol. 1, no. 1, pp. 9-36, Mar. 1976, doi: 10.1145/320434.320440.
             b.Entity<TaskAssignment>().HasIndex(x => new { x.TaskId, x.UserId }).IsUnique();
             b.Entity<ProjectMember>().HasIndex(x => new { x.ProjectId, x.UserId }).IsUnique();
             b.Entity<MeetingAttendee>().HasIndex(x => new { x.MeetingId, x.UserId }).IsUnique();
@@ -115,7 +115,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Data
 
             // ponytail: at-most-one attachment context on FileUpload is enforced here as a
             // CHECK constraint; the service also guards it so the error is friendly.
-            // Reference: Codd, E.F. (1970) 'A relational model of data for large shared data banks', Communications of the ACM, 13(6), pp. 377-387. doi: 10.1145/362384.362685.
+            // Reference: E. F. Codd, "A relational model of data for large shared data banks," Commun. ACM, vol. 13, no. 6, pp. 377-387, Jun. 1970, doi: 10.1145/362384.362685.
             b.Entity<FileUpload>().ToTable(t => t.HasCheckConstraint(
                 "CK_FileUpload_OneContext",
                 "((CASE WHEN [TaskId] IS NULL THEN 0 ELSE 1 END) + " +

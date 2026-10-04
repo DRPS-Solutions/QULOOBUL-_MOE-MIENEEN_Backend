@@ -5,8 +5,8 @@ namespace Frontend_Mobile;
 /// <summary>
 /// App entry point for every platform: one .NET MAUI project builds the Android, iOS,
 /// Mac Catalyst and Windows apps.
-/// Reference: Microsoft (2026) .NET Multi-platform App UI documentation. Available at: https://learn.microsoft.com/en-us/dotnet/maui/?view=net-maui-10.0 (Accessed: 8 August 2026).
-/// Reference: Microsoft (2026) .NET MAUI app startup. Available at: https://learn.microsoft.com/en-us/dotnet/maui/fundamentals/app-startup (Accessed: 4 October 2026).
+/// Reference: Microsoft, ".NET Multi-platform App UI documentation." Accessed: Aug. 08, 2026. [Online]. Available: https://learn.microsoft.com/en-us/dotnet/maui/?view=net-maui-10.0
+/// Reference: Microsoft, ".NET MAUI app startup." Accessed: Oct. 04, 2026. [Online]. Available: https://learn.microsoft.com/en-us/dotnet/maui/fundamentals/app-startup
 /// </summary>
 public static class MauiProgram
 {

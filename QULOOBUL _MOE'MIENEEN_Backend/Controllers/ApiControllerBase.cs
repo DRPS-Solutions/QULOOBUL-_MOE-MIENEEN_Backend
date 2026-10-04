@@ -7,8 +7,8 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Controllers
     /// <summary>
     /// Base for every API controller: resource-oriented routes, authenticated by default, no logic
     /// (each action delegates to its use-case service).
-    /// Reference: Fielding, R.T. (2000) Architectural styles and the design of network-based software architectures. PhD thesis. University of California, Irvine.
-    /// Reference: Microsoft (2026) Create web APIs with ASP.NET Core. Available at: https://learn.microsoft.com/en-us/aspnet/core/web-api/ (Accessed: 4 October 2026).
+    /// Reference: R. T. Fielding, "Architectural styles and the design of network-based software architectures," Ph.D. dissertation, Univ. of California, Irvine, CA, USA, 2000.
+    /// Reference: Microsoft, "Create web APIs with ASP.NET Core." Accessed: Oct. 04, 2026. [Online]. Available: https://learn.microsoft.com/en-us/aspnet/core/web-api/
     /// </summary>
     [ApiController]
     [Route("api/[controller]")]

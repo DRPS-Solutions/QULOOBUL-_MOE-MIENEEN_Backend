@@ -232,7 +232,7 @@
     {
         if (await AppData.GetAsync<FileDownloadResponse>($"api/files/{f.FileId}/download") is not { } link) return;
         // window.open returns null when a pop-up blocker stops it.
-        // Reference: MDN Web Docs (2026) Window: open() method. Available at: https://developer.mozilla.org/en-US/docs/Web/API/Window/open (Accessed: 4 October 2026).
+        // Reference: MDN Web Docs, "Window: open() method." Accessed: Oct. 04, 2026. [Online]. Available: https://developer.mozilla.org/en-US/docs/Web/API/Window/open
         await using var tab = await JS.InvokeAsync<IJSObjectReference?>("open", link.DownloadUrl, "_blank");
         if (tab is null)
             Snackbar.Add("The browser blocked the download tab. Allow pop-ups for this site and try again.", Severity.Warning);

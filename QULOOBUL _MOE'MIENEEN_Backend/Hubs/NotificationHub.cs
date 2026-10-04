@@ -6,8 +6,8 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Hubs
     /// The Observer subject (architecture doc, "Observer"). Each connection joins a group
     /// named after its user so a service can push to "user-{id}" without knowing which
     /// devices are listening. Services send via IHubContext&lt;NotificationHub&gt;.
-    /// Reference: Gamma, E., Helm, R., Johnson, R. and Vlissides, J. (2016) Design patterns: elements of reusable object-oriented software. Boston: Addison-Wesley.
-    /// Reference: Microsoft (2026) Use hubs in ASP.NET Core SignalR. Available at: https://learn.microsoft.com/en-us/aspnet/core/signalr/hubs?view=aspnetcore-10.0 (Accessed: 8 August 2026).
+    /// Reference: E. Gamma, R. Helm, R. E. Johnson, and J. Vlissides, Design Patterns: Elements of Reusable Object-Oriented Software. Boston, MA, USA: Addison-Wesley, 2016.
+    /// Reference: Microsoft, "Use hubs in ASP.NET Core SignalR." Accessed: Aug. 08, 2026. [Online]. Available: https://learn.microsoft.com/en-us/aspnet/core/signalr/hubs?view=aspnetcore-10.0
     /// </summary>
     [Microsoft.AspNetCore.Authorization.Authorize]
     public class NotificationHub : Hub
@@ -17,7 +17,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Hubs
         public override async Task OnConnectedAsync()
         {
             var sub = Context.User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-            // Reference: Microsoft (2026) Manage users and groups in SignalR. Available at: https://learn.microsoft.com/en-us/aspnet/core/signalr/groups (Accessed: 4 October 2026).
+            // Reference: Microsoft, "Manage users and groups in SignalR." Accessed: Oct. 04, 2026. [Online]. Available: https://learn.microsoft.com/en-us/aspnet/core/signalr/groups
             if (int.TryParse(sub, out var userId))
                 await Groups.AddToGroupAsync(Context.ConnectionId, GroupFor(userId));
             await base.OnConnectedAsync();

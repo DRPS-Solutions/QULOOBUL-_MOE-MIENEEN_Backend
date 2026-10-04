@@ -9,8 +9,8 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.SharedClasses.Auth
     /// <summary>
     /// Issues the signed (HMAC-SHA256) access token UC-01 returns: user id, name, role, and one
     /// "perm" claim per granted permission, which Program.cs's authorization policies check.
-    /// Reference: Jones, M., Bradley, J. and Sakimura, N. (2015) RFC 7519: JSON Web Token (JWT). Internet Engineering Task Force. Available at: https://www.rfc-editor.org/info/rfc7519 (Accessed: 8 August 2026).
-    /// Reference: Microsoft (2026) Claims-based authorization in ASP.NET Core. Available at: https://learn.microsoft.com/en-us/aspnet/core/security/authorization/claims (Accessed: 4 October 2026).
+    /// Reference: M. Jones, J. Bradley, and N. Sakimura, "JSON Web Token (JWT)," Internet Engineering Task Force (IETF), RFC 7519, May 2015. Accessed: Aug. 08, 2026. [Online]. Available: https://www.rfc-editor.org/info/rfc7519
+    /// Reference: Microsoft, "Claims-based authorization in ASP.NET Core." Accessed: Oct. 04, 2026. [Online]. Available: https://learn.microsoft.com/en-us/aspnet/core/security/authorization/claims
     /// </summary>
     public class JwtTokenFactory(IConfiguration config)
     {

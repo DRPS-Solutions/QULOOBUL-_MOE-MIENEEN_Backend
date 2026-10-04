@@ -10,9 +10,9 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Data
     /// depth": the database refuses another user's rows even if an application check is missed).
     /// Read-only, so SQL running on the connection cannot impersonate someone else. No user (login,
     /// background jobs, migrations) leaves it unset, and the policy lets those through.
-    /// Reference: Microsoft (2026) Row-level security - SQL Server. Available at: https://learn.microsoft.com/en-us/sql/relational-databases/security/row-level-security (Accessed: 4 October 2026).
-    /// Reference: Microsoft (2026) Interceptors - EF Core. Available at: https://learn.microsoft.com/en-us/ef/core/logging-events-diagnostics/interceptors (Accessed: 4 October 2026).
-    /// Reference: Microsoft (2026) Security overview - Azure SQL Database. Available at: https://learn.microsoft.com/en-us/azure/azure-sql/database/security-overview?view=azuresql (Accessed: 8 August 2026).
+    /// Reference: Microsoft, "Row-level security - SQL Server." Accessed: Oct. 04, 2026. [Online]. Available: https://learn.microsoft.com/en-us/sql/relational-databases/security/row-level-security
+    /// Reference: Microsoft, "Interceptors - EF Core." Accessed: Oct. 04, 2026. [Online]. Available: https://learn.microsoft.com/en-us/ef/core/logging-events-diagnostics/interceptors
+    /// Reference: Microsoft, "Security overview - Azure SQL Database." Accessed: Aug. 08, 2026. [Online]. Available: https://learn.microsoft.com/en-us/azure/azure-sql/database/security-overview?view=azuresql
     /// </summary>
     public class SessionContextInterceptor(IHttpContextAccessor http) : DbConnectionInterceptor
     {
@@ -34,7 +34,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Data
             if (!int.TryParse(http.HttpContext?.User.FindFirstValue(ClaimTypes.NameIdentifier), out var userId))
                 return null;
 
-            // Reference: Microsoft (2026) sp_set_session_context (Transact-SQL). Available at: https://learn.microsoft.com/en-us/sql/relational-databases/system-stored-procedures/sp-set-session-context-transact-sql (Accessed: 4 October 2026).
+            // Reference: Microsoft, "sp_set_session_context (Transact-SQL)." Accessed: Oct. 04, 2026. [Online]. Available: https://learn.microsoft.com/en-us/sql/relational-databases/system-stored-procedures/sp-set-session-context-transact-sql
             var cmd = connection.CreateCommand();
             cmd.CommandText = "EXEC sp_set_session_context @key = N'UserId', @value = @id, @read_only = 1;";
             var p = cmd.CreateParameter();

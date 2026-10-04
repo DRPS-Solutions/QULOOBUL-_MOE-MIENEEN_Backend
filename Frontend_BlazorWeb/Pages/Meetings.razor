@@ -388,7 +388,7 @@
 
     // Dictation: the browser transcribes speech and each finished phrase is
     // appended to the minutes text.
-    // Reference: Microsoft (2026) Call .NET methods from JavaScript functions in ASP.NET Core Blazor. Available at: https://learn.microsoft.com/en-us/aspnet/core/blazor/javascript-interoperability/call-dotnet-from-javascript (Accessed: 4 October 2026).
+    // Reference: Microsoft, "Call .NET methods from JavaScript functions in ASP.NET Core Blazor." Accessed: Oct. 04, 2026. [Online]. Available: https://learn.microsoft.com/en-us/aspnet/core/blazor/javascript-interoperability/call-dotnet-from-javascript
     private bool recording;
     private DotNetObjectReference<Meetings>? self;
 
@@ -456,7 +456,7 @@
 
     // The minutes as on screen (unsaved notes included) in a new Word document:
     // a minimal .docx is just three XML parts in a zip.
-    // Reference: Ecma International (2021) ECMA-376: Office Open XML file formats. 5th edn. Available at: https://ecma-international.org/publications-and-standards/standards/ecma-376/ (Accessed: 4 October 2026).
+    // Reference: Ecma International, "Office Open XML File Formats," ECMA-376, 5th ed., Dec. 2021. Accessed: Oct. 04, 2026. [Online]. Available: https://ecma-international.org/publications-and-standards/standards/ecma-376/
     private string DocxHref()
     {
         static string Para(string text, bool heading = false) =>

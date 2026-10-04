@@ -19,7 +19,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
     ///
     /// The sweep methods are static and take their dependencies explicitly so they can be exercised
     /// against an in-memory context with an injected clock, without starting a host.
-    /// Reference: Microsoft (2026) Background tasks with hosted services in ASP.NET Core. Available at: https://learn.microsoft.com/en-us/aspnet/core/fundamentals/host/hosted-services (Accessed: 4 October 2026).
+    /// Reference: Microsoft, "Background tasks with hosted services in ASP.NET Core." Accessed: Oct. 04, 2026. [Online]. Available: https://learn.microsoft.com/en-us/aspnet/core/fundamentals/host/hosted-services
     /// </summary>
     public class MaintenanceJobs(IServiceScopeFactory scopes, ILogger<MaintenanceJobs> log) : BackgroundService
     {
@@ -36,7 +36,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
 //----------------------------------------------------------------------------------------------------------------------//
         protected override async Task ExecuteAsync(CancellationToken ct)
         {
-            // Reference: Microsoft (2026) PeriodicTimer Class. Available at: https://learn.microsoft.com/en-us/dotnet/api/system.threading.periodictimer (Accessed: 4 October 2026).
+            // Reference: Microsoft, "PeriodicTimer Class." Accessed: Oct. 04, 2026. [Online]. Available: https://learn.microsoft.com/en-us/dotnet/api/system.threading.periodictimer
             using var timer = new PeriodicTimer(Interval);
             try
             {

@@ -9,7 +9,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
     /// happens through a short-lived SAS scoped to a single blob, so the file itself never
     /// passes through the API (architecture doc, SD-04 / "Network segregation").
     /// No provider abstraction on purpose (architecture doc rejects "Abstract Factory over storage").
-    /// Reference: Microsoft (2026) Grant limited access to data with shared access signatures (SAS). Available at: https://learn.microsoft.com/en-us/azure/storage/common/storage-sas-overview (Accessed: 8 August 2026).
+    /// Reference: Microsoft, "Grant limited access to data with shared access signatures (SAS)." Accessed: Aug. 08, 2026. [Online]. Available: https://learn.microsoft.com/en-us/azure/storage/common/storage-sas-overview
     /// </summary>
     public class BlobStorageService(BlobServiceClient client)
     {
@@ -78,7 +78,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
                     "BlobServiceClient has no shared key. Use a connection string with an account key, " +
                     "or switch to a user-delegation SAS when moving to managed identity.");
 
-            // Reference: Microsoft (2026) Create a service SAS for a blob with .NET. Available at: https://learn.microsoft.com/en-us/azure/storage/blobs/sas-service-create-dotnet (Accessed: 4 October 2026).
+            // Reference: Microsoft, "Create a service SAS for a blob with .NET." Accessed: Oct. 04, 2026. [Online]. Available: https://learn.microsoft.com/en-us/azure/storage/blobs/sas-service-create-dotnet
             var builder = new BlobSasBuilder
             {
                 BlobContainerName = blob.BlobContainerName,
@@ -86,7 +86,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
                 Resource = "b",
                 ExpiresOn = DateTimeOffset.UtcNow.Add(ttl ?? DefaultTtl),
                 // Blob Storage sends this back as the response header, so the browser saves rather than previews.
-                // Reference: Reschke, J. (2011) RFC 6266: Use of the Content-Disposition header field in HTTP. Internet Engineering Task Force. Available at: https://www.rfc-editor.org/rfc/rfc6266 (Accessed: 4 October 2026).
+                // Reference: J. Reschke, "Use of the Content-Disposition Header Field in the Hypertext Transfer Protocol (HTTP)," Internet Engineering Task Force (IETF), RFC 6266, Jun. 2011. Accessed: Oct. 04, 2026. [Online]. Available: https://www.rfc-editor.org/rfc/rfc6266
                 ContentDisposition = downloadName is null ? null
                     : new System.Net.Http.Headers.ContentDispositionHeaderValue("attachment") { FileNameStar = downloadName }.ToString(),
             };
