@@ -34,7 +34,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Data
         {
             ["To Do"] = ["In Progress", TaskCancelled],
             ["In Progress"] = ["Blocked", "Done", "To Do", TaskCancelled],
-            ["Blocked"] = ["In Progress", "To Do"],
+            ["Blocked"] = ["In Progress", "To Do", TaskCancelled], // a cancelled event takes its blocked tasks too
             ["Done"] = ["In Progress", TaskArchived], // reopen, archive
         };
 //----------------------------------------------------------------------------------------------------------------------//

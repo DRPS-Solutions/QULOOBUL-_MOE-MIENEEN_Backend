@@ -28,7 +28,8 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
         public async Task<IReadOnlyList<TaskCardDto>> ListAsync(
             DateTime? from, DateTime? to, int? assigneeId, int userId)
         {
-            var q = db.Tasks.AsQueryable();
+            // Cancelled work is off everyone's list; the event page still shows it via the board.
+            var q = db.Tasks.Where(t => t.Status != Lifecycle.TaskCancelled);
             if (from is { } f) q = q.Where(t => t.Deadline >= f);
             if (to is { } e) q = q.Where(t => t.Deadline < e);
             if (assigneeId is { } a) q = q.Where(t => db.TaskAssignments.Any(x => x.TaskId == t.TaskId && x.UserId == a));

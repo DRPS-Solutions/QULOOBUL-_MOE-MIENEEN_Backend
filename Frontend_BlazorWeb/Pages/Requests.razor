@@ -100,6 +100,11 @@
         border-radius: 12px;
         padding: 14px 16px;
         margin-bottom: 12px;
+        overflow-wrap: anywhere; /* long notes/titles wrap instead of pushing the page wide (R3) */
+    }
+
+    .drps-request-top > div:first-child {
+        min-width: 0;
     }
 
     .drps-request-item:last-child {
@@ -271,7 +276,8 @@
                         </MudSelect>
                     }
 
-                    <MudTextField T="string" @bind-Value="newRequest.Notes" Label="Justification / notes" Variant="Variant.Outlined" Lines="3" Class="mb-4" />
+                    <MudTextField T="string" @bind-Value="newRequest.Notes" Label="Justification / notes (optional)" Variant="Variant.Outlined" Lines="3" Class="mb-4"
+                                  MaxLength="500" Counter="500" Immediate="true" />
 
                     <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" Disabled="@(!CanSubmit)" OnClick="SubmitRequest">
                         @(submitting ? "Submitting..." : "Submit Request")

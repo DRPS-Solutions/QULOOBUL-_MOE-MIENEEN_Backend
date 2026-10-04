@@ -154,18 +154,36 @@ else
     private bool CanLogin =>
         !loggingIn && !string.IsNullOrWhiteSpace(emailInput) && !string.IsNullOrWhiteSpace(passwordInput);
 
-    // localStorage, unlike the session: a display preference should outlive the tab.
+    // localStorage, unlike the session: a display preference should outlive the tab. Keyed per user so
+    // two accounts on one browser don't share them (test plan X1); signed out uses the ":" key.
+    private int? prefsUser;
+    private string PrefKey(string name) => $"{name}:{AppData.CurrentUser?.UserId}";
+
+    private async Task LoadPrefs()
+    {
+        prefsUser = AppData.CurrentUser?.UserId;
+        isDarkMode = await JS.InvokeAsync<string?>("localStorage.getItem", PrefKey("darkMode")) == "true";
+        isVerticalNav = await JS.InvokeAsync<string?>("localStorage.getItem", PrefKey("verticalNav")) == "true";
+    }
+
     private async Task ToggleDarkMode()
     {
         isDarkMode = !isDarkMode;
-        await JS.InvokeVoidAsync("localStorage.setItem", "darkMode", isDarkMode);
+        await JS.InvokeVoidAsync("localStorage.setItem", PrefKey("darkMode"), isDarkMode);
     }
 
     private async Task ToggleNavOrientation()
     {
         isVerticalNav = !isVerticalNav;
-        await JS.InvokeVoidAsync("localStorage.setItem", "verticalNav", isVerticalNav);
+        await JS.InvokeVoidAsync("localStorage.setItem", PrefKey("verticalNav"), isVerticalNav);
     }
+
+    // Sign-in, sign-out and expired sessions all come through here; swap prefs when the user changes.
+    private void OnAppDataChange() => InvokeAsync(async () =>
+    {
+        if (prefsUser != AppData.CurrentUser?.UserId) await LoadPrefs();
+        StateHasChanged();
+    });
 
     // UC-01: the API checks the credentials and returns a JWT.
     private async Task Login()
@@ -198,16 +216,15 @@ else
     // Re-render when the session ends elsewhere (e.g. an expired token).
     protected override async Task OnInitializedAsync()
     {
-        AppData.OnChange += StateHasChanged;
-        isDarkMode = await JS.InvokeAsync<string?>("localStorage.getItem", "darkMode") == "true";
-        isVerticalNav = await JS.InvokeAsync<string?>("localStorage.getItem", "verticalNav") == "true";
+        AppData.OnChange += OnAppDataChange;
         await AppData.RestoreSessionAsync();
+        await LoadPrefs();
         restoring = false;
     }
 
     private bool restoring = true;
 
-    public void Dispose() => AppData.OnChange -= StateHasChanged;
+    public void Dispose() => AppData.OnChange -= OnAppDataChange;
 
     // Drives MudThemeProvider so built-in MudBlazor components (buttons,
     // dialogs, tables, inputs, snackbars) switch palette automatically

@@ -583,6 +583,7 @@
         ["schedule.create"] = "Created a recurring task",
         ["schedule.update"] = "Updated a recurring task",
         ["schedule.pause"] = "Paused a recurring task",
+        ["schedule.reassign"] = "Reassigned a recurring task",
         ["event.create"] = "Created an event",
         ["event.attendee.add"] = "Invited someone to an event",
         ["event.attendee.respond"] = "Responded to an event",
@@ -627,8 +628,9 @@
         return AuditActions.GetValueOrDefault(e.Action, e.Action);
     }
 
-    private static string AuditTargetLabel(AuditEntryDto e)
+    private string AuditTargetLabel(AuditEntryDto e)
     {
+        if (e.EntityType == "User" && e.EntityId != 0) return AppData.UserName(e.EntityId); // a name, not "User #7" (U7)
         if (e.EntityType == "http")
         {
             // "POST /api/meeting-minutes/3/approve" -> "Meeting minutes"
@@ -761,16 +763,14 @@
         if (result is null) return;
 
         // Shown once and never stored in the clear: the admin passes it on in person or by phone.
-        // A Copy button, since there's no getting it back once the dialog closes (test plan A3/U4).
-        var name = System.Net.WebUtility.HtmlEncode(user.FullName);
-        var temp = System.Net.WebUtility.HtmlEncode(result.TemporaryPassword);
-        await DialogService.ShowMessageBoxAsync("Temporary password", new MarkupString(
-            $"<p>Temporary password for {name}:</p>" +
-            $"<p><code style=\"font-size:1.1rem; user-select:all;\">{temp}</code> " +
-            $"<button type=\"button\" class=\"mud-button-root mud-button mud-button-outlined mud-button-outlined-primary mud-button-outlined-size-small\" data-p=\"{temp}\" " +
-            "onclick=\"navigator.clipboard.writeText(this.dataset.p).then(() => this.textContent = 'Copied')\">Copy</button></p>" +
-            "<p>Give it to them directly. They must choose a new password when they next sign in.</p>"),
-            yesText: "Done");
+        var dialog = await DialogService.ShowAsync<TempPasswordDialog>("Temporary password",
+            new DialogParameters<TempPasswordDialog>
+            {
+                { x => x.FullName, user.FullName },
+                { x => x.Password, result.TemporaryPassword },
+            },
+            new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true, BackdropClick = false, CloseOnEscapeKey = false });
+        await dialog.Result;
         await Task.WhenAll(AppData.RefreshUsersAsync(), LoadOverview());
         if (AppData.Users.FirstOrDefault(u => u.UserId == user.UserId) is { } updated) await SelectEmployee(updated);
     }

@@ -159,6 +159,19 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
                     $"Task \"{a.Task.Title}\" was reassigned to you because its assignee was deactivated.",
                     nameof(ProjectTask), a.TaskId));
             }
+
+            // Recurring schedules would keep generating tasks for the leaver (test plan U6): hand them to
+            // whoever set the schedule up, or to the acting admin when that's the leaver or inactive.
+            foreach (var s in await db.TaskSchedules.Where(s => s.AssignedTo == userId).ToListAsync())
+            {
+                var heir = s.CreatedBy != userId && await db.Users.AnyAsync(u => u.UserId == s.CreatedBy && u.IsActive)
+                    ? s.CreatedBy : actorId;
+                s.AssignedTo = heir;
+                audit.Record(actorId, "schedule.reassign", nameof(TaskSchedule), s.ScheduleId);
+                notices.Add(await notify.QueueAsync(heir, "TaskAssigned",
+                    $"Recurring task \"{s.Title}\" was reassigned to you because its assignee was deactivated.",
+                    nameof(TaskSchedule), s.ScheduleId));
+            }
             return notices;
         }
 //----------------------------------------------------------------------------------------------------------------------//

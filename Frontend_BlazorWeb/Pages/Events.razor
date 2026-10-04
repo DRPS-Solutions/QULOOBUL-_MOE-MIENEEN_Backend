@@ -405,6 +405,8 @@
                                             @(assignees.Length == 0 ? "Unassigned" : assignees)
                                             &nbsp;·&nbsp;
                                             @linkedTask.Deadline.ToString(linkedTask.IsAllDay() ? "dd MMM" : "dd MMM, h:mm tt")
+                                            &nbsp;·&nbsp;
+                                            @linkedTask.Status
                                         </div>
                                     </div>
                                 }
