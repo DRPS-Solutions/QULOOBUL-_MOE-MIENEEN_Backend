@@ -95,6 +95,25 @@
                 </div>
             }
         </div>
+
+        @* UC-08 / test plan N4: per-type opt-out. A muted type sends neither in-app nor email;
+           an admin's direct announcement ignores these, so it isn't listed. *@
+        <div class="drps-card mt-4">
+            <MudText Typo="Typo.subtitle1" Style="font-weight:600;">Notifications</MudText>
+            <div class="drps-profile-muted mb-2">Choose what you hear about. Messages sent directly by an administrator always come through.</div>
+            @if (prefs is null)
+            {
+                <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+            }
+            else
+            {
+                @foreach (var pref in prefs.Where(p => p.Type != "Announcement"))
+                {
+                    <MudSwitch T="bool" Value="pref.Enabled" ValueChanged="@(v => SetPref(pref, v))" Color="Color.Primary"
+                               Label="@PrefLabel(pref.Type)" Disabled="@savingPref" />
+                }
+            }
+        </div>
     </MudContainer>
 </div>
 
@@ -120,9 +139,42 @@
 
     protected override async Task OnInitializedAsync()
     {
+        var prefsLoad = AppData.GetAsync<List<NotificationPreferenceDto>>("api/notifications/preferences");
         user = await AppData.GetAsync<UserDto>("api/users/me");
         Reset();
+        prefs = await prefsLoad ?? [];
     }
+
+    private List<NotificationPreferenceDto>? prefs;
+    private bool savingPref;
+
+    private async Task SetPref(NotificationPreferenceDto pref, bool enabled)
+    {
+        savingPref = true;
+        var updated = pref with { Enabled = enabled };
+        var ok = await AppData.SendAsync(HttpMethod.Put, "api/notifications/preferences",
+            new UpdateNotificationPreferencesRequest { Preferences = [updated] });
+        savingPref = false;
+        if (ok) prefs![prefs.IndexOf(pref)] = updated;
+    }
+
+    // NotificationType names are machine keys ("TaskAssigned"); unknown ones fall back to the key.
+    private static string PrefLabel(string type) => type switch
+    {
+        "TaskAssigned" => "A task is assigned to me",
+        "TaskCancelled" => "A task of mine is cancelled",
+        "DeadlineApproaching" => "A task deadline is approaching",
+        "ProjectAssigned" => "I'm added to an event",
+        "ProjectCancelled" => "An event I'm on is cancelled",
+        "EventInvite" => "I'm invited to a calendar event",
+        "RequestSubmitted" => "A request is submitted for review",
+        "RequestReviewed" => "My request is approved or declined",
+        "RequestCompleted" => "My request is fulfilled",
+        "RequestEscalated" => "A request is escalated",
+        "UserLocked" => "An account is locked",
+        "PasswordResetRequested" => "Someone asks for a password reset",
+        _ => type,
+    };
 
     private void Reset()
     {

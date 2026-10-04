@@ -329,6 +329,22 @@ public class AppDataService(HttpClient http, ISnackbar snackbar, IDialogService 
         await RefreshTasksAsync();
     }
 
+    /// <summary>A kanban drop: one move, guarded by the API (SM-01). A refused move shows the API's
+    /// message, and the refresh puts the card back in its real column.</summary>
+    public async Task<bool> MoveTaskAsync(TaskCardDto task, string status)
+    {
+        var ok = await Move(task.TaskId, status);
+        await RefreshTasksAsync();
+        return ok;
+    }
+
+    public async Task<bool> SetTaskProgressAsync(TaskCardDto task, int percent)
+    {
+        var ok = await SendAsync(HttpMethod.Patch, $"api/tasks/{task.TaskId}", new UpdateTaskRequest { PercentComplete = percent });
+        await RefreshTasksAsync();
+        return ok;
+    }
+
     private Task<bool> Move(int taskId, string status, int? completedBy = null) =>
         SendAsync(HttpMethod.Post, $"api/tasks/{taskId}/move", new MoveTaskRequest { NewStatus = status, CompletedBy = completedBy });
 

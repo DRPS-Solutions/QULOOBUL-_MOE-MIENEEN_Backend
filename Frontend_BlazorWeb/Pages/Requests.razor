@@ -3,6 +3,7 @@
 @implements IDisposable
 @inject IDialogService DialogService
 @inject AppDataService AppData
+@inject ISnackbar Snackbar
 
 <PageTitle>Resource Requests</PageTitle>
 
@@ -369,6 +370,33 @@
                                         </MudButton>
                                     </div>
                                 }
+
+                                @* SM-02 resubmit: the requester may revise a declined request within 30 days (R4). *@
+                                @if (CanResubmit(req))
+                                {
+                                    @if (resubmittingId == req.RequestId)
+                                    {
+                                        <MudTextField T="string" @bind-Value="resubmitDetail" Label="Request (first line is the title)" Variant="Variant.Outlined"
+                                                      Lines="4" MaxLength="1000" Counter="1000" Immediate="true" Class="mt-3"
+                                                      HelperText="Change what the reviewer asked about, then send it back." />
+                                        <div class="drps-request-actions">
+                                            <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary"
+                                                       Disabled="@(resubmitBusy || string.IsNullOrWhiteSpace(resubmitDetail))" OnClick="@(() => Resubmit(req))">
+                                                @(resubmitBusy ? "Sending..." : "Send for review")
+                                            </MudButton>
+                                            <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="() => resubmittingId = null">Cancel</MudButton>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="drps-request-actions">
+                                            <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Replay"
+                                                       OnClick="@(() => { resubmittingId = req.RequestId; resubmitDetail = req.Detail ?? string.Empty; })">
+                                                Revise &amp; resubmit
+                                            </MudButton>
+                                        </div>
+                                    }
+                                }
                             </div>
                         }
                     }
@@ -453,6 +481,28 @@
     {
         if (await AppData.SendAsync(HttpMethod.Post, $"api/requests/{req.RequestId}/complete"))
             await AppData.RefreshRequestsAsync();
+    }
+
+    // --- Resubmit (SM-02). The API re-checks owner, status and the 30-day window. ---
+    private int? resubmittingId;
+    private string resubmitDetail = string.Empty;
+    private bool resubmitBusy;
+
+    private bool CanResubmit(ResourceRequestDto req) =>
+        req.Status == "Declined" && req.RequestedBy == AppData.CurrentUser?.UserId
+        && req.History.LastOrDefault(h => h.NewStatus == "Declined") is { } declined
+        && DateTime.UtcNow - declined.TimeCreated < TimeSpan.FromDays(30);
+
+    private async Task Resubmit(ResourceRequestDto req)
+    {
+        resubmitBusy = true;
+        var ok = await AppData.SendAsync(HttpMethod.Post, $"api/requests/{req.RequestId}/resubmit",
+            new ResubmitRequestRequest { Detail = resubmitDetail.Trim() });
+        resubmitBusy = false;
+        if (!ok) return;
+        resubmittingId = null;
+        await AppData.RefreshRequestsAsync();
+        Snackbar.Add("Request sent back for review.", Severity.Success);
     }
 
     private static (string Title, string? Notes) SplitDetail(ResourceRequestDto req)
