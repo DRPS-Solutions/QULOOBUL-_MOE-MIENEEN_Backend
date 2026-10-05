@@ -25,6 +25,7 @@ live updates from the SignalR hub. See [What's not built yet](#whats-not-built-y
   - [`Frontend_BlazorWeb` - Blazor WebAssembly](#frontend_blazorweb---blazor-webassembly)
   - [`Frontend_Mobile` - .NET MAUI](#frontend_mobile---net-maui)
 - [CI/CD](#cicd)
+- [YouTube Video Link](#youtube-video-link)
 - [References](#references)
 
 ## Solution layout
@@ -347,6 +348,9 @@ Required repository config:
 Deploy jobs are skipped while `vars.AZURE_WEBAPP_NAME` / `AZURE_WEBAPP_NAME_PROD` are unset.
 Mobile builds unsigned and warns when the keystore secret is absent. Play Store distribution
 is deliberately not automated - Phase 1 side-loads the APK.
+
+## YouTube Video Link
+- https://youtu.be/5JoQesAxa2o
 
 ## References
 
