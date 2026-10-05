@@ -1,0 +1,219 @@
+@page "/calendar"
+@using MudBlazor
+@inject AppDataService AppData
+
+<PageTitle>Calendar</PageTitle>
+
+@* Dated organisational events (the API's Event entity), separate from the project-style "events"
+   on Event Planning. Open to every role, because anyone can be invited and must be able to answer. *@
+<div class="drps-page">
+    <MudContainer MaxWidth="MaxWidth.Large" Class="pt-6">
+
+        <div class="drps-page-header">
+            <div>
+                <MudText Typo="Typo.h6" Style="font-weight:600;">Calendar</MudText>
+                <div class="drps-subtitle">Upcoming events, who is invited, and your RSVP.</div>
+            </div>
+            <MudButton Variant="Variant.Outlined"
+                       StartIcon="@Icons.Material.Filled.Add" OnClick="@(() => { creating = true; selected = null; })">
+                New event
+            </MudButton>
+        </div>
+
+        <MudGrid>
+            <MudItem xs="12" md="5">
+                <div class="drps-panel">
+                    <MudSwitch T="bool" Value="showPast" ValueChanged="@(async (bool v) => { showPast = v; await Load(); })"
+                               Label="Include past events" Color="Color.Primary" Class="mb-2" />
+                    @if (!events.Any())
+                    {
+                        <div class="drps-muted">No events.</div>
+                    }
+                    @foreach (var ev in events)
+                    {
+                        <div class="drps-list-item @(selected?.EventId == ev.EventId ? "selected" : "")" @onclick="() => Select(ev.EventId)">
+                            <div style="font-weight:600;">@ev.Title</div>
+                            <div class="drps-muted">@ev.EventDate.ToString("ddd d MMM yyyy, HH:mm")@(string.IsNullOrEmpty(ev.Location) ? "" : $" · {ev.Location}")</div>
+                        </div>
+                    }
+                </div>
+            </MudItem>
+
+            <MudItem xs="12" md="7">
+                <div class="drps-panel">
+                    @if (creating)
+                    {
+                        <MudText Typo="Typo.subtitle1" Style="font-weight:600;" Class="mb-3">New event</MudText>
+                        <MudTextField T="string" @bind-Value="newTitle" Label="Title" Variant="Variant.Outlined" Required="true" RequiredError="Give the event a title." MaxLength="200" Immediate="true" Class="mb-3" />
+                        <div class="d-flex gap-3 mb-3">
+                            <MudDatePicker @bind-Date="newDate" Label="Date" Variant="Variant.Outlined" Required="true" RequiredError="Choose a date." />
+                            <MudTimePicker @bind-Time="newTime" Label="Time" Variant="Variant.Outlined" Required="true" RequiredError="Choose a time." />
+                        </div>
+                        <MudTextField T="string" @bind-Value="newLocation" Label="Location" Variant="Variant.Outlined" MaxLength="200" Class="mb-3" />
+                        <div class="d-flex gap-2">
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Create"
+                                       Disabled="@(string.IsNullOrWhiteSpace(newTitle) || newDate is null || newTime is null)">Create</MudButton>
+                            <MudButton Variant="Variant.Outlined" OnClick="@(() => creating = false)">Cancel</MudButton>
+                        </div>
+                    }
+                    else if (selected is null)
+                    {
+                        <div class="drps-muted">Select an event to see who is going.</div>
+                    }
+                    else
+                    {
+                        var me = attendees.FirstOrDefault(a => a.UserId == MyId);
+                        <MudText Typo="Typo.h6">@selected.Title</MudText>
+                        <div class="drps-muted mb-3">
+                            @selected.EventDate.ToString("dddd d MMMM yyyy, HH:mm")
+                            @(string.IsNullOrEmpty(selected.Location) ? "" : $" · {selected.Location}")
+                            · organised by @AppData.UserName(selected.OrganiserId)
+                        </div>
+                        <MudButton Size="Size.Small" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.EventAvailable" Class="mb-4"
+                                   Href="@IcsHref(selected)" download="@($"event-{selected.EventId}.ics")">Add to calendar</MudButton>
+
+                        @if (me is not null)
+                        {
+                            <div class="d-flex gap-2 align-center mb-4">
+                                <span>Your answer: <b>@me.Status</b></span>
+                                <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Success" Disabled="@(me.Status == "Accepted")"
+                                           OnClick="@(() => Respond("Accepted"))">Accept</MudButton>
+                                <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Error" Disabled="@(me.Status == "Declined")"
+                                           OnClick="@(() => Respond("Declined"))">Decline</MudButton>
+                            </div>
+                        }
+
+                        <MudText Typo="Typo.subtitle2" Class="mb-2">Attendees (@attendees.Count)</MudText>
+                        @foreach (var a in attendees)
+                        {
+                            <div class="d-flex align-center justify-space-between mb-1">
+                                <span>@a.FullName <MudChip T="string" Size="Size.Small" Color="@StatusColor(a.Status)">@a.Status</MudChip></span>
+                                @if (CanManage || a.UserId == MyId)
+                                {
+                                    <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small"
+                                                   title="@(a.UserId == MyId ? "Leave" : "Remove")" OnClick="@(() => Remove(a.UserId))" />
+                                }
+                            </div>
+                        }
+
+                        @if (CanManage)
+                        {
+                            <div class="d-flex gap-2 align-center mt-3">
+                                <MudSelect T="int?" @bind-Value="invitee" Label="Invite someone" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                           ToStringFunc="@(id => AppData.UserName(id))">
+                                    @foreach (var u in AppData.Users.Where(u => u.IsActive && attendees.All(a => a.UserId != u.UserId)).OrderBy(u => u.FullName))
+                                    {
+                                        <MudSelectItem T="int?" Value="@u.UserId">@u.FullName</MudSelectItem>
+                                    }
+                                </MudSelect>
+                                <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@(invitee is null)" OnClick="Invite">Invite</MudButton>
+                            </div>
+                        }
+                    }
+                </div>
+            </MudItem>
+        </MudGrid>
+    </MudContainer>
+</div>
+
+@code {
+    private List<EventDto> events = [];
+    private EventDto? selected;
+    private List<EventAttendeeDto> attendees = [];
+    private bool showPast;
+
+    private bool creating;
+    private string newTitle = string.Empty;
+    private DateTime? newDate = DateTime.Today;
+    private TimeSpan? newTime = new(10, 0, 0);
+    private string newLocation = string.Empty;
+
+    private int? invitee;
+
+    private int MyId => AppData.CurrentUser?.UserId ?? 0;
+
+    // The API lets only the organiser or an admin change who is on an event.
+    private bool CanManage => selected is not null
+        && (selected.OrganiserId == MyId || AppData.HasPermission(Permissions.ManageUsers));
+
+    // calendar?event=5 (an invite notification's link) opens that event.
+    [SupplyParameterFromQuery(Name = "event")] public int? DeepLinkEventId { get; set; }
+
+    protected override Task OnInitializedAsync() => Load();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (DeepLinkEventId is { } id && selected?.EventId != id) await Select(id);
+    }
+
+    private async Task Load() =>
+        events = await AppData.GetAsync<List<EventDto>>(showPast ? "api/events" : $"api/events?from={DateTime.Today:s}") ?? [];
+
+    private async Task Select(int eventId)
+    {
+        creating = false;
+        invitee = null;
+        selected = await AppData.GetAsync<EventDto>($"api/events/{eventId}");
+        attendees = selected is null ? [] : await AppData.GetAsync<List<EventAttendeeDto>>($"api/events/{eventId}/attendees") ?? [];
+    }
+
+    private async Task Create()
+    {
+        var ev = await AppData.SendAsync<EventDto>(HttpMethod.Post, "api/events", new CreateEventRequest
+        {
+            Title = newTitle.Trim(),
+            EventDate = AppDataService.Wall(newDate!.Value.Date + newTime!.Value),
+            Location = newLocation.Trim(),
+        });
+        if (ev is null) return;
+        newTitle = newLocation = string.Empty;
+        await Load();
+        await Select(ev.EventId);
+    }
+
+    private async Task Respond(string status)
+    {
+        if (await AppData.SendAsync(HttpMethod.Post, $"api/events/{selected!.EventId}/response", new RespondToEventRequest { Status = status }))
+            await Select(selected.EventId);
+    }
+
+    private async Task Invite()
+    {
+        if (await AppData.SendAsync(HttpMethod.Post, $"api/events/{selected!.EventId}/attendees", new AddEventAttendeeRequest { UserId = invitee!.Value }))
+            await Select(selected.EventId);
+    }
+
+    private async Task Remove(int userId)
+    {
+        if (await AppData.SendAsync(HttpMethod.Delete, $"api/events/{selected!.EventId}/attendees/{userId}"))
+            await Select(selected.EventId);
+    }
+
+    // iCalendar (RFC 5545) file as a data: link, so any calendar app can import the event without an API call.
+    // Reference: B. Desruisseaux, "Internet Calendaring and Scheduling Core Object Specification (iCalendar)," Internet Engineering Task Force (IETF), RFC 5545, Sep. 2009. Accessed: Oct. 04, 2026. [Online]. Available: https://www.rfc-editor.org/rfc/rfc5545
+    // EventDate is wall-clock, so DTSTART is a "floating" time (no Z / TZID): it shows at the same clock time everywhere.
+    // ponytail: Event has no duration, so every export is 1 hour; add DTEND when the entity gets an end time.
+    // ponytail: lines aren't folded at 75 octets; Google/Outlook/Apple accept long lines anyway.
+    private static string IcsHref(EventDto ev)
+    {
+        static string Esc(string s) => s.Replace("\\", "\\\\").Replace(";", "\\;").Replace(",", "\\,").Replace("\r", "").Replace("\n", "\\n");
+        var ics = string.Join("\r\n",
+            "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//DRPS Solutions//Calendar//EN",
+            "BEGIN:VEVENT",
+            $"UID:event-{ev.EventId}@drps",
+            FormattableString.Invariant($"DTSTAMP:{DateTime.UtcNow:yyyyMMdd'T'HHmmss'Z'}"),
+            FormattableString.Invariant($"DTSTART:{ev.EventDate:yyyyMMdd'T'HHmmss}"),
+            "DURATION:PT1H",
+            $"SUMMARY:{Esc(ev.Title)}",
+            $"LOCATION:{Esc(ev.Location ?? "")}",
+            "END:VEVENT", "END:VCALENDAR", "");
+        return "data:text/calendar;charset=utf-8," + Uri.EscapeDataString(ics);
+    }
+
+    private static Color StatusColor(string status) => status switch
+    {
+        "Accepted" => Color.Success,
+        "Declined" => Color.Error,
+        _ => Color.Default,
+    };
+}

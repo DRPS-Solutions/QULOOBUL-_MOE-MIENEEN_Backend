@@ -1,0 +1,144 @@
+@* =====================================================================
+   CreateTaskDialog
+   A small MudBlazor dialog, shown via IDialogService from Tasks.razor
+   when the user clicks "New Task". Collects the fields the API stores
+   for a task (title, description, date, time/all-day, priority,
+   assignee, and - only for Event-type tasks - which event/project it
+   belongs to) and hands them back to the caller as a NewTaskResult.
+   Cancelling returns no result, and Tasks.razor creates nothing.
+   ===================================================================== *@
+@using MudBlazor
+@inject AppDataService AppData
+
+<MudDialog Style="border-radius:16px;">
+    <TitleContent>
+        <MudText Typo="Typo.h6" Style="font-weight:600;">New task</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudTextField T="string"
+                       @bind-Value="title"
+                       Label="Task title" Required="true" RequiredError="Give the task a title."
+                       Variant="Variant.Outlined"
+                       MaxLength="200"
+                       Class="mb-3"
+                       Immediate="true" />
+
+        <MudTextField T="string"
+                       @bind-Value="description"
+                       Label="Description (optional)"
+                       Variant="Variant.Outlined"
+                       MaxLength="2000"
+                       Lines="2"
+                       Class="mb-3" />
+
+        <div class="d-flex gap-3 mb-3">
+            <MudDatePicker @bind-Date="date" Label="Date" Variant="Variant.Outlined" Required="true" RequiredError="Choose a date." />
+            @if (!isAllDay)
+            {
+                <MudTimePicker @bind-Time="time" Label="Time" Variant="Variant.Outlined" Required="true" RequiredError="Choose a time, or tick All day." />
+            }
+        </div>
+
+        <MudCheckBox T="bool" @bind-Value="isAllDay" Label="All day" Color="Color.Primary" Class="mb-3" />
+
+        <MudSelect T="string" Label="Priority" Variant="Variant.Outlined" @bind-Value="priority" Class="mb-3">
+            <MudSelectItem T="string" Value="@("Low")">Low</MudSelectItem>
+            <MudSelectItem T="string" Value="@("Medium")">Medium</MudSelectItem>
+            <MudSelectItem T="string" Value="@("High")">High</MudSelectItem>
+        </MudSelect>
+
+        <MudSelect T="int?" Label="Assignee" Variant="Variant.Outlined" Required="true" RequiredError="Choose who the task is for." @bind-Value="assigneeId"
+                   ToStringFunc="@(id => AppData.UserName(id))" Class="mb-3">
+            @foreach (var user in taskType == "Daily" ? AppData.DailyAssignees : AppData.AssignableUsers)
+            {
+                <MudSelectItem T="int?" Value="@user.UserId">@user.FullName</MudSelectItem>
+            }
+        </MudSelect>
+
+        @* Task type - Daily is a standalone task; Event ties the task
+           to one of the events/projects planned on the Events page, so it
+           shows up in that event's "Linked Tasks" list too. *@
+        <MudSelect T="string" Label="Task type" Variant="Variant.Outlined" @bind-Value="taskType" Class="mb-3">
+            <MudSelectItem T="string" Value="@("Daily")">Daily task</MudSelectItem>
+            <MudSelectItem T="string" Value="@("Event")">Event / project task</MudSelectItem>
+        </MudSelect>
+
+        @if (taskType == "Event")
+        {
+            @if (AppData.EventProjects.Any())
+            {
+                <MudSelect T="int?" Label="Linked event" Variant="Variant.Outlined" Required="true" RequiredError="Choose the event this task belongs to." @bind-Value="projectId"
+                           ToStringFunc="@(id => AppData.ProjectName(id))">
+                    @foreach (var project in AppData.EventProjects)
+                    {
+                        <MudSelectItem T="int?" Value="@project.ProjectId">@project.ProjectName</MudSelectItem>
+                    }
+                </MudSelect>
+            }
+            else
+            {
+                <MudText Typo="Typo.caption" Color="Color.Error">No events planned yet - create one on the Events page first.</MudText>
+            }
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary"
+                   Variant="Variant.Filled"
+                   Disabled="@(!CanConfirm)"
+                   OnClick="Confirm">
+            Create task
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    // Auto-injected by MudDialogProvider - lets this component close
+    // or cancel itself and hand a result back to the caller.
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    // The directory is loaded at sign-in; an admin may have changed someone's role since (test plan T2).
+    protected override Task OnInitializedAsync() => AppData.RefreshUsersAsync();
+
+    // --- Form state ---
+    private string title = string.Empty;
+    private string description = string.Empty;
+    private DateTime? date = DateTime.Today;
+    private TimeSpan? time = new TimeSpan(9, 0, 0);
+    private bool isAllDay = false;
+    private string priority = "Low";
+    private int? assigneeId;
+    private string taskType = "Daily";
+    private int? projectId;
+
+    // Confirm is only enabled once there's a title, a date and an
+    // assignee (time is only required when the task isn't all-day; an
+    // Event-type task also needs a chosen event).
+    private bool CanConfirm =>
+        !string.IsNullOrWhiteSpace(title) &&
+        assigneeId.HasValue &&
+        date.HasValue &&
+        (isAllDay || time.HasValue) &&
+        (taskType != "Event" || projectId.HasValue);
+
+    // Closes the dialog successfully, returning the entered details as
+    // a NewTaskResult - Tasks.razor passes it to AppDataService.
+    private void Confirm()
+    {
+        MudDialog.Close(DialogResult.Ok(new NewTaskResult
+        {
+            Title = title.Trim(),
+            Description = description.Trim(),
+            // An all-day task is stored as a midnight deadline.
+            ScheduledStart = isAllDay ? date!.Value.Date : date!.Value.Date + time!.Value,
+            Priority = priority,
+            AssigneeId = assigneeId,
+            ProjectId = taskType == "Event" ? projectId : null
+        }));
+    }
+
+    // Closes the dialog as cancelled - the caller treats this as "no
+    // change" and creates nothing.
+    private void Cancel() => MudDialog.Cancel();
+}

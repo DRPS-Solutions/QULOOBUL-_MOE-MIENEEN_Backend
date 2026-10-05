@@ -1,0 +1,262 @@
+@page "/files"
+@using MudBlazor
+@using QULOOBUL__MOE_MIENEEN_Shared.Files
+@inject AppDataService AppData
+@inject IJSRuntime JS
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>Files</PageTitle>
+
+@* UC-07 / SD-04. The API records metadata and hands back a short-lived single-blob SAS;
+   the bytes go straight between this browser and Blob Storage. *@
+<div class="drps-page">
+    <MudContainer MaxWidth="MaxWidth.Large" Class="pt-6">
+
+        <div class="drps-page-header">
+            <div>
+                <MudText Typo="Typo.h6" Style="font-weight:600;">Files</MudText>
+                <div class="drps-subtitle">Upload, find and download shared documents.</div>
+            </div>
+        </div>
+
+        <MudGrid>
+            <MudItem xs="12" md="4">
+                <div class="drps-panel">
+                    <MudText Typo="Typo.subtitle1" Style="font-weight:600;" Class="mb-3">Upload a file</MudText>
+                    <MudSelect T="int?" Label="Category" Variant="Variant.Outlined" @bind-Value="uploadCategory"
+                               ToStringFunc="@(id => CategoryName(id))" Class="mb-3">
+                        @foreach (var c in categories)
+                        {
+                            <MudSelectItem T="int?" Value="@c.CategoryId">@c.CategoryName</MudSelectItem>
+                        }
+                    </MudSelect>
+                    <InputFile OnChange="OnFilePicked" class="mb-3" />
+                    <div class="drps-muted mb-3">Up to @(MaxBytes / (1024 * 1024)) MB. Office documents, PDFs, text and images.</div>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" OnClick="Upload"
+                               Disabled="@uploading">
+                        @(uploading ? "Uploading..." : "Upload")
+                    </MudButton>
+                </div>
+            </MudItem>
+
+            <MudItem xs="12" md="8">
+                <div class="drps-panel">
+                    <div class="d-flex gap-3 flex-wrap align-center mb-3">
+                        <MudTextField T="string" @bind-Value="search" Label="Search by name" Variant="Variant.Outlined"
+                                      Margin="Margin.Dense" Immediate="true" DebounceInterval="300" OnDebounceIntervalElapsed="Load"
+                                      Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" Style="min-width:200px;" />
+                        <MudSelect T="int?" Label="Category" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true"
+                                   Value="filterCategory" ValueChanged="@(async (int? v) => { filterCategory = v; await Load(); })"
+                                   ToStringFunc="@(id => CategoryName(id))" Style="min-width:180px;">
+                            @foreach (var c in categories)
+                            {
+                                <MudSelectItem T="int?" Value="@c.CategoryId">@c.CategoryName</MudSelectItem>
+                            }
+                        </MudSelect>
+                        @if (CanManage)
+                        {
+                            <MudSwitch T="bool" Value="includeArchived" ValueChanged="@(async (bool v) => { includeArchived = v; await Load(); })"
+                                       Label="Show archived" Color="Color.Primary" />
+                        }
+                    </div>
+
+                    <MudTable T="FileMetadataDto" Items="files" Loading="loading" Hover="true" Elevation="0" Dense="true">
+                        <HeaderContent>
+                            <MudTh>Name</MudTh>
+                            <MudTh>Category</MudTh>
+                            <MudTh>Uploaded by</MudTh>
+                            <MudTh></MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="Name">
+                                @context.FileName
+                                @if (context.IsArchived)
+                                {
+                                    <MudChip T="string" Size="Size.Small" Class="ml-1">Archived</MudChip>
+                                }
+                            </MudTd>
+                            <MudTd DataLabel="Category">
+                                @if (CanManage)
+                                {
+                                    <MudSelect T="int" Value="context.CategoryId" Dense="true" Margin="Margin.Dense"
+                                               ValueChanged="@((int v) => Recategorise(context, v))" ToStringFunc="@(id => CategoryName(id))">
+                                        @foreach (var c in categories)
+                                        {
+                                            <MudSelectItem T="int" Value="@c.CategoryId">@c.CategoryName</MudSelectItem>
+                                        }
+                                    </MudSelect>
+                                }
+                                else
+                                {
+                                    @context.CategoryName
+                                }
+                            </MudTd>
+                            <MudTd DataLabel="Uploaded by">@AppData.UserName(context.UploadedBy)</MudTd>
+                            <MudTd Style="white-space:nowrap; text-align:right;">
+                                <MudIconButton Icon="@Icons.Material.Filled.Download" Size="Size.Small" title="Download" OnClick="@(() => Download(context))" />
+                                @if (CanManage)
+                                {
+                                    <MudIconButton Icon="@(context.IsArchived ? Icons.Material.Filled.Unarchive : Icons.Material.Filled.Archive)"
+                                                   Size="Size.Small" title="@(context.IsArchived ? "Unarchive" : "Archive")"
+                                                   OnClick="@(() => SetArchived(context, !context.IsArchived))" />
+                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" title="Delete"
+                                                   OnClick="@(() => Delete(context))" />
+                                }
+                            </MudTd>
+                        </RowTemplate>
+                        <NoRecordsContent>
+                            <MudText Typo="Typo.body2">No files match.</MudText>
+                        </NoRecordsContent>
+                    </MudTable>
+                </div>
+            </MudItem>
+        </MudGrid>
+    </MudContainer>
+</div>
+
+@code {
+    // Matches the API's default Files:MaxBytes; the API re-checks it before issuing a SAS.
+    private const long MaxBytes = 25L * 1024 * 1024;
+
+    private bool CanManage => AppData.HasPermission(Permissions.ManageFiles);
+
+    private List<FileCategoryDto> categories = [];
+    private List<FileMetadataDto> files = [];
+    private bool loading = true;
+
+    private string search = string.Empty;
+    private int? filterCategory;
+    private bool includeArchived;
+
+    private IBrowserFile? picked;
+    private int? uploadCategory;
+    private bool uploading;
+
+    private string CategoryName(int? id) => categories.FirstOrDefault(c => c.CategoryId == id)?.CategoryName ?? "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        categories = await AppData.GetAsync<List<FileCategoryDto>>("api/files/categories") ?? [];
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        loading = true;
+        var url = $"api/files?includeArchived={includeArchived}"
+                  + (string.IsNullOrWhiteSpace(search) ? "" : $"&q={Uri.EscapeDataString(search.Trim())}")
+                  + (filterCategory is { } c ? $"&categoryId={c}" : "");
+        files = await AppData.GetAsync<List<FileMetadataDto>>(url) ?? [];
+        loading = false;
+    }
+
+    private void OnFilePicked(InputFileChangeEventArgs e)
+    {
+        try
+        {
+            // e.File throws when the change event carries no file (picker cancelled) or more than one.
+            picked = e.File;
+        }
+        catch (Exception ex)
+        {
+            picked = null;
+            Console.Error.WriteLine(ex);
+            Snackbar.Add("Couldn't read the selected file. Please choose it again.", Severity.Warning);
+        }
+    }
+
+    private async Task Upload()
+    {
+        if (uploadCategory is null)
+        {
+            Snackbar.Add(categories.Count == 0
+                ? "There are no file categories yet, so files can't be uploaded. Ask an admin to add one."
+                : "Choose a category for the file.", Severity.Warning);
+            return;
+        }
+        if (picked is null)
+        {
+            Snackbar.Add("Choose a file to upload.", Severity.Warning);
+            return;
+        }
+        if (picked.Size == 0)
+        {
+            Snackbar.Add($"{picked.Name} is empty, so there's nothing to upload.", Severity.Warning);
+            return;
+        }
+        if (picked.Size > MaxBytes)
+        {
+            Snackbar.Add($"That file is larger than {MaxBytes / (1024 * 1024)} MB.", Severity.Error);
+            return;
+        }
+        uploading = true;
+        try
+        {
+            var type = string.IsNullOrEmpty(picked.ContentType) ? "application/octet-stream" : picked.ContentType;
+            var ticket = await AppData.SendAsync<FileUploadResponse>(HttpMethod.Post, "api/files", new FileUploadInitRequest
+            {
+                FileName = picked.Name, FileType = type, SizeBytes = picked.Size, CategoryId = uploadCategory.Value,
+            });
+            if (ticket is null) return; // AppDataService has already shown why
+
+            // A plain client: the SAS in the URL is the credential, so the API's bearer token must not go to Blob Storage.
+            using var blob = new HttpClient();
+            using var content = new StreamContent(picked.OpenReadStream(MaxBytes));
+            content.Headers.ContentType = new(type);
+            var put = new HttpRequestMessage(HttpMethod.Put, ticket.UploadUrl) { Content = content };
+            put.Headers.Add("x-ms-blob-type", "BlockBlob");
+            var res = await blob.SendAsync(put);
+            if (res.IsSuccessStatusCode) Snackbar.Add($"Uploaded {picked.Name}.", Severity.Success);
+            else Snackbar.Add($"Storage refused the upload ({(int)res.StatusCode}).", Severity.Error);
+            picked = null;
+            await Load();
+        }
+        catch (HttpRequestException)
+        {
+            Snackbar.Add("Couldn't reach file storage.", Severity.Error);
+        }
+        catch (Exception e) when (e is IOException or TaskCanceledException)
+        {
+            // The browser couldn't read the file (moved/deleted since it was picked) or the upload timed out.
+            Snackbar.Add($"Couldn't upload {picked?.Name}. Pick the file again and retry.", Severity.Error);
+            picked = null;
+        }
+        finally
+        {
+            uploading = false;
+        }
+    }
+
+    private async Task Download(FileMetadataDto f)
+    {
+        if (await AppData.GetAsync<FileDownloadResponse>($"api/files/{f.FileId}/download") is not { } link) return;
+        // window.open returns null when a pop-up blocker stops it.
+        // Reference: MDN Web Docs, "Window: open() method." Accessed: Oct. 04, 2026. [Online]. Available: https://developer.mozilla.org/en-US/docs/Web/API/Window/open
+        await using var tab = await JS.InvokeAsync<IJSObjectReference?>("open", link.DownloadUrl, "_blank");
+        if (tab is null)
+            Snackbar.Add("The browser blocked the download tab. Allow pop-ups for this site and try again.", Severity.Warning);
+    }
+
+    private async Task Recategorise(FileMetadataDto f, int categoryId)
+    {
+        if (await AppData.SendAsync(HttpMethod.Patch, $"api/files/{f.FileId}/category",
+                new RecategoriseFileRequest { CategoryId = categoryId }))
+            await Load();
+    }
+
+    private async Task SetArchived(FileMetadataDto f, bool archive)
+    {
+        if (await AppData.SendAsync(archive ? HttpMethod.Post : HttpMethod.Delete, $"api/files/{f.FileId}/archive"))
+            await Load();
+    }
+
+    private async Task Delete(FileMetadataDto f)
+    {
+        if (await DialogService.ShowMessageBoxAsync("Delete file", $"Delete \"{f.FileName}\" permanently?",
+                yesText: "Delete", cancelText: "Cancel") != true) return;
+        // Reload even on failure: the server may have removed the row before erroring.
+        await AppData.SendAsync(HttpMethod.Delete, $"api/files/{f.FileId}");
+        await Load();
+    }
+}

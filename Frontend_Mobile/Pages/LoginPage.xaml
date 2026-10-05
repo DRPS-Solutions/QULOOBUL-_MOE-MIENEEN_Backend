@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ContentPage
+    x:Class="Frontend_Mobile.Pages.LoginPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    Shell.NavBarIsVisible="False"
+    Title="Sign in">
+
+    <!-- UC-01 sign-in against the API. The role, and so which drawer items
+         show, comes back from the server with the token. -->
+
+    <Grid>
+        <ScrollView>
+            <Border Style="{StaticResource Card}"
+                    Padding="28"
+                    StrokeShape="RoundRectangle 20"
+                    Margin="24"
+                    VerticalOptions="Center">
+                <VerticalStackLayout Spacing="0">
+
+                    <Image Source="logo.png"
+                           HeightRequest="72"
+                           WidthRequest="72"
+                           Aspect="AspectFit"
+                           HorizontalOptions="Center" />
+
+                    <Label Text="QULOOBUL MOE'MIENEEN"
+                           Style="{StaticResource TitleLarge}"
+                           HorizontalTextAlignment="Center"
+                           Margin="0,12,0,0" />
+
+                    <!-- Shown instead of the sign-in form after signing in with an admin's temporary password. -->
+                    <VerticalStackLayout x:Name="ChangeSection" IsVisible="False">
+                        <Label Text="You signed in with a temporary password. Choose your own to continue: at least 8 characters, with a letter and a digit."
+                               Style="{StaticResource Muted}"
+                               FontSize="14"
+                               HorizontalTextAlignment="Center"
+                               Margin="0,4,0,20" />
+                        <Border Style="{StaticResource FieldBox}">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <Entry x:Name="NewPasswordEntry" Placeholder="New Password" IsPassword="True" TextChanged="OnChangeFormChanged" />
+                                <Button Grid.Column="1" Style="{StaticResource PasswordToggle}" Clicked="OnTogglePassword" />
+                            </Grid>
+                        </Border>
+                        <Border Style="{StaticResource FieldBox}" Margin="0,12,0,0">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <Entry x:Name="ConfirmPasswordEntry" Placeholder="Confirm Password" IsPassword="True"
+                                       TextChanged="OnChangeFormChanged" Completed="OnChangePassword" />
+                                <Button Grid.Column="1" Style="{StaticResource PasswordToggle}" Clicked="OnTogglePassword" />
+                            </Grid>
+                        </Border>
+                        <Label x:Name="ChangeErrorLabel" IsVisible="False" TextColor="{StaticResource StatusDenied}" Margin="0,8,0,0" />
+                        <Button x:Name="ChangeButton" Text="Change Password" IsEnabled="False" Clicked="OnChangePassword" Margin="0,20,0,0" />
+                        <Button Text="Cancel" Style="{StaticResource OutlineButton}" Clicked="OnCancelChange" Margin="0,8,0,0" />
+                    </VerticalStackLayout>
+
+                    <VerticalStackLayout x:Name="SignInSection">
+                    <Label Text="Sign in to continue"
+                           Style="{StaticResource Muted}"
+                           FontSize="14"
+                           HorizontalTextAlignment="Center"
+                           Margin="0,4,0,20" />
+
+                    <Border Style="{StaticResource FieldBox}">
+                        <Entry x:Name="EmailEntry"
+                               Placeholder="Email"
+                               Keyboard="Email"
+                               TextChanged="OnFormChanged" />
+                    </Border>
+
+                    <Border Style="{StaticResource FieldBox}" Margin="0,12,0,0">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <Entry x:Name="PasswordEntry"
+                                   Placeholder="Password"
+                                   IsPassword="True"
+                                   TextChanged="OnFormChanged"
+                                   Completed="OnLogin" />
+                            <Button Grid.Column="1" Style="{StaticResource PasswordToggle}" Clicked="OnTogglePassword" />
+                        </Grid>
+                    </Border>
+
+                    <Label x:Name="ErrorLabel"
+                           IsVisible="False"
+                           TextColor="{StaticResource StatusDenied}"
+                           Margin="0,8,0,0" />
+
+                    <Button x:Name="LoginButton"
+                            Text="Log In"
+                            IsEnabled="False"
+                            Clicked="OnLogin"
+                            Margin="0,20,0,0" />
+
+                    <Button Text="Forgot password?"
+                            Style="{StaticResource OutlineButton}"
+                            Clicked="OnShowForgot"
+                            Margin="0,8,0,0" />
+                    </VerticalStackLayout>
+
+                    <!-- "Forgot password?": tells the admins who is asking, so they can issue a temporary password. -->
+                    <VerticalStackLayout x:Name="ForgotSection" IsVisible="False">
+                        <Label x:Name="ForgotIntroLabel"
+                               Text="Tell the system admin who you are, and they'll send you a temporary password."
+                               Style="{StaticResource Muted}"
+                               FontSize="14"
+                               HorizontalTextAlignment="Center"
+                               Margin="0,4,0,20" />
+                        <VerticalStackLayout x:Name="ForgotForm">
+                            <Border Style="{StaticResource FieldBox}">
+                                <Entry x:Name="ForgotNameEntry" Placeholder="Name" MaxLength="100" TextChanged="OnForgotFormChanged" />
+                            </Border>
+                            <Border Style="{StaticResource FieldBox}" Margin="0,12,0,0">
+                                <Entry x:Name="ForgotSurnameEntry" Placeholder="Surname" MaxLength="100" TextChanged="OnForgotFormChanged" />
+                            </Border>
+                            <Border Style="{StaticResource FieldBox}" Margin="0,12,0,0">
+                                <Entry x:Name="ForgotEmailEntry" Placeholder="Email" Keyboard="Email" MaxLength="256"
+                                       TextChanged="OnForgotFormChanged" Completed="OnSendForgot" />
+                            </Border>
+                            <Button x:Name="ForgotButton" Text="Send Request" IsEnabled="False" Clicked="OnSendForgot" Margin="0,20,0,0" />
+                        </VerticalStackLayout>
+                        <Button Text="Back to sign in" Style="{StaticResource OutlineButton}" Clicked="OnHideForgot" Margin="0,8,0,0" />
+                    </VerticalStackLayout>
+
+                </VerticalStackLayout>
+            </Border>
+        </ScrollView>
+    </Grid>
+
+</ContentPage>

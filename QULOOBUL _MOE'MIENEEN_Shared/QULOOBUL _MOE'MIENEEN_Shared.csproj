@@ -1,0 +1,13 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>QULOOBUL__MOE_MIENEEN_Shared</RootNamespace>
+    <!-- No apostrophe/space in the DLL name: the Blazor WASM SDK target does a string
+         Contains() on it inside an MSBuild condition and a ' breaks it (MSB4113). -->
+    <AssemblyName>QULOOBUL__MOE_MIENEEN_Shared</AssemblyName>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ContentPage
+    x:Class="Frontend_Mobile.Pages.SearchPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:models="clr-namespace:Frontend_Mobile.Models"
+    Title="Search">
+
+    <!-- Search.razor: one box over tasks, requests, projects, meetings, events and files.
+         The API only returns what this user may open; hits this role has no page for are dropped. -->
+
+    <ScrollView>
+        <VerticalStackLayout Padding="16" Spacing="16">
+
+            <Border Style="{StaticResource HeaderBanner}">
+                <VerticalStackLayout Spacing="4">
+                    <Label Text="Search" Style="{StaticResource BannerTitle}" />
+                    <Label Text="Find tasks, requests, projects, meetings, events and files." Style="{StaticResource BannerSubtitle}" />
+                </VerticalStackLayout>
+            </Border>
+
+            <Border Style="{StaticResource FieldBox}">
+                <Entry x:Name="SearchEntry" Placeholder="Type at least 2 characters" TextChanged="OnSearchChanged" ReturnType="Search" />
+            </Border>
+
+            <ActivityIndicator x:Name="Busy" IsRunning="False" IsVisible="False" />
+            <Label x:Name="StatusLabel" Text="Results appear as you type." Style="{StaticResource Muted}" Margin="4,0" />
+
+            <VerticalStackLayout x:Name="ResultList" Spacing="10">
+                <BindableLayout.ItemTemplate>
+                    <DataTemplate x:DataType="models:SearchHit">
+                        <Border Style="{StaticResource Card}">
+                            <Border.GestureRecognizers>
+                                <TapGestureRecognizer Tapped="OnHitTapped" />
+                            </Border.GestureRecognizers>
+                            <VerticalStackLayout Spacing="2">
+                                <Label Text="{Binding KindLabel}" Style="{StaticResource LabelSmall}" />
+                                <Label Text="{Binding Title}" Style="{StaticResource TitleMedium}" />
+                                <Label Text="{Binding Detail}" Style="{StaticResource Muted}" IsVisible="{Binding HasDetail}" />
+                            </VerticalStackLayout>
+                        </Border>
+                    </DataTemplate>
+                </BindableLayout.ItemTemplate>
+            </VerticalStackLayout>
+
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

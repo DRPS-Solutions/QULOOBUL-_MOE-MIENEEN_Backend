@@ -1,0 +1,258 @@
+@inherits LayoutComponentBase
+@using MudBlazor
+@implements IDisposable
+@inject AppDataService AppData
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<MudThemeProvider IsDarkMode="isDarkMode" Theme="_theme" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+@if (restoring)
+{
+    @* Blank while a saved session loads, so a reload doesn't flash the login form. *@
+}
+else if (AppData.CurrentUser is null or { MustChangePassword: true })
+{
+    <div class="page @(isDarkMode ? "dark-mode" : "")">
+        <div class="drps-login-wrap">
+            <button class="drps-login-theme-toggle"
+                    type="button"
+                    title="@(isDarkMode ? "Switch to light mode" : "Switch to dark mode")"
+                    @onclick="ToggleDarkMode">
+                <MudIcon Icon="@(isDarkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)" Size="Size.Small" />
+            </button>
+
+            <div class="drps-login-card">
+                <img src="images/logos/QULOOBUL MOE'MIENEEN Logo.png" alt="Company Logo" class="drps-login-logo" />
+                <MudText Typo="Typo.h5" Class="drps-login-title">QULOOBUL MOE'MIENEEN</MudText>
+                @* The emailed activation / change-password link and "Forgot password?" are opened signed out, so those pages render here. *@
+                @if (AppData.CurrentUser is not null)
+                {
+                    <ChangePasswordForm />
+                }
+                else if (OnSetPasswordPage)
+                {
+                    @Body
+                }
+                else
+                {
+                <MudText Typo="Typo.body2" Class="drps-login-subtitle">Sign in to continue</MudText>
+
+                <MudTextField @bind-Value="emailInput"
+                              Label="Email"
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense"
+                              InputType="InputType.Email"
+                              Immediate="true"
+                              @onkeydown="OnLoginKeyDown"
+                              Class="mt-4 mb-3" />
+
+                <MudTextField @bind-Value="passwordInput"
+                              Label="Password"
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense"
+                              InputType="@(showPassword ? InputType.Text : InputType.Password)" Adornment="Adornment.End" AdornmentIcon="@PasswordIcon" OnAdornmentClick="() => showPassword = !showPassword" AdornmentAriaLabel="@(showPassword ? "Hide password" : "Show password")"
+                              Immediate="true"
+                              @onkeydown="OnLoginKeyDown"
+                              Class="mb-2" />
+
+                @if (loginError is not null)
+                {
+                    <MudText Typo="Typo.caption" Color="Color.Error" Class="drps-login-hint">
+                        @loginError
+                    </MudText>
+                }
+
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           FullWidth="true"
+                           Class="mt-4"
+                           Disabled="@(!CanLogin)"
+                           OnClick="Login">
+                    @(loggingIn ? "Signing in..." : "Log In")
+                </MudButton>
+                <MudLink Href="forgot-password" Typo="Typo.caption" Class="drps-login-hint d-block mt-3">
+                    Forgot password?
+                </MudLink>
+                }
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    <div class="page @(isDarkMode ? "dark-mode" : "") @(isVerticalNav ? "nav-vertical" : "")">
+        <header class="top-navbar">
+            <NavMenu IsDarkMode="isDarkMode"
+                     IsVerticalNav="isVerticalNav"
+                     OnToggleDarkMode="ToggleDarkMode"
+                     OnToggleNavOrientation="ToggleNavOrientation"
+                     CanSeeTasks="AppData.CanSeeTasks"
+                     CanSeeRequests="AppData.CanSeeRequests"
+                     CanSeeMeetings="AppData.CanSeeMeetings"
+                     CanSeeUserManagement="AppData.CanSeeUserManagement"
+                     CanSeeEvents="AppData.CanSeeEvents"
+                     OnLogout="Logout" />
+        </header>
+
+        <main>
+            <article class="content px-4">
+                @* Pages read the signed-in user from AppDataService. A page that throws shows
+                   this message instead of taking the whole app down; navigating away resets it. *@
+                <ErrorBoundary @ref="pageErrors">
+                    @* A page the role can't see never renders (so it never calls the API); OnAfterRender sends them home. *@
+                    <ChildContent>@if (CanSeePage) { @Body }</ChildContent>
+                    <ErrorContent>
+                        <MudAlert Severity="Severity.Error" Class="mt-6">
+                            Something went wrong on this page. Your other pages still work.
+                            <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="@(() => pageErrors?.Recover())">Try again</MudButton>
+                        </MudAlert>
+                    </ErrorContent>
+                </ErrorBoundary>
+            </article>
+        </main>
+    </div>
+}
+
+<div id="blazor-error-ui" data-nosnippet>
+    An unhandled error has occurred.
+    <a href="." class="reload">Reload</a>
+    <span class="dismiss">🗙</span>
+</div>
+
+@code {
+    // Both settings live here since MainLayout wraps every page - it
+    // cascades IsDarkMode/IsVerticalNav down to NavMenu (for the toggle
+    // buttons) and applies matching classes to the outer .page element,
+    // which every page's own stylesheet keys its dark-mode overrides off.
+    private bool isDarkMode = false;
+    private bool isVerticalNav = false;
+
+    // Signed-in state lives in AppDataService (AppData.CurrentUser null =
+    // show the login screen instead of NavMenu + @Body). Tab visibility
+    // comes from AppData.CanSee*, the one place the role matrix lives.
+    private string emailInput = string.Empty;
+    private string passwordInput = string.Empty;
+    private string? loginError = null;
+    private bool loggingIn = false;
+    private bool showPassword;
+    private string PasswordIcon => showPassword ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility;
+
+    private bool OnSetPasswordPage => Nav.ToBaseRelativePath(Nav.Uri) is var path
+        && (path.StartsWith("set-password") || path.StartsWith("forgot-password"));
+
+    private bool CanSeePage => AppData.CanSee(Nav.ToBaseRelativePath(Nav.Uri));
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (AppData.CurrentUser is not null && !CanSeePage) Nav.NavigateTo("/", replace: true);
+    }
+
+    private bool CanLogin =>
+        !loggingIn && !string.IsNullOrWhiteSpace(emailInput) && !string.IsNullOrWhiteSpace(passwordInput);
+
+    // localStorage, unlike the session: a display preference should outlive the tab. Keyed per user so
+    // two accounts on one browser don't share them (test plan X1); signed out uses the ":" key.
+    // Reference: MDN Web Docs, "Window: localStorage property." Accessed: Oct. 04, 2026. [Online]. Available: https://developer.mozilla.org/en-US/docs/Web/API/Window/localStorage
+    private int? prefsUser;
+    private string PrefKey(string name) => $"{name}:{AppData.CurrentUser?.UserId}";
+
+    private async Task LoadPrefs()
+    {
+        prefsUser = AppData.CurrentUser?.UserId;
+        isDarkMode = await JS.InvokeAsync<string?>("localStorage.getItem", PrefKey("darkMode")) == "true";
+        isVerticalNav = await JS.InvokeAsync<string?>("localStorage.getItem", PrefKey("verticalNav")) == "true";
+    }
+
+    private async Task ToggleDarkMode()
+    {
+        isDarkMode = !isDarkMode;
+        await JS.InvokeVoidAsync("localStorage.setItem", PrefKey("darkMode"), isDarkMode);
+    }
+
+    private async Task ToggleNavOrientation()
+    {
+        isVerticalNav = !isVerticalNav;
+        await JS.InvokeVoidAsync("localStorage.setItem", PrefKey("verticalNav"), isVerticalNav);
+    }
+
+    // Sign-in, sign-out and expired sessions all come through here; swap prefs when the user changes.
+    private void OnAppDataChange() => InvokeAsync(async () =>
+    {
+        if (prefsUser != AppData.CurrentUser?.UserId) await LoadPrefs();
+        StateHasChanged();
+    });
+
+    // UC-01: the API checks the credentials and returns a JWT.
+    private async Task Login()
+    {
+        if (!CanLogin) return;
+        loggingIn = true;
+        loginError = await AppData.LoginAsync(emailInput, passwordInput);
+        loggingIn = false;
+        if (loginError is null) { passwordInput = string.Empty; showPassword = false; }
+    }
+
+    private async Task OnLoginKeyDown(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await Login();
+    }
+
+    private async Task Logout()
+    {
+        await AppData.LogoutAsync();
+        passwordInput = string.Empty;
+        showPassword = false;
+        loginError = null;
+    }
+
+    private ErrorBoundary? pageErrors;
+
+    // The layout gets new parameters on every navigation: clear a previous page's error.
+    protected override void OnParametersSet() => pageErrors?.Recover();
+
+    // Re-render when the session ends elsewhere (e.g. an expired token).
+    protected override async Task OnInitializedAsync()
+    {
+        AppData.OnChange += OnAppDataChange;
+        await AppData.RestoreSessionAsync();
+        await LoadPrefs();
+        restoring = false;
+    }
+
+    private bool restoring = true;
+
+    public void Dispose() => AppData.OnChange -= OnAppDataChange;
+
+    // Drives MudThemeProvider so built-in MudBlazor components (buttons,
+    // dialogs, tables, inputs, snackbars) switch palette automatically
+    // alongside the custom DRPS-styled cards on each page.
+    private MudTheme _theme = new MudTheme
+    {
+        PaletteLight = new PaletteLight
+        {
+            Primary = "#3C7A63",
+            Secondary = "#2F5C4C",
+            Info = "#2A5CD1",
+            AppbarBackground = "#12271F",
+            Background = "#F5F3EC",
+            Surface = "#FFFFFF"
+        },
+        PaletteDark = new PaletteDark
+        {
+            Primary = "#6FA98C",
+            Secondary = "#3C7A63",
+            Info = "#5B84D6",
+            AppbarBackground = "#12271F",
+            Background = "#0B1B21",
+            Surface = "#1E362B",
+            DrawerBackground = "#0B1B21",
+            AppbarText = "#FFFFFF",
+            TextPrimary = "#E9F0EA",
+            TextSecondary = "#93A69A"
+        }
+    };
+}

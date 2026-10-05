@@ -1,0 +1,66 @@
+name: CI
+
+# Runs on every working branch and on every pull request into a deploy branch.
+# Builds and tests only - holds no deployment credentials.
+on:
+  push:
+    branches-ignore: [main, master, develop, dev]
+  pull_request:
+    branches: [main, master, develop, dev]
+
+# The MAUI app (Frontend_Mobile) is built and tested by cd-mobile.yml, which
+# installs the Android workload. This job deliberately builds only the projects
+# that run on a plain SDK so it stays fast and workload-free.
+env:
+  API: "QULOOBUL _MOE'MIENEEN_Backend/QULOOBUL _MOE'MIENEEN_Backend.csproj"
+  WEB: "Frontend_BlazorWeb/Frontend_BlazorWeb.csproj"
+  TESTS: "Backend.Tests/Backend.Tests.csproj"
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    # Integration tests migrate a throwaway database on this container (ApiIntegrationTests.cs).
+    services:
+      mssql:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: Y
+          MSSQL_SA_PASSWORD: Ci_Throwaway_Passw0rd
+        ports: ['1433:1433']
+        options: >-
+          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P Ci_Throwaway_Passw0rd -Q 'SELECT 1'"
+          --health-interval 10s --health-timeout 5s --health-retries 12
+    env:
+      TEST_SQL_CONNECTION: Server=localhost,1433;User Id=sa;Password=Ci_Throwaway_Passw0rd;TrustServerCertificate=True
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: |
+          dotnet restore "$API"
+          dotnet restore "$WEB"
+
+      - name: Build (warnings are errors)
+        run: |
+          dotnet build "$API" -c Release --no-restore -warnaserror
+          dotnet build "$WEB" -c Release --no-restore -warnaserror
+
+      - name: Test
+        run: dotnet test "$TESTS" -c Release -warnaserror --collect:"XPlat Code Coverage" --results-directory coverage
+
+      - name: Coverage gate
+        run: bash .github/scripts/coverage-gate.sh 70
+
+      - name: Upload coverage
+        if: always() && hashFiles('coverage/**/coverage.cobertura.xml') != ''
+        # Coverage is informational; a full artifact quota must not fail CI.
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage/**/coverage.cobertura.xml
+          retention-days: 3

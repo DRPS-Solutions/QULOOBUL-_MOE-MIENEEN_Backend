@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ContentPage
+    x:Class="Frontend_Mobile.Pages.CalendarPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:models="clr-namespace:Frontend_Mobile.Models"
+    Title="Calendar">
+
+    <!-- Calendar.razor: dated organisational events (the API's Event entity), separate from
+         the project-style "events" on Event Planning (EventsPage.xaml). Open to every role,
+         because anyone can be invited and must be able to answer. -->
+
+    <ScrollView>
+        <VerticalStackLayout Padding="16" Spacing="16">
+
+            <Border Style="{StaticResource HeaderBanner}">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                    <VerticalStackLayout Spacing="4">
+                        <Label Text="Calendar" Style="{StaticResource BannerTitle}" />
+                        <Label Text="Upcoming events, who is invited, and your RSVP." Style="{StaticResource BannerSubtitle}" />
+                    </VerticalStackLayout>
+                    <Button Grid.Column="1"
+                            x:Name="NewEventButton"
+                            Text="+ New event"
+                            Clicked="OnToggleCreate"
+                            BackgroundColor="Transparent"
+                            BorderColor="{StaticResource White}"
+                            BorderWidth="1"
+                            TextColor="{StaticResource White}"
+                            FontSize="12"
+                            Padding="12,8"
+                            MinimumHeightRequest="0"
+                            VerticalOptions="Center" />
+                </Grid>
+            </Border>
+
+            <!-- New event -->
+            <Border x:Name="CreateSection" Style="{StaticResource Card}" IsVisible="False">
+                <VerticalStackLayout Spacing="12">
+                    <Label Text="New event" Style="{StaticResource TitleMedium}" />
+
+                    <Border Style="{StaticResource FieldBox}">
+                        <Entry x:Name="TitleEntry" Placeholder="Title" MaxLength="200" TextChanged="OnFormChanged" />
+                    </Border>
+
+                    <VerticalStackLayout>
+                        <Label Text="Date" Style="{StaticResource LabelSmall}" />
+                        <Border Style="{StaticResource FieldBox}">
+                            <DatePicker x:Name="EventDatePicker" Format="d MMM yyyy" />
+                        </Border>
+                    </VerticalStackLayout>
+
+                    <VerticalStackLayout>
+                        <Label Text="Time" Style="{StaticResource LabelSmall}" />
+                        <Border Style="{StaticResource FieldBox}">
+                            <TimePicker x:Name="EventTimePicker" Format="h:mm tt" />
+                        </Border>
+                    </VerticalStackLayout>
+
+                    <Border Style="{StaticResource FieldBox}">
+                        <Entry x:Name="LocationEntry" Placeholder="Location (optional)" MaxLength="200" />
+                    </Border>
+
+                    <HorizontalStackLayout Spacing="8">
+                        <Button x:Name="CreateButton" Text="Create" Clicked="OnCreate" IsEnabled="False" />
+                        <Button Text="Cancel" Style="{StaticResource OutlineButton}" Clicked="OnCancelCreate" />
+                    </HorizontalStackLayout>
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Event list -->
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout>
+                    <HorizontalStackLayout Spacing="8" Margin="0,0,0,12">
+                        <Switch x:Name="ShowPastSwitch" Toggled="OnShowPastToggled" />
+                        <Label Text="Include past events" VerticalOptions="Center" />
+                    </HorizontalStackLayout>
+
+                    <Label x:Name="EmptyEventsLabel" Text="No events." Style="{StaticResource Muted}" IsVisible="False" />
+
+                    <VerticalStackLayout x:Name="EventList" Spacing="10">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate x:DataType="models:CalendarEventRow">
+                                <Border BackgroundColor="{Binding RowBackground}"
+                                        Stroke="{Binding RowBorder}"
+                                        StrokeThickness="1"
+                                        StrokeShape="RoundRectangle 12"
+                                        Padding="14">
+                                    <Border.GestureRecognizers>
+                                        <TapGestureRecognizer Tapped="OnSelectEvent" />
+                                    </Border.GestureRecognizers>
+                                    <VerticalStackLayout Spacing="2">
+                                        <Label Text="{Binding Title}" FontSize="14" FontAttributes="Bold" />
+                                        <Label Style="{StaticResource LabelSmall}">
+                                            <Label.FormattedText>
+                                                <FormattedString>
+                                                    <Span Text="{Binding DateLabel}" />
+                                                    <Span Text="{Binding LocationSuffix}" />
+                                                </FormattedString>
+                                            </Label.FormattedText>
+                                        </Label>
+                                    </VerticalStackLayout>
+                                </Border>
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </VerticalStackLayout>
+                </VerticalStackLayout>
+            </Border>
+
+            <Label x:Name="NoSelectionLabel" Text="Select an event to see who is going." Style="{StaticResource Muted}" Margin="4,0" />
+
+            <!-- Event details -->
+            <Border x:Name="DetailSection" Style="{StaticResource Card}" IsVisible="False">
+                <VerticalStackLayout Spacing="4">
+                    <Label x:Name="SelectedTitleLabel" Style="{StaticResource TitleLarge}" />
+                    <Label x:Name="SelectedMetaLabel" Style="{StaticResource Muted}" Margin="0,0,0,12" />
+
+                    <HorizontalStackLayout x:Name="MyAnswerSection" Spacing="8" Margin="0,0,0,16">
+                        <Label x:Name="MyAnswerLabel" VerticalOptions="Center" />
+                        <Button x:Name="AcceptButton"
+                                Text="Accept"
+                                Clicked="OnRespond"
+                                BackgroundColor="{StaticResource StatusApproved}"
+                                FontSize="12"
+                                Padding="14,8"
+                                MinimumHeightRequest="36" />
+                        <Button x:Name="DeclineButton"
+                                Text="Decline"
+                                Clicked="OnRespond"
+                                Style="{StaticResource OutlineButton}"
+                                TextColor="{StaticResource StatusDenied}"
+                                FontSize="12"
+                                Padding="14,8"
+                                MinimumHeightRequest="36" />
+                    </HorizontalStackLayout>
+
+                    <Label x:Name="AttendeesHeaderLabel" Style="{StaticResource TitleMedium}" Margin="0,0,0,8" />
+
+                    <VerticalStackLayout x:Name="AttendeeList" Spacing="8">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate x:DataType="models:AttendeeRow">
+                                <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                                    <Label Text="{Binding FullName}" VerticalOptions="Center" />
+                                    <Border Grid.Column="1"
+                                            BackgroundColor="{Binding StatusBackground}"
+                                            StrokeThickness="0"
+                                            StrokeShape="RoundRectangle 12"
+                                            Padding="10,4"
+                                            VerticalOptions="Center">
+                                        <Label Text="{Binding Status}" TextColor="{Binding StatusForeground}" FontSize="10" FontAttributes="Bold" />
+                                    </Border>
+                                    <Button Grid.Column="2"
+                                            Text="{Binding RemoveLabel}"
+                                            IsVisible="{Binding ShowRemove}"
+                                            Clicked="OnRemoveAttendee"
+                                            Style="{StaticResource OutlineButton}"
+                                            FontSize="11"
+                                            Padding="10,4"
+                                            MinimumHeightRequest="0" />
+                                </Grid>
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </VerticalStackLayout>
+
+                    <VerticalStackLayout x:Name="InviteSection" Spacing="8" Margin="0,16,0,0" IsVisible="False">
+                        <Label Text="Invite someone" Style="{StaticResource LabelSmall}" />
+                        <Border Style="{StaticResource FieldBox}">
+                            <Picker x:Name="InviteePicker" Title="Invite someone" SelectedIndexChanged="OnInviteeChanged" />
+                        </Border>
+                        <Button x:Name="InviteButton" Text="Invite" Clicked="OnInvite" IsEnabled="False" />
+                    </VerticalStackLayout>
+                </VerticalStackLayout>
+            </Border>
+
+        </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>

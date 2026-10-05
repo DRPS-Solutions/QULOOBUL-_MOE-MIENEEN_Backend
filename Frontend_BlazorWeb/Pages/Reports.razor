@@ -1,0 +1,212 @@
+@page "/reports"
+@using MudBlazor
+@using QULOOBUL__MOE_MIENEEN_Shared.Reports
+@inject AppDataService AppData
+@inject IJSRuntime JS
+@inject ISnackbar Snackbar
+
+<PageTitle>Reports</PageTitle>
+
+@* UC-09: admin reporting dashboard. The API recomputes the figures on every run and logs who ran it. *@
+<div class="drps-page">
+    <MudContainer MaxWidth="MaxWidth.Large" Class="pt-6">
+
+        <div class="drps-page-header">
+            <div>
+                <MudText Typo="Typo.h6" Style="font-weight:600;">Reports &amp; Analytics</MudText>
+                <div class="drps-subtitle">Task completion, staff workload and project progress over a period.</div>
+            </div>
+        </div>
+
+        <div class="drps-panel d-flex gap-3 flex-wrap align-center">
+            <div style="flex:1 1 130px; max-width:180px;"><MudDatePicker @bind-Date="from" Label="From" Variant="Variant.Outlined" Margin="Margin.Dense" /></div>
+            <div style="flex:1 1 130px; max-width:180px;"><MudDatePicker @bind-Date="to" Label="To" Variant="Variant.Outlined" Margin="Margin.Dense" /></div>
+            <MudSelect T="string" @bind-Value="reportType" Label="Report" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width:220px;">
+                <MudSelectItem T="string" Value="@("TaskCompletion")">Task completion</MudSelectItem>
+                <MudSelectItem T="string" Value="@("Workload")">Staff workload</MudSelectItem>
+                <MudSelectItem T="string" Value="@("ProjectProgress")">Project progress</MudSelectItem>
+            </MudSelect>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Run" Disabled="@busy">Run</MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.FileDownload"
+                       OnClick="Export" Disabled="@busy">Export CSV</MudButton>
+        </div>
+
+        @if (RangeError is { } rangeError)
+        {
+            <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-3">@rangeError</MudAlert>
+        }
+
+        @if (report is null)
+        {
+            <div class="drps-panel drps-muted">Pick a period and run a report.</div>
+        }
+        else if (IsEmpty(report))
+        {
+            <div class="drps-panel drps-muted">No tasks were due or completed in this period. Try a wider date range.</div>
+        }
+        else
+        {
+            <MudGrid>
+                <MudItem xs="12" md="6">
+                    <div class="drps-panel">
+                        <MudText Typo="Typo.subtitle1" Style="font-weight:600;">Completed over time</MudText>
+                        <MudChart T="double" ChartType="ChartType.Line" ChartSeries="trendSeries" ChartLabels="trendLabels" Height="260px" />
+                    </div>
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    <div class="drps-panel">
+                        <MudText Typo="Typo.subtitle1" Style="font-weight:600;">Tasks by priority</MudText>
+                        @if (completionLabels.Length == 0)
+                        {
+                            <div class="drps-muted">No tasks were due in this period.</div>
+                        }
+                        else
+                        {
+                            <MudChart T="double" ChartType="ChartType.StackedBar" ChartSeries="completionSeries" ChartLabels="completionLabels" Height="260px" />
+                        }
+                    </div>
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    <div class="drps-panel">
+                        <MudText Typo="Typo.subtitle1" Style="font-weight:600;">Staff workload</MudText>
+                        @if (workloadLabels.Length == 0)
+                        {
+                            <div class="drps-muted">No active staff to show.</div>
+                        }
+                        else
+                        {
+                            <MudChart T="double" ChartType="ChartType.Bar" ChartSeries="workloadSeries" ChartLabels="workloadLabels" Height="260px" />
+                        }
+                    </div>
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    <div class="drps-panel">
+                        <MudText Typo="Typo.subtitle1" Style="font-weight:600;">Project progress</MudText>
+                        <MudSimpleTable Dense="true" Elevation="0">
+                            <thead><tr><th>Project</th><th>Done</th><th>Total</th><th>%</th></tr></thead>
+                            <tbody>
+                                @if (report.Progress.Count == 0)
+                                {
+                                    <tr><td colspan="4" class="drps-muted">No projects yet.</td></tr>
+                                }
+                                @foreach (var p in report.Progress)
+                                {
+                                    <tr>
+                                        <td>@p.ProjectName</td><td>@p.Done</td><td>@p.Total</td>
+                                        <td><MudProgressLinear Value="p.PercentComplete" Color="Color.Primary" Style="min-width:80px;" /> @p.PercentComplete%</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </MudSimpleTable>
+                    </div>
+                </MudItem>
+            </MudGrid>
+        }
+    </MudContainer>
+</div>
+
+@code {
+    private DateTime? from = DateTime.Today.AddDays(-30);
+    private DateTime? to = DateTime.Today;
+    private string reportType = "TaskCompletion";
+    private bool busy;
+    private ReportDto? report;
+
+    private List<ChartSeries<double>> trendSeries = [], completionSeries = [], workloadSeries = [];
+    private string[] trendLabels = [], completionLabels = [], workloadLabels = [];
+
+    // Why the chosen period can't be reported on, or null when it can.
+    private string? RangeError =>
+        from is null || to is null ? "Choose both a From and a To date."
+        : to < from ? "The To date is before the From date. Swap them, or pick a later To date."
+        : to > from.Value.AddYears(1) ? "Reports cover a year at most. Pick a narrower date range." // same cap as the API
+        : null;
+
+    // The API refuses a period with no data, but a run can still come back with nothing to chart.
+    private static bool IsEmpty(ReportDto r) =>
+        r.Completion.Count == 0 && r.Trend.All(p => p.Completed == 0) && r.Workload.All(w => w.Assigned == 0);
+
+    private bool CanSend()
+    {
+        if (RangeError is not { } error) return true;
+        Snackbar.Add(error, Severity.Warning);
+        return false;
+    }
+
+    // The end date is inclusive: a report "to 23 Sep" covers all of that day.
+    private ReportRequest Request => new()
+    {
+        PeriodStart = AppDataService.Wall(from!.Value.Date),
+        PeriodEnd = AppDataService.Wall(to!.Value.Date.AddDays(1).AddTicks(-1)),
+        ReportType = reportType,
+    };
+
+    private async Task Run()
+    {
+        if (!CanSend()) return;
+        busy = true;
+        try
+        {
+            report = await AppData.SendAsync<ReportDto>(HttpMethod.Post, "api/reports", Request);
+            if (report is not null) BuildCharts(report);
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private async Task Export()
+    {
+        if (!CanSend()) return;
+        // The API also refuses an empty period ("Not enough data..."); this just skips the round trip.
+        if (report is not null && IsEmpty(report) && report.PeriodStart == Request.PeriodStart && report.PeriodEnd == Request.PeriodEnd)
+        {
+            Snackbar.Add("There's nothing to export for this period. Try a wider date range.", Severity.Warning);
+            return;
+        }
+        busy = true;
+        try
+        {
+            if (await AppData.SendAsync<ReportExportResponse>(HttpMethod.Post, "api/reports/export", Request) is not { } file)
+                return; // AppDataService has already shown why
+            // window.open returns null when a pop-up blocker stops it.
+            // Reference: MDN Web Docs, "Window: open() method." Accessed: Oct. 04, 2026. [Online]. Available: https://developer.mozilla.org/en-US/docs/Web/API/Window/open
+            await using var tab = await JS.InvokeAsync<IJSObjectReference?>("open", file.DownloadUrl, "_blank");
+            if (tab is null)
+                Snackbar.Add("The report was exported, but the browser blocked the download tab. Allow pop-ups for this site and export again.", Severity.Warning);
+            else
+                Snackbar.Add("Report exported. The CSV download has opened in a new tab.", Severity.Success);
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private void BuildCharts(ReportDto r)
+    {
+        // Label every bucket when there are few; otherwise every seventh, so the axis stays legible.
+        trendLabels = r.Trend.Select((p, i) => r.Trend.Count <= 10 || i % 7 == 0 ? p.BucketStart.ToString("d MMM") : "").ToArray();
+        trendSeries = [Series("Cumulative completed", r.Trend.Select(p => (double)p.CumulativeCompleted))];
+
+        completionLabels = r.Completion.Select(c => c.Bucket).ToArray();
+        completionSeries =
+        [
+            Series("Completed", r.Completion.Select(c => (double)c.Completed)),
+            Series("Outstanding", r.Completion.Select(c => (double)c.Outstanding)),
+        ];
+
+        var busiest = r.Workload.OrderByDescending(w => w.Assigned).Take(8).ToList();
+        workloadLabels = busiest.Select(w => w.FullName.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? $"#{w.UserId}").ToArray();
+        workloadSeries =
+        [
+            Series("Assigned", busiest.Select(w => (double)w.Assigned)),
+            Series("Completed", busiest.Select(w => (double)w.Completed)),
+            Series("Overdue", busiest.Select(w => (double)w.Overdue)),
+        ];
+    }
+
+    private static ChartSeries<double> Series(string name, IEnumerable<double> values) =>
+        new() { Name = name, Data = new(values.ToArray()) };
+}

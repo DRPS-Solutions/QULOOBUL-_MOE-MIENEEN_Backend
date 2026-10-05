@@ -1,0 +1,822 @@
+@page "/users"
+@using MudBlazor
+@using System.ComponentModel.DataAnnotations
+@using QULOOBUL__MOE_MIENEEN_Shared.Auth
+@implements IDisposable
+@inject AppDataService AppData
+@inject IDialogService DialogService
+
+<PageTitle>User Management</PageTitle>
+
+<style>
+    .drps-users {
+        --drps-navy-900: #12271F;
+        --drps-navy-800: #1C3D32;
+        --drps-blue-600: #2F5C4C;
+        --drps-blue-500: #3C7A63;
+        --drps-blue-400: #6FA98C;
+        --drps-bg: #F5F3EC;
+        --drps-surface: #FFFFFF;
+        --drps-text-muted: #75806F;
+        --drps-tint-blue: #EAF2ED;
+        --drps-tint-amber: #F6EBD3;
+        --drps-tint-red: #FCEEF0;
+        --drps-border-soft: #F1EEE2;
+        --drps-hover: #F2EFE4;
+        --drps-empty: #B7B2A0;
+        --drps-shadow: rgba(11, 22, 38, 0.06);
+        background: var(--drps-bg);
+        min-height: 100%;
+        padding-bottom: 2rem;
+    }
+
+    .drps-users-header {
+        background: linear-gradient(135deg, var(--drps-navy-900) 0%, var(--drps-blue-600) 100%);
+        border-radius: 16px;
+        padding: 20px 24px;
+        color: white;
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        flex-wrap: wrap;
+    }
+
+    .drps-users-search .mud-input-outlined-border {
+        border-color: rgba(255, 255, 255, 0.35) !important;
+    }
+
+    .drps-users-search .mud-input-slot,
+    .drps-users-search input {
+        color: white !important;
+    }
+
+    .drps-users-search .mud-input-label,
+    .drps-users-search .mud-icon-root {
+        color: rgba(255, 255, 255, 0.7) !important;
+    }
+
+    /* --- Left column: employee roster --- */
+    .drps-roster {
+        background: var(--drps-surface);
+        border-radius: 16px;
+        box-shadow: 0 2px 10px var(--drps-shadow);
+        overflow: hidden;
+    }
+
+    .drps-roster-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 16px;
+        cursor: pointer;
+        border-left: 3px solid transparent;
+        border-bottom: 1px solid var(--drps-border-soft);
+        transition: background 0.15s ease;
+    }
+
+    .drps-roster-item:last-child {
+        border-bottom: none;
+    }
+
+    .drps-roster-item:hover {
+        background: var(--drps-hover);
+    }
+
+    .drps-roster-item.selected {
+        background: var(--drps-tint-blue);
+        border-left-color: var(--drps-blue-500);
+    }
+
+    .drps-avatar {
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--drps-blue-400) 0%, var(--drps-blue-500) 100%);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        font-size: 0.85rem;
+        flex-shrink: 0;
+    }
+
+    .drps-avatar.large {
+        width: 60px;
+        height: 60px;
+        font-size: 1.2rem;
+    }
+
+    .drps-roster-name {
+        font-size: 0.88rem;
+        font-weight: 600;
+        color: var(--drps-navy-800);
+    }
+
+    .drps-roster-role {
+        font-size: 0.74rem;
+        color: var(--drps-text-muted);
+    }
+
+    /* --- Right column: selected employee detail --- */
+    .drps-profile-card {
+        background: var(--drps-surface);
+        border-radius: 16px;
+        padding: 20px 24px;
+        box-shadow: 0 2px 10px var(--drps-shadow);
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 16px;
+        flex-wrap: wrap;
+    }
+
+    .drps-profile-name {
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: var(--drps-navy-800);
+    }
+
+    .drps-profile-role {
+        font-size: 0.85rem;
+        color: var(--drps-blue-500);
+        font-weight: 500;
+    }
+
+    .drps-profile-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px;
+        margin-top: 6px;
+        font-size: 0.78rem;
+        color: var(--drps-text-muted);
+    }
+
+    .drps-profile-meta span {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+
+    /* --- Stat cards row --- */
+    .drps-stats-row {
+        display: flex;
+        gap: 14px;
+        margin-bottom: 16px;
+        flex-wrap: wrap;
+    }
+
+    .drps-stat-card {
+        flex: 1;
+        min-width: 140px;
+        background: var(--drps-surface);
+        border-radius: 14px;
+        padding: 14px 18px;
+        box-shadow: 0 2px 10px var(--drps-shadow);
+        border-left: 4px solid var(--drps-blue-500);
+    }
+
+    .drps-stat-card.pending {
+        border-left-color: #B9862E;
+    }
+
+    .drps-stat-card.rate {
+        border-left-color: #2E9E5B;
+    }
+
+    .drps-stat-value {
+        font-size: 1.4rem;
+        font-weight: 700;
+        color: var(--drps-navy-800);
+    }
+
+    .drps-stat-label {
+        font-size: 0.74rem;
+        color: var(--drps-text-muted);
+    }
+
+    /* --- Task lists (completed / outstanding) --- */
+    .drps-task-columns {
+        display: flex;
+        gap: 16px;
+        flex-wrap: wrap;
+    }
+
+    .drps-task-col {
+        flex: 1;
+        min-width: 260px;
+        background: var(--drps-surface);
+        border-radius: 16px;
+        padding: 18px;
+        box-shadow: 0 2px 10px var(--drps-shadow);
+    }
+
+    .drps-task-col-title {
+        font-weight: 600;
+        color: var(--drps-navy-800);
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.9rem;
+    }
+
+    .drps-user-task {
+        border-radius: 8px;
+        padding: 8px 12px;
+        background: var(--drps-tint-blue);
+        border-left: 4px solid var(--drps-blue-500);
+        margin-bottom: 8px;
+    }
+
+    .drps-user-task.priority-high { border-left-color: #E0435C; background: var(--drps-tint-red); }
+    .drps-user-task.priority-medium { border-left-color: #B9862E; background: var(--drps-tint-amber); }
+    .drps-user-task.priority-low { border-left-color: var(--drps-blue-500); background: var(--drps-tint-blue); }
+
+    .drps-user-task.done {
+        opacity: 0.6;
+    }
+
+    .drps-user-task.done .drps-user-task-title {
+        text-decoration: line-through;
+    }
+
+    .drps-user-task-title {
+        font-size: 0.85rem;
+        font-weight: 500;
+        color: var(--drps-navy-800);
+    }
+
+    .drps-user-task-meta {
+        font-size: 0.7rem;
+        color: var(--drps-text-muted);
+        margin-top: 2px;
+    }
+
+    .drps-task-col-empty {
+        color: var(--drps-empty);
+        font-size: 0.8rem;
+        text-align: center;
+        padding: 20px 0;
+    }
+
+    /* --- Create user card styling --- */
+    .drps-create-card {
+        background: var(--drps-surface);
+        border-radius: 16px;
+        padding: 24px;
+        box-shadow: 0 2px 10px var(--drps-shadow);
+        min-height: 60vh;
+    }
+
+    /* --- Dark mode overrides --- */
+    .page.dark-mode .drps-users {
+        --drps-bg: #0B1B21;
+        --drps-surface: #1E362B;
+        --drps-text-muted: #93A69A;
+        --drps-navy-800: #E9F0EA;
+        --drps-tint-blue: rgba(60, 122, 99, 0.16);
+        --drps-tint-amber: rgba(185, 134, 46, 0.18);
+        --drps-tint-red: rgba(224, 67, 92, 0.16);
+        --drps-border-soft: #2E4A3B;
+        --drps-hover: #1E3327;
+        --drps-empty: #4E5F52;
+        --drps-shadow: rgba(0, 0, 0, 0.35);
+    }
+</style>
+
+<div class="drps-users">
+    <MudContainer MaxWidth="MaxWidth.Large" Class="pt-6">
+
+        @* --- Header: title, search, and action button --- *@
+        <div class="drps-users-header">
+            <MudText Typo="Typo.h6" Style="font-weight:600;">User Management</MudText>
+
+            <div class="d-flex align-center flex-wrap gap-3">
+                @if (!showCreateUserScreen)
+                {
+                    <MudTextField T="string"
+                                  @bind-Value="searchTerm"
+                                  Placeholder="Search employees..."
+                                  Variant="Variant.Outlined"
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Search"
+                                  Immediate="true"
+                                  Class="drps-users-search"
+                                  Style="max-width:280px; min-width:200px;" />
+
+                    <MudButton Style="white-space:nowrap;" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="() => showCreateUserScreen = true">
+                        Add New User
+                    </MudButton>
+                }
+                else
+                {
+                    <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.ArrowBack" OnClick="() => showCreateUserScreen = false">
+                        Back to Roster
+                    </MudButton>
+                }
+            </div>
+        </div>
+
+        @if (!showCreateUserScreen)
+        {
+            @* --- ROSTER & DETAIL VIEW --- *@
+            <MudGrid>
+                <MudItem xs="12" md="4">
+                    <div class="drps-roster">
+                        @if (!FilteredEmployees.Any())
+                        {
+                            <div class="drps-task-col-empty">No employees match your search</div>
+                        }
+                        else
+                        {
+                            @foreach (var employee in FilteredEmployees)
+                            {
+                                <div class="drps-roster-item @(employee == selectedEmployee ? "selected" : "")" @onclick="() => SelectEmployee(employee)">
+                                    <div class="drps-avatar">@Initials(employee.FullName)</div>
+                                    <div style="flex:1;">
+                                        <div class="drps-roster-name">@employee.FullName</div>
+                                        <div class="drps-roster-role">@employee.Role</div>
+                                        <div class="drps-roster-role">@WorkloadFor(employee)</div>
+                                    </div>
+                                </div>
+                            }
+                        }
+                    </div>
+                </MudItem>
+
+                <MudItem xs="12" md="8">
+                    @if (selectedEmployee is not null)
+                    {
+                        var completedTasks = selectedTasks.Where(t => t.IsDone()).ToList();
+                        var pendingTasks = selectedTasks.Where(t => !t.IsDone()).ToList();
+
+                        <div class="drps-profile-card">
+                            <div class="drps-avatar large">@Initials(selectedEmployee.FullName)</div>
+                            <div>
+                                <div class="drps-profile-name">@selectedEmployee.FullName</div>
+                                <div class="drps-profile-role">@selectedEmployee.Role</div>
+                                <div class="drps-profile-meta">
+                                    <span><MudIcon Icon="@Icons.Material.Filled.Email" Size="Size.Small" />@selectedEmployee.Email</span>
+                                    @if (selectedEmployee.IsActive)
+                                    {
+                                        <span><MudIcon Icon="@Icons.Material.Filled.FiberManualRecord" Size="Size.Small" Style="color:#2E9E5B;" />Active</span>
+                                    }
+                                    else
+                                    {
+                                        <span><MudIcon Icon="@Icons.Material.Filled.FiberManualRecord" Size="Size.Small" Style="color:#E0435C;" />@selectedEmployee.Status</span>
+                                    }
+                                </div>
+                            </div>
+                            @* Facility managers and up bring role and password requests to the admin directly. *@
+                            @if (selectedEmployee.UserId != AppData.CurrentUser?.UserId)
+                            {
+                                <div class="d-flex align-center gap-2 flex-wrap" style="margin-left:auto;">
+                                    @if (selectedEmployee.IsActive)
+                                    {
+                                        <MudSelect T="int?" Label="Role" Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true"
+                                                   Value="@RoleIdOf(selectedEmployee)" ValueChanged="ChangeRole" Disabled="@busy"
+                                                   ToStringFunc="@(id => roles.FirstOrDefault(r => r.RoleId == id)?.RoleName)" Style="min-width:170px;">
+                                            @foreach (var role in roles)
+                                            {
+                                                <MudSelectItem T="int?" Value="@role.RoleId">@role.RoleName</MudSelectItem>
+                                            }
+                                        </MudSelect>
+                                    }
+                                    @if (selectedEmployee.Status != "Inactive")
+                                    {
+                                        <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.LockReset"
+                                                   Disabled="@busy" OnClick="ResetPassword">
+                                            Reset Password
+                                        </MudButton>
+                                    }
+                                    @* SM-03: only Active ↔ Inactive. *@
+                                    @if (selectedEmployee.Status == "Active")
+                                    {
+                                        <MudButton Variant="Variant.Outlined" Color="Color.Warning" StartIcon="@Icons.Material.Filled.PersonOff"
+                                                   Disabled="@busy" OnClick="() => SetActive(false)">
+                                            Deactivate
+                                        </MudButton>
+                                    }
+                                    else if (selectedEmployee.Status == "Inactive")
+                                    {
+                                        <MudButton Variant="Variant.Outlined" Color="Color.Success" StartIcon="@Icons.Material.Filled.HowToReg"
+                                                   Disabled="@busy" OnClick="() => SetActive(true)">
+                                            Reactivate
+                                        </MudButton>
+                                    }
+                                    <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Filled.Delete"
+                                               Disabled="@busy" OnClick="DeleteSelected">
+                                        Delete User
+                                    </MudButton>
+                                </div>
+                            }
+                        </div>
+
+                        <div class="drps-stats-row">
+                            <div class="drps-stat-card">
+                                <div class="drps-stat-value">@completedTasks.Count</div>
+                                <div class="drps-stat-label">Tasks completed</div>
+                            </div>
+                            <div class="drps-stat-card pending">
+                                <div class="drps-stat-value">@pendingTasks.Count</div>
+                                <div class="drps-stat-label">Tasks pending</div>
+                            </div>
+                            <div class="drps-stat-card rate">
+                                <div class="drps-stat-value">@(selectedTasks.Count == 0 ? 0 : (int)Math.Round(completedTasks.Count * 100.0 / selectedTasks.Count))%</div>
+                                <div class="drps-stat-label">Completion rate</div>
+                            </div>
+                        </div>
+
+                        <div class="drps-task-columns">
+                            <div class="drps-task-col">
+                                <div class="drps-task-col-title">
+                                    <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Small" Style="color:#2E9E5B;" />
+                                    Completed
+                                </div>
+                                @if (!completedTasks.Any())
+                                {
+                                    <div class="drps-task-col-empty">Nothing completed yet</div>
+                                }
+                                else
+                                {
+                                    @foreach (var task in completedTasks)
+                                    {
+                                        <div class="drps-user-task priority-@task.Priority.ToLower() done">
+                                            <div class="drps-user-task-title">@task.Title</div>
+                                            <div class="drps-user-task-meta">@TaskMeta(task)</div>
+                                        </div>
+                                    }
+                                }
+                            </div>
+
+                            <div class="drps-task-col">
+                                <div class="drps-task-col-title">
+                                    <MudIcon Icon="@Icons.Material.Filled.PendingActions" Size="Size.Small" Style="color:#B9862E;" />
+                                    Still To Do
+                                </div>
+                                @if (!pendingTasks.Any())
+                                {
+                                    <div class="drps-task-col-empty">All caught up</div>
+                                }
+                                else
+                                {
+                                    @foreach (var task in pendingTasks)
+                                    {
+                                        <div class="drps-user-task priority-@task.Priority.ToLower()">
+                                            <div class="drps-user-task-title">@task.Title</div>
+                                            <div class="drps-user-task-meta">@TaskMeta(task)</div>
+                                        </div>
+                                    }
+                                }
+                            </div>
+                        </div>
+
+                        <div class="drps-task-col mt-4">
+                            <div class="drps-task-col-title">
+                                <MudIcon Icon="@Icons.Material.Filled.History" Size="Size.Small" />
+                                Activity Log
+                            </div>
+                            @if (!selectedAudit.Any())
+                            {
+                                <div class="drps-task-col-empty">No recorded activity</div>
+                            }
+                            else
+                            {
+                                <MudSimpleTable Dense="true" Hover="true" Style="max-height:360px; overflow-y:auto; background:transparent;">
+                                    <thead><tr><th>When</th><th>Action</th><th>Target</th></tr></thead>
+                                    <tbody>
+                                        @foreach (var entry in selectedAudit)
+                                        {
+                                            <tr>
+                                                <td>@entry.Timestamp.ToLocalTime().ToString("d MMM yyyy HH:mm")</td>
+                                                <td>@AuditActionLabel(entry)</td>
+                                                <td>@AuditTargetLabel(entry)</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </MudSimpleTable>
+                            }
+                        </div>
+                    }
+                </MudItem>
+            </MudGrid>
+        }
+        else
+        {
+            @* --- CREATE USER FORM --- *@
+            <div class="drps-create-card">
+                <MudText Typo="Typo.h6" Style="font-weight:600; color:var(--drps-navy-800);" Class="mb-4">Create New Account</MudText>
+
+                <MudGrid Justify="Justify.Center">
+                    <MudItem xs="12" md="6">
+                        <MudTextField T="string" @bind-Value="newUser.FirstName" Label="First Name" Required="true" RequiredError="Enter a first name." Variant="Variant.Outlined" MaxLength="100" Immediate="true" Class="mb-3" />
+                        <MudTextField T="string" @bind-Value="newUser.Surname" Label="Surname" Required="true" RequiredError="Enter a surname." Variant="Variant.Outlined" MaxLength="100" Immediate="true" Class="mb-3" />
+                        <MudTextField T="string" @bind-Value="newUser.Email" Label="Email Address" Required="true" RequiredError="Enter an email address." Validation="@EmailRule" InputType="InputType.Email" Variant="Variant.Outlined" MaxLength="256" Immediate="true" Class="mb-3" />
+                        <MudTextField T="string" @bind-Value="newUser.CellNo" Label="Cell Number" Required="true" RequiredError="Enter a cell number." Validation="@PhoneRule" InputType="InputType.Telephone" Variant="Variant.Outlined" MaxLength="20" Immediate="true" Class="mb-3" />
+
+                        @* The role decides which pages the account can see (see
+                           AppDataService.CanSee*) and what it may do in the API. *@
+                        <MudSelect T="int?" Label="System Role" Variant="Variant.Outlined" Required="true" RequiredError="Choose a role." @bind-Value="newUser.RoleId"
+                                   ToStringFunc="@(id => roles.FirstOrDefault(r => r.RoleId == id)?.RoleName)" Class="mb-3">
+                            @foreach (var role in roles)
+                            {
+                                <MudSelectItem T="int?" Value="@role.RoleId">@role.RoleName</MudSelectItem>
+                            }
+                        </MudSelect>
+
+
+                        <div class="d-flex gap-2">
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@(!CanSaveUser)" OnClick="SaveUser">
+                                @(saving ? "Saving..." : "Save User")
+                            </MudButton>
+                            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="() => showCreateUserScreen = false">Cancel</MudButton>
+                        </div>
+                    </MudItem>
+                </MudGrid>
+            </div>
+        }
+
+    </MudContainer>
+</div>
+
+@code {
+    private string searchTerm = string.Empty;
+    private bool showCreateUserScreen = false;
+
+    // UC-06 workload counts per active user, and the roles to pick from.
+    private IReadOnlyList<StaffOverviewRow> overview = [];
+    private IReadOnlyList<RoleDto> roles = [];
+
+    private UserSummaryDto? selectedEmployee;
+    private IReadOnlyList<TaskCardDto> selectedTasks = [];
+    private IReadOnlyList<AuditEntryDto> selectedAudit = [];
+
+    // Audit_Log stores machine keys ("task.create", or "POST /api/tasks/5" from AuditMiddleware);
+    // these turn them into what the user actually did. Unknown keys fall through unchanged.
+    private static readonly Dictionary<string, string> AuditActions = new()
+    {
+        ["auth.login"] = "Signed in",
+        ["auth.login.failed"] = "Failed sign-in attempt",
+        ["user.create"] = "Created a user account",
+        ["user.update"] = "Updated a profile",
+        ["user.role"] = "Changed a user's role",
+        ["user.deactivate"] = "Deactivated a user",
+        ["user.reactivate"] = "Reactivated a user",
+        ["user.delete"] = "Deleted a user",
+        ["user.locked"] = "Account locked",
+        ["user.anonymise"] = "Anonymised a user",
+        ["user.password.set"] = "Set their password",
+        ["user.password.reset"] = "Reset a password",
+        ["user.password.link"] = "Requested a password link",
+        ["project.create"] = "Created a project",
+        ["project.update"] = "Updated a project",
+        ["project.member.add"] = "Added a project member",
+        ["project.member.remove"] = "Removed a project member",
+        ["task.create"] = "Created a task",
+        ["task.update"] = "Updated a task",
+        ["task.assign"] = "Assigned a task",
+        ["task.unassign"] = "Unassigned a task",
+        ["task.status"] = "Changed a task's status",
+        ["schedule.create"] = "Created a recurring task",
+        ["schedule.update"] = "Updated a recurring task",
+        ["schedule.pause"] = "Paused a recurring task",
+        ["schedule.reassign"] = "Reassigned a recurring task",
+        ["event.create"] = "Created an event",
+        ["event.attendee.add"] = "Invited someone to an event",
+        ["event.attendee.respond"] = "Responded to an event",
+        ["event.attendee.remove"] = "Removed an event attendee",
+        ["meeting.create"] = "Scheduled a meeting",
+        ["meeting.minutes.record"] = "Recorded meeting minutes",
+        ["meeting.minutes.edit"] = "Edited meeting minutes",
+        ["meeting.minutes.append"] = "Added to meeting minutes",
+        ["meeting.minutes.approve"] = "Approved meeting minutes",
+        ["request.submit"] = "Submitted a request",
+        ["request.resubmit"] = "Resubmitted a request",
+        ["request.approve"] = "Approved a request",
+        ["request.decline"] = "Declined a request",
+        ["request.complete"] = "Completed a request",
+        ["request.review.begin"] = "Started reviewing a request",
+        ["file.upload"] = "Uploaded a file",
+        ["file.recategorise"] = "Recategorised a file",
+        ["file.archive"] = "Archived a file",
+        ["file.unarchive"] = "Restored a file",
+        ["file.delete"] = "Deleted a file",
+        ["notification.preferences"] = "Changed notification settings",
+        ["notification.broadcast"] = "Sent an announcement",
+        ["email.sent"] = "Email sent",
+    };
+
+    private static readonly Dictionary<string, string> AuditEntities = new()
+    {
+        ["ProjectTask"] = "Task", ["TaskAssignment"] = "Task", ["TaskSchedule"] = "Recurring task",
+        ["ProjectMember"] = "Project", ["EventAttendee"] = "Event", ["MeetingMinutes"] = "Meeting minutes",
+        ["ResourceRequest"] = "Request", ["FileUpload"] = "File", ["NotificationPreference"] = "Notification settings",
+    };
+
+    private static string AuditActionLabel(AuditEntryDto e)
+    {
+        if (e.EntityType == "http")
+            return e.Action.Split(' ')[0] switch
+            {
+                "PUT" or "PATCH" => "Made a change",
+                "DELETE" => "Removed something",
+                _ => "Made request",
+            };
+        return AuditActions.GetValueOrDefault(e.Action, e.Action);
+    }
+
+    private string AuditTargetLabel(AuditEntryDto e)
+    {
+        if (e.EntityType == "User" && e.EntityId != 0) return AppData.UserName(e.EntityId); // a name, not "User #7" (U7)
+        if (e.EntityType == "http")
+        {
+            // "POST /api/meeting-minutes/3/approve" -> "Meeting minutes"
+            var area = e.Action.Split('/', StringSplitOptions.RemoveEmptyEntries).ElementAtOrDefault(2) ?? ""; // [0]="POST ", [1]="api"
+            area = area.Replace('-', ' ');
+            return area.Length == 0 ? "" : char.ToUpper(area[0]) + area[1..];
+        }
+        var name = AuditEntities.GetValueOrDefault(e.EntityType, e.EntityType);
+        return e.EntityId == 0 ? name : $"{name} #{e.EntityId}";
+    }
+
+    // Create user form
+    private NewUserForm newUser = new();
+    private bool saving;
+
+    private bool CanSaveUser =>
+        !saving &&
+        !string.IsNullOrWhiteSpace(newUser.FirstName) &&
+        !string.IsNullOrWhiteSpace(newUser.Surname) &&
+        EmailRule.IsValid(newUser.Email.Trim()) && !string.IsNullOrWhiteSpace(newUser.Email) &&
+        PhoneRule.IsValid(newUser.CellNo.Trim()) && !string.IsNullOrWhiteSpace(newUser.CellNo) &&
+        newUser.RoleId.HasValue;
+
+    // The same rules CreateUserRequest applies server-side, so the message shows before Save.
+    private static readonly EmailAddressAttribute EmailRule = new() { ErrorMessage = "Enter a valid email address, e.g. name@example.com." };
+    private static readonly PhoneAttribute PhoneRule = new() { ErrorMessage = "Enter a valid phone number, e.g. 082 123 4567." };
+
+    private IEnumerable<UserSummaryDto> FilteredEmployees =>
+        AppData.Users
+            .Where(e => e.Status != "Anonymised") // deleted accounts
+            .Where(e => string.IsNullOrWhiteSpace(searchTerm) ||
+                        e.FullName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                        e.Role.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                        e.Email.Contains(searchTerm, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(e => e.FullName);
+
+    private string WorkloadFor(UserSummaryDto user) =>
+        !user.IsActive ? user.Status
+        : overview.FirstOrDefault(r => r.UserId == user.UserId) is { } row
+            ? $"{row.ActiveTasks} active · {row.OverdueTasks} overdue"
+            : "";
+
+    private string TaskMeta(TaskCardDto task) =>
+        $"{AppData.EventName(task) ?? "Daily task"} · due {task.Deadline:d MMM}";
+
+    private static string Initials(string fullName) =>
+        string.Concat(fullName.Split(' ', StringSplitOptions.RemoveEmptyEntries).Select(part => part[0])).ToUpper();
+
+    protected override async Task OnInitializedAsync()
+    {
+        AppData.OnChange += StateHasChanged;
+        var rolesLoad = AppData.GetAsync<List<RoleDto>>("api/roles");
+        await Task.WhenAll(rolesLoad, LoadOverview(), AppData.RefreshUsersAsync());
+        roles = await rolesLoad ?? [];
+        if (FilteredEmployees.FirstOrDefault() is { } first) await SelectEmployee(first);
+    }
+
+    private async Task LoadOverview() =>
+        overview = await AppData.GetAsync<List<StaffOverviewRow>>("api/users/overview") ?? [];
+
+    // Every task assigned to the employee, completed or not.
+    private async Task SelectEmployee(UserSummaryDto employee)
+    {
+        selectedEmployee = employee;
+        selectedTasks = [];
+        selectedAudit = [];
+        var tasksLoad = AppData.GetAsync<List<TaskCardDto>>($"api/tasks?assigneeId={employee.UserId}");
+        var auditLoad = AppData.GetAsync<List<AuditEntryDto>>($"api/users/{employee.UserId}/audit");
+        await Task.WhenAll(tasksLoad, auditLoad);
+        if (selectedEmployee != employee) return; // ignore a slower, older click
+        selectedTasks = await tasksLoad ?? [];
+        var audit = await auditLoad ?? [];
+        // AuditMiddleware writes a generic "http" row right after the service's own row for the same
+        // request; hide it when a specific row sits within a few seconds. Lone http rows stay.
+        selectedAudit = audit.Where(a => a.EntityType != "http" || !audit.Any(o =>
+            o.EntityType != "http" && Math.Abs((o.Timestamp - a.Timestamp).TotalSeconds) < 5)).ToList();
+    }
+
+    private async Task SaveUser()
+    {
+        if (!CanSaveUser) return;
+        saving = true;
+        var created = await AppData.SendAsync<UserDto>(HttpMethod.Post, "api/users", new CreateUserRequest
+        {
+            FirstName = newUser.FirstName.Trim(),
+            Surname = newUser.Surname.Trim(),
+            Email = newUser.Email.Trim(),
+            CellNo = newUser.CellNo.Trim(),
+            RoleId = newUser.RoleId!.Value,
+        });
+        saving = false;
+        if (created is null) return;
+
+        await Task.WhenAll(AppData.RefreshUsersAsync(), LoadOverview());
+        newUser = new NewUserForm();
+        showCreateUserScreen = false;
+        if (AppData.Users.FirstOrDefault(u => u.UserId == created.UserId) is { } user) await SelectEmployee(user);
+    }
+
+    private bool busy;
+
+    // The directory carries the role name only; the role list maps it back to an id.
+    private int? RoleIdOf(UserSummaryDto user) => roles.FirstOrDefault(r => r.RoleName == user.Role)?.RoleId;
+
+    private async Task ChangeRole(int? roleId)
+    {
+        if (selectedEmployee is not { } user || roleId is null || roleId == RoleIdOf(user)) return;
+        var roleName = roles.First(r => r.RoleId == roleId).RoleName;
+        if (await DialogService.ShowMessageBoxAsync("Change role",
+                $"Make {user.FullName} {roleName}? This changes which pages they see and what they may do. It applies at their next sign-in.",
+                yesText: "Change role", cancelText: "Cancel") != true) return;
+        busy = true;
+        var saved = await AppData.SendAsync<UserDto>(HttpMethod.Patch, $"api/users/{user.UserId}", new UpdateUserRequest { RoleId = roleId });
+        busy = false;
+        if (saved is null) return;
+
+        await Task.WhenAll(AppData.RefreshUsersAsync(), LoadOverview());
+        if (AppData.Users.FirstOrDefault(u => u.UserId == user.UserId) is { } updated) await SelectEmployee(updated);
+    }
+
+    private async Task ResetPassword()
+    {
+        if (selectedEmployee is not { } user) return;
+        if (await DialogService.ShowMessageBoxAsync("Reset password",
+                $"Give {user.FullName} a temporary password? Their current password stops working, and a locked account is unlocked.",
+                yesText: "Reset", cancelText: "Cancel") != true) return;
+        busy = true;
+        var result = await AppData.SendAsync<TemporaryPasswordDto>(HttpMethod.Post, $"api/users/{user.UserId}/reset-password", null);
+        busy = false;
+        if (result is null) return;
+
+        // Shown once and never stored in the clear: the admin passes it on in person or by phone.
+        var dialog = await DialogService.ShowAsync<TempPasswordDialog>("Temporary password",
+            new DialogParameters<TempPasswordDialog>
+            {
+                { x => x.FullName, user.FullName },
+                { x => x.Password, result.TemporaryPassword },
+            },
+            new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true, BackdropClick = false, CloseOnEscapeKey = false });
+        await dialog.Result;
+        await Task.WhenAll(AppData.RefreshUsersAsync(), LoadOverview());
+        if (AppData.Users.FirstOrDefault(u => u.UserId == user.UserId) is { } updated) await SelectEmployee(updated);
+    }
+
+    private async Task SetActive(bool active)
+    {
+        if (selectedEmployee is not { } user) return;
+        if (!active && await DialogService.ShowMessageBoxAsync("Deactivate user",
+                $"Deactivate {user.FullName}? They can't sign in, and their open tasks are reassigned. You can reactivate them later.",
+                yesText: "Deactivate", cancelText: "Cancel") != true) return;
+        busy = true;
+        var ok = await AppData.SendAsync(HttpMethod.Post, $"api/users/{user.UserId}/{(active ? "reactivate" : "deactivate")}");
+        busy = false;
+        if (!ok) return;
+
+        await Task.WhenAll(AppData.RefreshUsersAsync(), LoadOverview());
+        if (AppData.Users.FirstOrDefault(u => u.UserId == user.UserId) is { } updated) await SelectEmployee(updated);
+    }
+
+    private async Task DeleteSelected()
+    {
+        if (selectedEmployee is not { } user) return;
+        if (await DialogService.ShowMessageBoxAsync("Delete user",
+                $"Delete {user.FullName}? Their open tasks are reassigned and their personal details erased. This cannot be undone.",
+                yesText: "Delete", cancelText: "Cancel") != true) return;
+        busy = true;
+        var ok = await AppData.SendAsync(HttpMethod.Delete, $"api/users/{user.UserId}");
+        busy = false;
+        if (!ok) return;
+
+        await Task.WhenAll(AppData.RefreshUsersAsync(), LoadOverview());
+        selectedEmployee = null;
+        if (FilteredEmployees.FirstOrDefault() is { } first) await SelectEmployee(first);
+    }
+
+    private class NewUserForm
+    {
+        public string FirstName { get; set; } = string.Empty;
+        public string Surname { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public string CellNo { get; set; } = string.Empty;
+        public int? RoleId { get; set; }
+    }
+
+    public void Dispose()
+    {
+        AppData.OnChange -= StateHasChanged;
+    }
+}

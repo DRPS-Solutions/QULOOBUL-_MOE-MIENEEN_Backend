@@ -1,0 +1,127 @@
+name: CD Staging
+
+on:
+  push:
+    branches: [develop, dev]
+
+# Builds the API and the Blazor client. The MAUI app ships via cd-mobile.yml; the
+# Blazor client is published here and deployed prebuilt, so its CSP can hash the build.
+env:
+  PROJECT: "QULOOBUL _MOE'MIENEEN_Backend/QULOOBUL _MOE'MIENEEN_Backend.csproj"
+
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    # Integration tests migrate a throwaway database on this container (ApiIntegrationTests.cs).
+    services:
+      mssql:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: Y
+          MSSQL_SA_PASSWORD: Ci_Throwaway_Passw0rd
+        ports: ['1433:1433']
+        options: >-
+          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P Ci_Throwaway_Passw0rd -Q 'SELECT 1'"
+          --health-interval 10s --health-timeout 5s --health-retries 12
+    env:
+      TEST_SQL_CONNECTION: Server=localhost,1433;User Id=sa;Password=Ci_Throwaway_Passw0rd;TrustServerCertificate=True
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore "$PROJECT"
+
+      - name: Build (warnings are errors)
+        run: dotnet build "$PROJECT" -c Release --no-restore -warnaserror
+
+      - name: Test
+        run: dotnet test "Backend.Tests/Backend.Tests.csproj" -c Release -warnaserror --collect:"XPlat Code Coverage" --results-directory coverage
+
+      - name: Coverage gate
+        run: bash .github/scripts/coverage-gate.sh 70
+
+      # Proves both projects publish. The deploy job republishes from the same commit
+      # instead of passing artifacts, so a full artifact quota cannot block a release.
+      - name: Publish
+        run: |
+          dotnet publish "$PROJECT" -c Release --no-build -o ./publish
+          dotnet publish "Frontend_BlazorWeb/Frontend_BlazorWeb.csproj" -c Release -o ./web
+
+  deploy:
+    needs: build
+    # Skipped until Azure is provisioned and AZURE_WEBAPP_NAME is set as a repository variable.
+    if: ${{ vars.AZURE_WEBAPP_NAME != '' }}
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Publish
+        run: |
+          dotnet publish "$PROJECT" -c Release -o ./publish
+          dotnet publish "Frontend_BlazorWeb/Frontend_BlazorWeb.csproj" -c Release -o ./web-build
+          mv ./web-build/wwwroot ./web
+
+      - uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      # Staging never swaps, so it deploys straight to its own app rather than a slot.
+      - name: Deploy API to the staging app
+        id: deploy
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ vars.AZURE_WEBAPP_NAME }}
+          package: ./publish
+
+      # Points the client at this API and writes its CSP (hash of the build-specific import map).
+      - name: Configure Blazor client for Static Web Apps
+        run: bash .github/scripts/web-config.sh ./web "${{ steps.deploy.outputs.webapp-url }}"
+
+      - name: Deploy Blazor client to Static Web Apps
+        if: ${{ vars.AZURE_STATIC_WEB_APP != '' }}
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: upload
+          app_location: ./web
+          skip_app_build: true
+
+      # Azure SQL admits only App Service and named developer IPs, so the runner opens a rule for itself.
+      - name: Open SQL firewall for this runner
+        run: |
+          ip=$(curl -fsS https://api.ipify.org)
+          az sql server firewall-rule create -g "${{ vars.AZURE_RESOURCE_GROUP }}" -s "${{ vars.AZURE_SQL_SERVER }}" \
+            -n "gh-${{ github.run_id }}" --start-ip-address "$ip" --end-ip-address "$ip"
+
+      # Migrations run against the database the live build is still using,
+      # so every migration must be backward compatible.
+      - name: Apply EF Core migrations
+        env:
+          ConnectionStrings__Default: ${{ secrets.STAGING_DB_CONNECTION }}
+          Seed__AdminEmail: ${{ secrets.SEED_ADMIN_EMAIL }}
+          Seed__AdminPassword: ${{ secrets.SEED_ADMIN_PASSWORD }}
+        run: |
+          dotnet tool install --global dotnet-ef
+          dotnet ef database update --project "$PROJECT"
+
+      - name: Close SQL firewall
+        if: always()
+        run: az sql server firewall-rule delete -g "${{ vars.AZURE_RESOURCE_GROUP }}" -s "${{ vars.AZURE_SQL_SERVER }}" -n "gh-${{ github.run_id }}" || true
+
+      # SMOKE_EMAIL / SMOKE_PASSWORD: a low-privilege account kept for this check, not the seed admin.
+      - name: Smoke test
+        env:
+          SMOKE_EMAIL: ${{ secrets.SMOKE_EMAIL }}
+          SMOKE_PASSWORD: ${{ secrets.SMOKE_PASSWORD }}
+        run: bash .github/scripts/smoke-test.sh "${{ steps.deploy.outputs.webapp-url }}"
