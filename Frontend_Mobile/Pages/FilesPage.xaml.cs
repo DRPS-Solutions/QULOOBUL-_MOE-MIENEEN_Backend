@@ -202,7 +202,7 @@ public partial class FilesPage : ContentPage
             using var put = new HttpRequestMessage(HttpMethod.Put, AppState.ForThisDevice(new Uri(ticket.UploadUrl))) { Content = content };
             put.Headers.Add("x-ms-blob-type", "BlockBlob");
 
-            using var res = await blobClient.SendAsync(put);
+            using var res = await blobClient.SendAsync(put, CancellationToken.None);
             if (res.IsSuccessStatusCode)
             {
                 _picked = null;
