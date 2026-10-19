@@ -243,15 +243,23 @@ else
             Primary = "#3C7A63",
             Secondary = "#2F5C4C",
             Info = "#2A5CD1",
+            Error = "#C62828", // MudBlazor's default red gives white badge text only 3.7:1
             AppbarBackground = "#12271F",
             Background = "#F5F3EC",
             Surface = "#FFFFFF"
         },
         PaletteDark = new PaletteDark
         {
+            // Contrast (WCAG AA): the light greens/blue are used as text and as button fills in dark mode,
+            // so their label colour is dark ink (>= 6.4:1) and they sit at >= 4.5:1 on Surface.
             Primary = "#6FA98C",
-            Secondary = "#3C7A63",
-            Info = "#5B84D6",
+            PrimaryContrastText = "#0B1B21",
+            Secondary = "#8FD1B0",
+            SecondaryContrastText = "#0B1B21",
+            Info = "#8FAEF0",
+            InfoContrastText = "#0B1B21",
+            Error = "#F28B82",
+            ErrorContrastText = "#0B1B21",
             AppbarBackground = "#12271F",
             Background = "#0B1B21",
             Surface = "#1E362B",
