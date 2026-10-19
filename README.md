@@ -23,6 +23,7 @@ live updates from the SignalR hub. See [What's not built yet](#whats-not-built-y
   - [Rules worth knowing](#rules-worth-knowing)
 - [Clients](#clients-1)
   - [`Frontend_BlazorWeb` - Blazor WebAssembly](#frontend_blazorweb---blazor-webassembly)
+    - [Accessibility](#accessibility)
   - [`Frontend_Mobile` - .NET MAUI](#frontend_mobile---net-maui)
 - [CI/CD](#cicd)
 - [YouTube Video Link](#youtube-video-link)
@@ -259,6 +260,65 @@ What it keeps in the browser, and why:
 
 The hub connection takes its token from the `HttpClient`'s auth header, not `CurrentUser`:
 `CurrentUser` is only set after the session (and the hub) has started.
+
+#### Accessibility
+
+MudBlazor gives ARIA roles and keyboard handling on its own components; the work below covers
+what its defaults don't: the hand-built `drps-*` cards and chips, the board, focus, and colour.
+
+| Area | What the web client does |
+|---|---|
+| Keyboard reach | Clickable cards, list rows, filter chips and toggles are `role="button" tabindex="0"`; one handler in `wwwroot/index.html` turns Enter/Space into a click. Filter chips use `aria-pressed`, selected rows `aria-current`. Task cards hold other controls, so only the title is the button (a button can't contain buttons). |
+| Focus | A 3px focus ring on everything focusable, blue on light surfaces and light blue on the dark navbar and in dark mode (`wwwroot/css/app.css`). A "Skip to main content" link is the first Tab stop. Dialogs focus their first field, close on Escape and return focus to what opened them. `FocusOnNavigate` lands on each page's `<h1>`. |
+| Board | The Kanban drag-and-drop has a keyboard route: each card's ⋮ menu ("Move to ...") calls the same `MoveCard` as a drop, so the same step-skipping rules apply. |
+| Names and announcements | Every icon-only button has an `aria-label` (file name or note included where there are many). The login error and "no events planned" hints are live regions; snackbars already are. |
+| Colour | Text meets WCAG 2.1 AA (4.5:1) in light and dark mode, below. Reduced-motion is honoured (`prefers-reduced-motion`). |
+
+Contrast, checked with the WCAG formula and re-checked in the running app. The palette changes
+are in the `_theme` in `MainLayout.razor`, the rest in each page's `<style>` block.
+
+| Text | Before | After |
+|---|---|---|
+| Label on a filled dark-mode button (green) | 2.72 | 6.48 (dark ink) |
+| Dark-mode Secondary text/outline on a card | 2.57 | 7.37 |
+| Dark-mode Info on a card | 3.53 | 5.86 |
+| Dark-mode empty-state text | 1.91 | 4.69 |
+| Dark-mode muted text on a task card | 4.36 | 6.44 |
+| Light-mode muted text (`#75806F`) | 3.63 - 4.14 | 5.20 - 5.77 |
+| Light-mode empty-state text | 2.12 | 4.69 |
+| White on the red unread badge | 3.68 | 5.62 |
+| Warning (orange) text on white | 2.15 | 5.86 |
+| "Completed" chip text | 2.99 | 4.66 |
+
+Automated check: axe-core 4.10.2 (WCAG 2.0/2.1 A and AA rules), run in the app signed in as a
+Facility Manager on every page, in light mode, before (commit `6256521`) and after. Counts are
+elements failing, not rules.
+
+| Page | Before | After |
+|---|---|---|
+| Home | 4 | 0 |
+| Daily Tasks, day view | 31 | 0 |
+| Daily Tasks, board view | 14 | 0 |
+| Resource Requests | 26 | 0 |
+| Meetings | 2 | 0 |
+| Event Planning | 8 | 0 |
+| Calendar | 5 | 0 |
+| Files | 7 | 0 |
+| Reports | 3 | 0 |
+| Notifications | 14 | 0 |
+| Profile | 4 | 0 |
+| Search | 3 | 0 |
+| **Total** | **121** | **0** |
+
+User Management (`/users`) was not in the before run; after the fixes it is 0 too. Dark mode was
+run after only: 0 on every page. The "before" failures were mostly low-contrast text, plus the
+unlabelled navbar menu buttons on every page and the unlabelled file and category inputs on Files.
+
+Tested by hand with the keyboard only: skip link (Tab, Enter lands in the page), a card's
+Enter/Space, the ⋮ menu moving a task In Progress to Blocked, and New task / Task details opening
+on their first field, closing on Escape and returning focus. Not done: a screen reader pass,
+Lighthouse, keyboard use of every dialog, and the MAUI app, none of which axe covers. Automated
+tools find only part of the problems, so treat 0 as "no machine-detectable failures", not "accessible".
 
 ### `Frontend_Mobile` - .NET MAUI
 

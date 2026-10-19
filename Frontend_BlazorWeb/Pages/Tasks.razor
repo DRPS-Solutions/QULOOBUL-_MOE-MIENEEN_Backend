@@ -548,10 +548,10 @@
                 <ItemRenderer>
                     @{ var assignees = AppData.AssigneeNames(context); }
                     <div class="drps-task-card priority-@context.Priority.ToLower() @(context.IsDone() ? "done" : "")"
-                         role="button" tabindex="0"
                          @onclick="() => OnOpenTaskDetails(context)">
                         <div class="d-flex align-start justify-space-between">
-                            <div class="drps-task-title">@context.Title</div>
+                            @* The card holds other controls (menu, slider), so only the title is the keyboard button. *@
+                            <div class="drps-task-title" role="button" tabindex="0" @onclick="() => OnOpenTaskDetails(context)" @onclick:stopPropagation="true">@context.Title</div>
                             @* Keyboard alternative to dragging: Enter opens it, arrows pick a column. *@
                             <span @onclick:stopPropagation="true">
                                 <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="Size.Small" Dense="true"
@@ -607,10 +607,9 @@
                 @foreach (var task in AllDayTasksForSelectedDay)
                 {
                     <div class="drps-allday-chip priority-@task.Priority.ToLower() @(task.IsDone() ? "done" : "")"
-                         role="button" tabindex="0"
                          @onclick="() => OnOpenTaskDetails(task)">
                         <div>
-                            <span class="drps-allday-title">@task.Title</span>
+                            <span class="drps-allday-title" role="button" tabindex="0" @onclick="() => OnOpenTaskDetails(task)" @onclick:stopPropagation="true">@task.Title</span>
                             @if (AppData.EventName(task) is { } eventName)
                             {
                                 <div class="drps-task-completed-by">Linked: @eventName</div>
@@ -663,10 +662,9 @@
                             {
                                 var assignees = AppData.AssigneeNames(task);
                                 <div class="drps-task-card priority-@task.Priority.ToLower() @(task.IsDone() ? "done" : "")"
-                                     role="button" tabindex="0"
                                      @onclick="() => OnOpenTaskDetails(task)">
                                     <div>
-                                        <div class="drps-task-title">@task.Title</div>
+                                        <div class="drps-task-title" role="button" tabindex="0" @onclick="() => OnOpenTaskDetails(task)" @onclick:stopPropagation="true">@task.Title</div>
                                         <div class="drps-task-time">
                                             @task.Deadline.ToString("h:mm tt")
                                             @(assignees.Length == 0 ? "" : $" \u00b7 {assignees}")

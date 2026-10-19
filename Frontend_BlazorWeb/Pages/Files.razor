@@ -31,7 +31,7 @@
                             <MudSelectItem T="int?" Value="@c.CategoryId">@c.CategoryName</MudSelectItem>
                         }
                     </MudSelect>
-                    <InputFile OnChange="OnFilePicked" class="mb-3" />
+                    <InputFile OnChange="OnFilePicked" class="mb-3" aria-label="File to upload" />
                     <div class="drps-muted mb-3">Up to @(MaxBytes / (1024 * 1024)) MB. Office documents, PDFs, text and images.</div>
                     <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" OnClick="Upload"
                                Disabled="@uploading">
@@ -79,7 +79,7 @@
                             <MudTd DataLabel="Category">
                                 @if (CanManage)
                                 {
-                                    <MudSelect T="int" Value="context.CategoryId" Dense="true" Margin="Margin.Dense"
+                                    <MudSelect T="int" Value="context.CategoryId" Dense="true" Margin="Margin.Dense" aria-label="@($"Category for {context.FileName}")"
                                                ValueChanged="@((int v) => Recategorise(context, v))" ToStringFunc="@(id => CategoryName(id))">
                                         @foreach (var c in categories)
                                         {
