@@ -29,7 +29,8 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.SharedClasses.Middleware
                 EntityId = 0,
                 Timestamp = DateTime.UtcNow,
             });
-            await db.SaveChangesAsync();
+            // None, not ctx.RequestAborted: the mutation already committed, so a client disconnect must not drop its audit row.
+            await db.SaveChangesAsync(CancellationToken.None);
         }
     }
 }
