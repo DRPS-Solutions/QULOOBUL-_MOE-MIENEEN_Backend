@@ -334,7 +334,7 @@
                         {
                             @foreach (var employee in FilteredEmployees)
                             {
-                                <div class="drps-roster-item @(employee == selectedEmployee ? "selected" : "")" @onclick="() => SelectEmployee(employee)">
+                                <div class="drps-roster-item @(employee == selectedEmployee ? "selected" : "")" role="button" tabindex="0" aria-current="@(employee == selectedEmployee)" @onclick="() => SelectEmployee(employee)">
                                     <div class="drps-avatar">@Initials(employee.FullName)</div>
                                     <div style="flex:1;">
                                         <div class="drps-roster-name">@employee.FullName</div>

@@ -19,6 +19,17 @@
     <script src="_content/MudBlazor/MudBlazor.min.js"></script>
     <script src="js/dictation.js"></script>
     <script src="js/download.js"></script>
+    <script>
+        // Clickable divs/spans marked role="button" act like real buttons: Enter or Space clicks them.
+        // Only when the element itself has focus, so typing in a slider/checkbox inside a card is untouched.
+        document.addEventListener("keydown", e => {
+            const el = e.target;
+            if ((e.key === "Enter" || e.key === " ") && el.getAttribute?.("role") === "button" && el.tagName !== "BUTTON") {
+                e.preventDefault();
+                el.click();
+            }
+        });
+    </script>
     <div id="app">
         <style>
             .boot { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; font-family: sans-serif; color: #555; }

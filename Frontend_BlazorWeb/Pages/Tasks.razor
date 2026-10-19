@@ -488,7 +488,7 @@
                     // plus "selected" if it's the active date, plus "today" if
                     // it's the real current date (both can apply at once).
                     var cssClass = "drps-day-cell" + (day.Date == selectedDate.Date ? " selected" : "") + (day.Date == DateTime.Today ? " today" : "");
-                    <div class="@cssClass" @onclick="() => SelectDay(day)">
+                    <div class="@cssClass" role="button" tabindex="0" aria-current="@(day.Date == selectedDate.Date)" @onclick="() => SelectDay(day)">
                         <span class="drps-day-label">@day.ToString("ddd").ToUpper()</span>
                         <span class="drps-day-number">@day.Day</span>
                         @* Dot only renders if this day has at least one task. *@
@@ -548,6 +548,7 @@
                 <ItemRenderer>
                     @{ var assignees = AppData.AssigneeNames(context); }
                     <div class="drps-task-card priority-@context.Priority.ToLower() @(context.IsDone() ? "done" : "")"
+                         role="button" tabindex="0"
                          @onclick="() => OnOpenTaskDetails(context)">
                         <div class="drps-task-title">@context.Title</div>
                         <div class="drps-task-time">
@@ -594,6 +595,7 @@
                 @foreach (var task in AllDayTasksForSelectedDay)
                 {
                     <div class="drps-allday-chip priority-@task.Priority.ToLower() @(task.IsDone() ? "done" : "")"
+                         role="button" tabindex="0"
                          @onclick="() => OnOpenTaskDetails(task)">
                         <div>
                             <span class="drps-allday-title">@task.Title</span>
@@ -649,6 +651,7 @@
                             {
                                 var assignees = AppData.AssigneeNames(task);
                                 <div class="drps-task-card priority-@task.Priority.ToLower() @(task.IsDone() ? "done" : "")"
+                                     role="button" tabindex="0"
                                      @onclick="() => OnOpenTaskDetails(task)">
                                     <div>
                                         <div class="drps-task-title">@task.Title</div>

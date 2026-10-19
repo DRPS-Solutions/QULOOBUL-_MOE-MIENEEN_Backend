@@ -31,7 +31,7 @@
                     }
                     @foreach (var ev in events)
                     {
-                        <div class="drps-list-item @(selected?.EventId == ev.EventId ? "selected" : "")" @onclick="() => Select(ev.EventId)">
+                        <div class="drps-list-item @(selected?.EventId == ev.EventId ? "selected" : "")" role="button" tabindex="0" aria-current="@(selected?.EventId == ev.EventId)" @onclick="() => Select(ev.EventId)">
                             <div style="font-weight:600;">@ev.Title</div>
                             <div class="drps-muted">@ev.EventDate.ToString("ddd d MMM yyyy, HH:mm")@(string.IsNullOrEmpty(ev.Location) ? "" : $" · {ev.Location}")</div>
                         </div>
