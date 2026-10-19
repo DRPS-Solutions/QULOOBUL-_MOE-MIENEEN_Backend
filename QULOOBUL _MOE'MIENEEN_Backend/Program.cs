@@ -200,7 +200,11 @@ app.UseMiddleware<AuditMiddleware>();
 
 app.MapControllers();
 app.MapHub<NotificationHub>("/hubs/notifications").RequireAuthorization();
-app.MapGet("/health", () => Results.Ok(new { status = "ok" })).AllowAnonymous();
+// Checks the database too, so the post-deploy smoke test and App Service health check fail when the API can't reach it.
+app.MapGet("/health", async (AppDbContext db, CancellationToken ct) => await db.Database.CanConnectAsync(ct)
+    ? Results.Ok(new { status = "ok" })
+    : Results.Json(new { status = "database unreachable" }, statusCode: StatusCodes.Status503ServiceUnavailable))
+    .AllowAnonymous();
 
 await app.RunAsync();
 

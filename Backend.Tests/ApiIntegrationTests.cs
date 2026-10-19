@@ -107,6 +107,14 @@ public class ApiIntegrationTests(ApiFactory api) : IClassFixture<ApiFactory>
     }
 //----------------------------------------------------------------------------------------------------------------------//
     [Fact]
+    public async Task Health_is_unavailable_when_the_database_is_unreachable()
+    {
+        var missingDb = new SqlConnectionStringBuilder(api.ConnectionString) { InitialCatalog = $"QM_Missing_{Guid.NewGuid():N}" };
+        var client = api.WithWebHostBuilder(b => b.UseSetting("ConnectionStrings:Default", missingDb.ConnectionString)).CreateClient();
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, (await client.GetAsync("/health")).StatusCode);
+    }
+//----------------------------------------------------------------------------------------------------------------------//
+    [Fact]
     public async Task Responses_carry_the_security_headers()
     {
         var res = await api.CreateClient().GetAsync("/health");
