@@ -473,9 +473,9 @@
 
             @* Prev/next week arrows either side of the current month/year *@
             <div class="drps-week-nav">
-                <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" Color="Color.Inherit" Size="Size.Small" OnClick="PrevWeek" />
+                <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" Color="Color.Inherit" Size="Size.Small" aria-label="Previous week" OnClick="PrevWeek" />
                 <MudText Typo="Typo.subtitle1" Style="font-weight:600;">@weekStart.ToString("MMMM yyyy")</MudText>
-                <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" Color="Color.Inherit" Size="Size.Small" OnClick="NextWeek" />
+                <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" Color="Color.Inherit" Size="Size.Small" aria-label="Next week" OnClick="NextWeek" />
             </div>
 
             @* One cell per day of the currently displayed week. Clicking
