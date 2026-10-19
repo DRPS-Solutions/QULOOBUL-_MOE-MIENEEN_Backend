@@ -61,7 +61,7 @@ else if (AppData.CurrentUser is null or { MustChangePassword: true })
 
                 @if (loginError is not null)
                 {
-                    <MudText Typo="Typo.caption" Color="Color.Error" Class="drps-login-hint">
+                    <MudText Typo="Typo.caption" Color="Color.Error" Class="drps-login-hint" role="alert">
                         @loginError
                     </MudText>
                 }

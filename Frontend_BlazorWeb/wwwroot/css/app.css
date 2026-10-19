@@ -10,8 +10,9 @@ h1:focus {
    light surfaces; the light blue is used on the dark navbar and in dark mode for the same contrast.
    body:has() rather than .dark-mode so dialogs and popovers, which render outside .page, are covered.
    !important because MudBlazor.min.css loads after this file and resets button:focus to outline:none.
-   Mud text fields are skipped: their outlined border already thickens and recolours on focus. */
-:focus-visible:not(.mud-input-slot) {
+   Mud text fields are skipped: their outlined border already thickens and recolours on focus. So is h1,
+   which FocusOnNavigate focuses after each page change for screen readers, not as a Tab stop. */
+:focus-visible:not(.mud-input-slot):not(h1) {
     outline: 3px solid #2A5CD1 !important;
     outline-offset: 2px;
 }
