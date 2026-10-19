@@ -114,7 +114,7 @@ main {
 }
 
 .drps-login-subtitle {
-    color: #75806F;
+    color: #5E6958;
     margin-bottom: 8px;
     display: block;
 }
@@ -122,7 +122,7 @@ main {
 .drps-login-hint {
     display: block;
     text-align: left;
-    color: #75806F;
+    color: #5E6958;
     min-height: 1.2em;
 }
 

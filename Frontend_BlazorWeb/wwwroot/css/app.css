@@ -21,6 +21,16 @@ h1:focus {
     outline-color: #8FAEF0 !important;
 }
 
+/* Honour the OS "reduce motion" setting: drop the theme fade, nav transitions and spinners. */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
 a, .btn-link {
     color: #0071c1;
 }
@@ -101,7 +111,7 @@ code {
     --drps-blue-600: #2F5C4C;
     --drps-bg: #F5F3EC;
     --drps-surface: #FFFFFF;
-    --drps-text-muted: #75806F;
+    --drps-text-muted: #5E6958;
     --drps-border-soft: #E7E4D8;
     --drps-shadow: rgba(11, 22, 38, 0.06);
     background: var(--drps-bg);
@@ -157,7 +167,7 @@ code {
 .page.dark-mode .drps-page {
     --drps-bg: #0B1B21;
     --drps-surface: #1E362B;
-    --drps-text-muted: #93A69A;
+    --drps-text-muted: #A9BBB0;
     --drps-border-soft: #2E4A3B;
     --drps-shadow: rgba(0, 0, 0, 0.35);
 }

@@ -24,12 +24,12 @@
         --drps-blue-400: #6FA98C;   /* lighter blue, gradient start / highlights */
         --drps-bg: #F5F3EC;         /* overall page background */
         --drps-surface: #FFFFFF;    /* card/panel background */
-        --drps-text-muted: #75806F; /* secondary/muted text color */
+        --drps-text-muted: #5E6958; /* secondary/muted text color */
         --drps-tint-blue: #EAF2ED;  /* low-priority task card/chip tint */
         --drps-tint-amber: #F6EBD3; /* medium-priority task card/chip tint */
         --drps-tint-red: #FCEEF0;   /* high-priority task card/chip tint */
         --drps-border-soft: #E7E4D8; /* hour-row and card hairlines */
-        --drps-empty: #B7B2A0;      /* empty-state / placeholder text */
+        --drps-empty: #65705F;      /* empty-state / placeholder text */
         --drps-shadow: rgba(11, 22, 38, 0.06); /* card drop shadow */
         background: var(--drps-bg);
         min-height: 100%;
@@ -444,13 +444,13 @@
     .page.dark-mode .drps-schedule {
         --drps-bg: #0B1B21;
         --drps-surface: #1E362B;
-        --drps-text-muted: #93A69A;
+        --drps-text-muted: #A9BBB0;
         --drps-navy-800: #E9F0EA;
         --drps-tint-blue: rgba(60, 122, 99, 0.16);
         --drps-tint-amber: rgba(185, 134, 46, 0.18);
         --drps-tint-red: rgba(224, 67, 92, 0.16);
         --drps-border-soft: #2E4A3B;
-        --drps-empty: #4E5F52;
+        --drps-empty: #8DA095;
         --drps-shadow: rgba(0, 0, 0, 0.35);
     }
 </style>
@@ -528,7 +528,7 @@
 
         @if (boardView)
         {
-            <MudText Typo="Typo.body2" Class="mb-3" Style="color:#75806F;">
+            <MudText Typo="Typo.body2" Class="mb-3" Style="color:var(--drps-text-muted);">
                 Drag a card, or use its ⋮ menu, to change its status. Moves that skip a step (e.g. To Do straight to Done) are refused.
             </MudText>
 
@@ -588,7 +588,7 @@
         else
         {
         @* --- Completion summary for the selected day --- *@
-        <MudText Typo="Typo.body2" Class="mb-3" Style="color:#75806F;">
+        <MudText Typo="Typo.body2" Class="mb-3" Style="color:var(--drps-text-muted);">
             @(TasksForSelectedDay.Count() == 0 ? "No tasks scheduled" : $"{TasksForSelectedDay.Count(t => t.IsDone())} of {TasksForSelectedDay.Count()} completed")
         </MudText>
 
