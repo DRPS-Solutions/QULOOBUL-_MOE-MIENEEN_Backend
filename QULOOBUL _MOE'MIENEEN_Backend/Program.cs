@@ -18,7 +18,7 @@ using static QULOOBUL__MOE_MIENEEN_Shared.Classes.Common;
 // Local-only: lift KEY=VALUE lines from .env into the environment before the builder snapshots it,
 // so ConnectionStrings__Default etc. override appsettings.json. Real env vars (CI, App Service) win.
 if (File.Exists(".env"))
-    foreach (var line in File.ReadAllLines(".env"))
+    foreach (var line in await File.ReadAllLinesAsync(".env"))
     {
         var t = line.Trim();
         var eq = t.IndexOf('=');
@@ -202,7 +202,7 @@ app.MapControllers();
 app.MapHub<NotificationHub>("/hubs/notifications").RequireAuthorization();
 app.MapGet("/health", () => Results.Ok(new { status = "ok" })).AllowAnonymous();
 
-app.Run();
+await app.RunAsync();
 
 public partial class Program;       // WebApplicationFactory<Program> in Backend.Tests
 //---------------------------DDDDDDDDDDDoooooooooooooo END OF FILE DDDDDDDDDDDoooooooooooooo---------------------------//

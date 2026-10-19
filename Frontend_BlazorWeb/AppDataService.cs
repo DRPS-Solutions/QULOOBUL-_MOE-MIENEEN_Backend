@@ -14,8 +14,8 @@
 // Reference: Microsoft, "ASP.NET Core Blazor state management." Accessed: Oct. 04, 2026. [Online]. Available: https://learn.microsoft.com/en-us/aspnet/core/blazor/state-management
 // Reference: Microsoft, "Call a web API from ASP.NET Core Blazor." Accessed: Oct. 04, 2026. [Online]. Available: https://learn.microsoft.com/en-us/aspnet/core/blazor/call-web-api
 //
-// No namespace declared here on purpose - same convention as
-// NewTaskResult.cs - so every page sees this without an extra @using.
+// Lives in the project's root namespace, so every page (Frontend_BlazorWeb.*)
+// sees it without an extra @using.
 
 using System.Net;
 using System.Net.Http.Headers;
@@ -30,6 +30,8 @@ using QULOOBUL__MOE_MIENEEN_Shared.Notifications;
 using QULOOBUL__MOE_MIENEEN_Shared.Requests;
 using QULOOBUL__MOE_MIENEEN_Shared.Tasks;
 using static QULOOBUL__MOE_MIENEEN_Shared.Classes.Common;
+
+namespace Frontend_BlazorWeb;
 
 public class AppDataService(HttpClient http, ISnackbar snackbar, IDialogService dialogs,
     Microsoft.AspNetCore.Components.NavigationManager nav, IJSRuntime js)
