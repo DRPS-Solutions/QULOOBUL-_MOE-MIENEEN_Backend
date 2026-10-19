@@ -114,6 +114,7 @@
                        Color="Color.Inherit"
                        Size="Size.Small"
                        title="Search"
+                       aria-label="Search"
                        Class="mx-1"
                        OnClick="@(() => Navigation.NavigateTo("search"))" />
 
@@ -126,6 +127,7 @@
                             Color="Color.Inherit"
                             Size="Size.Small"
                             title="Notifications"
+                            aria-label="Notifications"
                             OnClick="@(() => Navigation.NavigateTo("notifications"))" />
         </MudBadge>
 
@@ -133,6 +135,7 @@
                   Color="Color.Inherit"
                   Size="Size.Small"
                   title="Settings"
+                  AriaLabel="Settings"
                   AnchorOrigin="Origin.BottomRight"
                   TransformOrigin="Origin.TopRight">
             <MudMenuItem OnClick="@(() => Navigation.NavigateTo("profile"))">
@@ -165,6 +168,7 @@
                   Color="Color.Inherit"
                   Size="Size.Small"
                   title="Account"
+                  AriaLabel="Account"
                   AnchorOrigin="Origin.BottomRight"
                   TransformOrigin="Origin.TopRight">
             <MudText Typo="Typo.subtitle2" Class="px-4 pt-1 pb-2">

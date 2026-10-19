@@ -91,7 +91,7 @@
                                 @if (CanManage || a.UserId == MyId)
                                 {
                                     <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small"
-                                                   title="@(a.UserId == MyId ? "Leave" : "Remove")" OnClick="@(() => Remove(a.UserId))" />
+                                                   title="@(a.UserId == MyId ? "Leave" : "Remove")" aria-label="@(a.UserId == MyId ? "Leave event" : "Remove " + AppData.UserName(a.UserId))" OnClick="@(() => Remove(a.UserId))" />
                                 }
                             </div>
                         }

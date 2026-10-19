@@ -94,13 +94,14 @@
                             </MudTd>
                             <MudTd DataLabel="Uploaded by">@AppData.UserName(context.UploadedBy)</MudTd>
                             <MudTd Style="white-space:nowrap; text-align:right;">
-                                <MudIconButton Icon="@Icons.Material.Filled.Download" Size="Size.Small" title="Download" OnClick="@(() => Download(context))" />
+                                <MudIconButton Icon="@Icons.Material.Filled.Download" Size="Size.Small" title="Download" aria-label="@($"Download {context.FileName}")" OnClick="@(() => Download(context))" />
                                 @if (CanManage)
                                 {
                                     <MudIconButton Icon="@(context.IsArchived ? Icons.Material.Filled.Unarchive : Icons.Material.Filled.Archive)"
                                                    Size="Size.Small" title="@(context.IsArchived ? "Unarchive" : "Archive")"
+                                                   aria-label="@($"{(context.IsArchived ? "Unarchive" : "Archive")} {context.FileName}")"
                                                    OnClick="@(() => SetArchived(context, !context.IsArchived))" />
-                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" title="Delete"
+                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" title="Delete" aria-label="@($"Delete {context.FileName}")"
                                                    OnClick="@(() => Delete(context))" />
                                 }
                             </MudTd>
