@@ -488,7 +488,7 @@
                     // plus "selected" if it's the active date, plus "today" if
                     // it's the real current date (both can apply at once).
                     var cssClass = "drps-day-cell" + (day.Date == selectedDate.Date ? " selected" : "") + (day.Date == DateTime.Today ? " today" : "");
-                    <div class="@cssClass" @onclick="() => SelectDay(day)">
+                    <div class="@cssClass" role="button" tabindex="0" aria-current="@(day.Date == selectedDate.Date)" @onclick="() => SelectDay(day)">
                         <span class="drps-day-label">@day.ToString("ddd").ToUpper()</span>
                         <span class="drps-day-number">@day.Day</span>
                         @* Dot only renders if this day has at least one task. *@
@@ -503,7 +503,7 @@
 
         @* --- Selected date heading + "New Task" button --- *@
         <div class="d-flex align-center justify-space-between flex-wrap gap-2 mb-1">
-            <MudText Typo="Typo.h6" Style="color:var(--drps-navy-800); font-weight:600;">
+            <MudText Typo="Typo.h6" HtmlTag="h1" Style="color:var(--drps-navy-800); font-weight:600;">
                 @(boardView ? $"Week of {weekStart:d MMMM}" : selectedDate.ToString("dddd, d MMMM"))
             </MudText>
 
@@ -529,7 +529,7 @@
         @if (boardView)
         {
             <MudText Typo="Typo.body2" Class="mb-3" Style="color:#75806F;">
-                Drag a card to change its status. Moves that skip a step (e.g. To Do straight to Done) are refused.
+                Drag a card, or use its ⋮ menu, to change its status. Moves that skip a step (e.g. To Do straight to Done) are refused.
             </MudText>
 
             <MudDropContainer T="TaskCardDto" @ref="board" Items="tasks" ItemsSelector="@((t, column) => ColumnOf(t) == column)"
@@ -548,8 +548,21 @@
                 <ItemRenderer>
                     @{ var assignees = AppData.AssigneeNames(context); }
                     <div class="drps-task-card priority-@context.Priority.ToLower() @(context.IsDone() ? "done" : "")"
+                         role="button" tabindex="0"
                          @onclick="() => OnOpenTaskDetails(context)">
-                        <div class="drps-task-title">@context.Title</div>
+                        <div class="d-flex align-start justify-space-between">
+                            <div class="drps-task-title">@context.Title</div>
+                            @* Keyboard alternative to dragging: Enter opens it, arrows pick a column. *@
+                            <span @onclick:stopPropagation="true">
+                                <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="Size.Small" Dense="true"
+                                         AriaLabel="@($"Move {context.Title} to another column")">
+                                    @foreach (var column in BoardColumns.Where(c => c != ColumnOf(context)))
+                                    {
+                                        <MudMenuItem OnClick="@(() => MoveCard(context, column))">Move to @column</MudMenuItem>
+                                    }
+                                </MudMenu>
+                            </span>
+                        </div>
                         <div class="drps-task-time">
                             @context.Deadline.ToString(context.IsAllDay() ? "ddd d MMM" : "ddd d MMM, h:mm tt")
                             @(assignees.Length == 0 ? "" : $" · {assignees}")
@@ -594,6 +607,7 @@
                 @foreach (var task in AllDayTasksForSelectedDay)
                 {
                     <div class="drps-allday-chip priority-@task.Priority.ToLower() @(task.IsDone() ? "done" : "")"
+                         role="button" tabindex="0"
                          @onclick="() => OnOpenTaskDetails(task)">
                         <div>
                             <span class="drps-allday-title">@task.Title</span>
@@ -649,6 +663,7 @@
                             {
                                 var assignees = AppData.AssigneeNames(task);
                                 <div class="drps-task-card priority-@task.Priority.ToLower() @(task.IsDone() ? "done" : "")"
+                                     role="button" tabindex="0"
                                      @onclick="() => OnOpenTaskDetails(task)">
                                     <div>
                                         <div class="drps-task-title">@task.Title</div>
@@ -833,8 +848,14 @@
     // Reference: MudBlazor, "Drop Zone - MudBlazor." Accessed: Oct. 04, 2026. [Online]. Available: https://mudblazor.com/components/dropzone
     private async Task OnCardDropped(MudItemDropInfo<TaskCardDto> drop)
     {
-        if (drop.Item is { } task && drop.DropzoneIdentifier != ColumnOf(task))
-            await AppData.MoveTaskAsync(task, drop.DropzoneIdentifier);
+        if (drop.Item is { } task) await MoveCard(task, drop.DropzoneIdentifier);
+        else board?.Refresh();
+    }
+
+    // Shared by drag-and-drop and each card's "Move to" menu (the keyboard route).
+    private async Task MoveCard(TaskCardDto task, string column)
+    {
+        if (column != ColumnOf(task)) await AppData.MoveTaskAsync(task, column);
         board?.Refresh(); // re-place every card from the refreshed list, so a refused move snaps back
     }
 

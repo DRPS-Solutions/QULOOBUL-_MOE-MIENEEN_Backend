@@ -61,7 +61,7 @@ else if (AppData.CurrentUser is null or { MustChangePassword: true })
 
                 @if (loginError is not null)
                 {
-                    <MudText Typo="Typo.caption" Color="Color.Error" Class="drps-login-hint">
+                    <MudText Typo="Typo.caption" Color="Color.Error" Class="drps-login-hint" role="alert">
                         @loginError
                     </MudText>
                 }
@@ -85,6 +85,9 @@ else if (AppData.CurrentUser is null or { MustChangePassword: true })
 else
 {
     <div class="page @(isDarkMode ? "dark-mode" : "") @(isVerticalNav ? "nav-vertical" : "")">
+        @* First Tab stop: lets keyboard users jump past the nav links. Focus is moved in code because
+           a bare "#main" resolves against <base href="/"> and Blazor would navigate home instead. *@
+        <a class="skip-link" href="#main" @onclick="SkipToMain" @onclick:preventDefault>Skip to main content</a>
         <header class="top-navbar">
             <NavMenu IsDarkMode="isDarkMode"
                      IsVerticalNav="isVerticalNav"
@@ -98,7 +101,7 @@ else
                      OnLogout="Logout" />
         </header>
 
-        <main>
+        <main id="main" tabindex="-1" @ref="mainEl">
             <article class="content px-4">
                 @* Pages read the signed-in user from AppDataService. A page that throws shows
                    this message instead of taking the whole app down; navigating away resets it. *@
@@ -208,6 +211,9 @@ else
         showPassword = false;
         loginError = null;
     }
+
+    private ElementReference mainEl;
+    private async Task SkipToMain() => await mainEl.FocusAsync();
 
     private ErrorBoundary? pageErrors;
 

@@ -209,7 +209,7 @@
 
         <div class="drps-notifications-header">
             <div>
-                <MudText Typo="Typo.h6" Style="font-weight:600;">Notifications</MudText>
+                <MudText Typo="Typo.h6" HtmlTag="h1" Style="font-weight:600;">Notifications</MudText>
                 <div class="drps-subtitle">
                     Resource request updates, event assignments and task assignments.
                     @(UnreadCount > 0 ? $"{UnreadCount} unread." : "You're all caught up.")
@@ -246,16 +246,16 @@
 
         <div class="drps-card">
             <div class="drps-filter-row">
-                <div class="drps-filter-chip @(activeFilter is null ? "active" : "")" @onclick="@(() => activeFilter = null)">
+                <div class="drps-filter-chip @(activeFilter is null ? "active" : "")" role="button" tabindex="0" aria-pressed="@(activeFilter is null ? "true" : "false")" @onclick="@(() => activeFilter = null)">
                     All (@MyNotifications.Count)
                 </div>
                 @foreach (var kind in new[] { Kind.ResourceRequest, Kind.EventAssignment, Kind.TaskAssignment })
                 {
-                    <div class="drps-filter-chip @(activeFilter == kind ? "active" : "")" @onclick="@(() => activeFilter = kind)">
+                    <div class="drps-filter-chip @(activeFilter == kind ? "active" : "")" role="button" tabindex="0" aria-pressed="@(activeFilter == kind ? "true" : "false")" @onclick="@(() => activeFilter = kind)">
                         @(NotifTypeLabel(kind))s (@MyNotifications.Count(n => KindOf(n) == kind))
                     </div>
                 }
-                <div class="drps-filter-chip @(unreadOnly ? "active" : "")" @onclick="@(() => unreadOnly = !unreadOnly)">
+                <div class="drps-filter-chip @(unreadOnly ? "active" : "")" role="button" tabindex="0" aria-pressed="@(unreadOnly ? "true" : "false")" @onclick="@(() => unreadOnly = !unreadOnly)">
                     Unread only
                 </div>
             </div>
@@ -271,7 +271,7 @@
                 @foreach (var n in FilteredNotifications)
                 {
                     var kind = KindOf(n);
-                    <div class="drps-notif-item @(n.IsRead ? "" : "unread")" @onclick="@(() => OpenNotification(n))">
+                    <div class="drps-notif-item @(n.IsRead ? "" : "unread")" role="button" tabindex="0" @onclick="@(() => OpenNotification(n))">
                         <div class="drps-notif-icon @(NotifIconClass(kind))">
                             <MudIcon Icon="@(NotifIcon(kind))" Size="Size.Small" />
                         </div>

@@ -292,7 +292,7 @@
 
         @* --- Header: title, search, and action button --- *@
         <div class="drps-users-header">
-            <MudText Typo="Typo.h6" Style="font-weight:600;">User Management</MudText>
+            <MudText Typo="Typo.h6" HtmlTag="h1" Style="font-weight:600;">User Management</MudText>
 
             <div class="d-flex align-center flex-wrap gap-3">
                 @if (!showCreateUserScreen)
@@ -334,7 +334,7 @@
                         {
                             @foreach (var employee in FilteredEmployees)
                             {
-                                <div class="drps-roster-item @(employee == selectedEmployee ? "selected" : "")" @onclick="() => SelectEmployee(employee)">
+                                <div class="drps-roster-item @(employee == selectedEmployee ? "selected" : "")" role="button" tabindex="0" aria-current="@(employee == selectedEmployee)" @onclick="() => SelectEmployee(employee)">
                                     <div class="drps-avatar">@Initials(employee.FullName)</div>
                                     <div style="flex:1;">
                                         <div class="drps-roster-name">@employee.FullName</div>

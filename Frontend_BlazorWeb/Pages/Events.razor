@@ -234,7 +234,7 @@
 
         @* Header *@
         <div class="drps-events-header">
-            <MudText Typo="Typo.h6" Style="font-weight:600;">Event & Project Planning</MudText>
+            <MudText Typo="Typo.h6" HtmlTag="h1" Style="font-weight:600;">Event & Project Planning</MudText>
         </div>
 
         <MudGrid>
@@ -265,7 +265,7 @@
                             @foreach (var project in AppData.EventProjects)
                             {
                                 var cssClass = "drps-roster-item" + (form is null && selected?.ProjectId == project.ProjectId ? " selected" : "");
-                                <div class="@cssClass" @onclick="() => SelectProject(project.ProjectId)">
+                                <div class="@cssClass" role="button" tabindex="0" aria-current="@(form is null && selected?.ProjectId == project.ProjectId)" @onclick="() => SelectProject(project.ProjectId)">
                                     <div class="drps-roster-title">@project.ProjectName</div>
                                     <div class="drps-roster-meta">
                                         <MudIcon Icon="@Icons.Material.Filled.Groups" Size="Size.Small" />

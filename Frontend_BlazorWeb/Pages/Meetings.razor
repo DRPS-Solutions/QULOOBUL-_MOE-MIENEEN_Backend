@@ -177,7 +177,7 @@
         {
             @* --- MEETINGS LIST VIEW --- *@
             <div class="drps-meeting-header">
-                <MudText Typo="Typo.h6" Style="font-weight:600;">Meeting Minutes</MudText>
+                <MudText Typo="Typo.h6" HtmlTag="h1" Style="font-weight:600;">Meeting Minutes</MudText>
                 <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="StartNewMeeting">
                     New Meeting
                 </MudButton>
@@ -206,7 +206,7 @@
                         @foreach (var hit in searchResults)
                         {
                             var meeting = meetings.FirstOrDefault(m => m.MeetingId == hit.MeetingId);
-                            <div class="drps-note-item" style="cursor:pointer;" @onclick="@(() => { if (meeting is not null) OpenExistingMeeting(meeting); })">
+                            <div class="drps-note-item" style="cursor:pointer;" role="button" tabindex="0" @onclick="@(() => { if (meeting is not null) OpenExistingMeeting(meeting); })">
                                 <div>
                                     <div class="drps-note-item-text"><b>@(meeting?.Title ?? $"Meeting #{hit.MeetingId}")</b></div>
                                     <div class="drps-note-item-meta">
@@ -326,8 +326,8 @@
                         </div>
 
                         <div class="drps-note-type-toggle">
-                            <span class="drps-note-type-btn @(!addingActionItem ? "selected" : "")" @onclick="() => addingActionItem = false">Note</span>
-                            <span class="drps-note-type-btn @(addingActionItem ? "selected" : "")" @onclick="() => addingActionItem = true">Action Item</span>
+                            <span class="drps-note-type-btn @(!addingActionItem ? "selected" : "")" role="button" tabindex="0" aria-pressed="@(!addingActionItem ? "true" : "false")" @onclick="() => addingActionItem = false">Note</span>
+                            <span class="drps-note-type-btn @(addingActionItem ? "selected" : "")" role="button" tabindex="0" aria-pressed="@(addingActionItem ? "true" : "false")" @onclick="() => addingActionItem = true">Action Item</span>
                         </div>
 
                         <div class="drps-note-add-row">
