@@ -5,7 +5,7 @@ resource requests, meetings and file storage for one organisation's staff and vo
 Serves both clients in this solution: a Blazor WebAssembly web app and a .NET MAUI app.
 
 **Status: API built, both clients wired to it, deployed to Azure.** The API has a DbContext,
-four migrations, 12 controllers and 21 services. The web and MAUI clients both sign in against
+ten migrations, 12 controllers and 21 services. The web and MAUI clients both sign in against
 `AuthController`, read and write through the controllers using the `Shared` DTOs, and take
 live updates from the SignalR hub. See [What's not built yet](#whats-not-built-yet).
 
@@ -18,6 +18,7 @@ live updates from the SignalR hub. See [What's not built yet](#whats-not-built-y
   - [Seed accounts](#seed-accounts)
   - [Clients](#clients)
 - [Data model](#data-model)
+  - [Database integrity](#database-integrity)
 - [API](#api)
 - [Services](#services)
   - [Rules worth knowing](#rules-worth-knowing)
@@ -164,8 +165,8 @@ Six modelling decisions carry business rules and shouldn't be "tidied away":
 Delete behaviour is set per relationship: `Cascade` for rows meaningless without their parent
 (task comments and assignments, project members, meeting and event attendees), `SetNull` for a
 file's task/meeting link, and `NoAction` everywhere else, including every FK to `User` and the
-history tables. Unique pairs, a `CK_FileUpload_OneContext` check constraint, and indexes on the
-task board (`ProjectId, Status`), the unread badge (`UserId, IsRead`) and `Audit_Log.Timestamp`.
+history tables. Integrity beyond the foreign keys (unique pairs, 27 check constraints, indexes,
+defaults and concurrency tokens) is listed under [Database integrity](#database-integrity).
 
 Database-side defence in depth (migration `SecurityAndIndexes`):
 
@@ -174,7 +175,76 @@ Database-side defence in depth (migration `SecurityAndIndexes`):
   user's rows. No user (login, background jobs, migrations) means no filter.
 - **`vw_UserDirectory`**: the staff directory reads a view with no password hash or token columns.
 
-Four migrations: `InitialCreate`, `SecurityAndIndexes`, `TemporaryPassword`, `RequestDecisionNote`.
+Ten migrations: `InitialCreate`, `SecurityAndIndexes`, `TemporaryPassword`, `RequestDecisionNote`, then the
+integrity set `AddRangeCheckConstraints`, `AddAllowedValueCheckConstraints`, `AddCrossColumnCheckConstraints`,
+`AddNotBlankCheckConstraints`, `AddQueryIndexes` and `AddDefaultsAndRowVersion`.
+
+### Database integrity
+
+Every rule below is enforced by SQL Server itself, so a bad write from any path (a future endpoint, a
+script, a manual `UPDATE`) is rejected, not only one that goes through a service. The services still
+check the same rules first so the user gets a clear message; the database is the backstop. All of it
+is configured in `AppDbContext.OnModelCreating`.
+
+**Check constraints (27)**
+
+| Group | Constraint | Table | Business rule |
+|---|---|---|---|
+| Range | `CK_Task_PercentComplete` | `Task` | Progress is 0 to 100 |
+| Range | `CK_Report_PeriodOrder` | `Report` | A report period ends on or after it starts |
+| Range | `CK_User_FailedLoginCount` | `User` | The failed-login counter never goes negative |
+| Allowed values | `CK_Task_Status`, `CK_TaskStatusHistory_NewStatus` | `Task`, `Task_Status_History` | Only the SM-01 states: To Do, In Progress, Blocked, Done, Cancelled, Archived |
+| Allowed values | `CK_ResourceRequest_Status`, `CK_RequestStatusHistory_NewStatus` | `Resource_Request`, `Request_Status_History` | Only the SM-02 states: Pending, Under Review, Escalated, Approved, Declined, Completed |
+| Allowed values | `CK_User_Status` | `User` | Only the SM-03 states: Pending Activation, Active, Locked, Inactive, Anonymised |
+| Allowed values | `CK_Task_Priority`, `CK_ResourceRequest_Priority` | `Task`, `Resource_Request` | Low, Normal, Medium or High |
+| Allowed values | `CK_Project_Status` | `Project` | Active, Closed or Cancelled |
+| Allowed values | `CK_TaskSchedule_DayOfWeek` | `Task_Schedule` | A real day name, as `DayOfWeek.ToString()` writes it |
+| Cross-column | `CK_User_ActiveMatchesStatus` | `User` | `IsActive` is true exactly when `Status` is Active (`Lifecycle.MoveUser`) |
+| Cross-column | `CK_User_InactiveHasDate` | `User` | An inactive account records when it was deactivated |
+| Cross-column | `CK_User_TokenPair` | `User` | The set-password token hash and its expiry are both present or both absent |
+| Cross-column | `CK_ResourceRequest_DecisionHasReviewer` | `Resource_Request` | An approved or declined request names who decided it |
+| Cross-column | `CK_Task_DoneHasCompletedBy` | `Task` | A finished task records who completed it |
+| Cross-column | `CK_FileUpload_OneContext` | `File_Upload` | A file attaches to at most one of task, meeting, or period |
+| Non-empty text | `CK_Project_NameNotBlank`, `CK_Task_TitleNotBlank`, `CK_Meeting_TitleNotBlank`, `CK_Event_TitleNotBlank` | `Project`, `Task`, `Meeting`, `Event` | Names and titles are not empty or all spaces |
+| Non-empty text | `CK_FileUpload_FileNameNotBlank`, `CK_FileUpload_FilePathNotBlank` | `File_Upload` | A file has a name and a storage path |
+| Non-empty text | `CK_User_FirstNameNotBlank`, `CK_User_SurnameNotBlank` | `User` | A user has a first name and surname |
+| Format | `CK_User_EmailFormat` | `User` | Email has the shape `something@something.something` |
+
+Priority and project status are free text in the services, so their lists are the values the clients and
+seeder use today; add a value to the constraint and the service together.
+
+**Unique constraints and indexes**
+
+| Index | Table | Purpose |
+|---|---|---|
+| Unique pair per junction table | `Task_Assignment`, `Project_Member`, `Meeting_Attendee`, `Event_Attendee`, `Role_Permission`, `Notification_Preference` | No duplicate membership or assignment |
+| `IX_User_Email` (unique) | `User` | One account per email |
+| `IX_User_PasswordTokenHash` (unique, filtered to non-null) | `User` | Set-password link lookup by token; no two users share a token |
+| `IX_Event_Location_EventDate` (unique, filtered to non-empty location) | `Event` | One event per venue per slot, even under concurrent bookings |
+| `(ProjectId, Status)` | `Task` | The task board |
+| `(Status, Deadline)`, `(Deadline)` | `Task` | Deadline-warning job; calendar and report date ranges |
+| `(Status, DateSubmitted)` | `Resource_Request` | 48-hour escalation job; newest-first list |
+| `(UserId, IsRead)` | `Notification` | The unread badge |
+| `(NewStatus, TimeCreated)` | `Task_Status_History` | Completed-in-period report |
+| `(UserId, Timestamp)`, `(Timestamp)` | `Audit_Log` | A user's recent activity; time-ranged audit queries |
+| `(MeetingDate)`, `(EventDate)` | `Meeting`, `Event` | Calendar and clash-check ranges |
+
+EF Core also indexes every foreign-key column, so those are not repeated here.
+
+**Defaults and concurrency**
+
+- `User.Status` defaults to `Active` and `Task.PercentComplete` to `0`, so a row inserted outside EF starts valid.
+- `Task` and `Resource_Request` carry a `RowVersion` (`rowversion`) concurrency token. A save whose row
+  changed since it was loaded fails, and the API answers 409 "Someone else changed this at the same time".
+  The clients do not send the token back, so this guards overlapping requests, not a stale screen.
+
+**Proof.** `QULOOBUL _MOE'MIENEEN_Backend/Data/CheckConstraintTests.sql` tries an invalid write for each
+rule inside a transaction it rolls back, plus a valid write as a control, and prints a failure count
+(0 = every rule held). It also checks the defaults and that a stale `RowVersion` update matches no rows.
+
+```bash
+sqlcmd -S .\SQLEXPRESS -d QuloobulMoeMieneen -E -C -W -i "QULOOBUL _MOE'MIENEEN_Backend/Data/CheckConstraintTests.sql"
+```
 
 ## API
 

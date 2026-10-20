@@ -91,6 +91,17 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Data
             b.Entity<ProjectTask>().HasIndex(x => new { x.ProjectId, x.Status });   // the task board
             b.Entity<Notification>().HasIndex(x => new { x.UserId, x.IsRead });     // the unread badge
             b.Entity<AuditLog>().HasIndex(x => x.Timestamp);                        // time-ranged audit queries
+            b.Entity<AuditLog>().HasIndex(x => new { x.UserId, x.Timestamp });      // a user's newest activity (replaces the plain UserId FK index)
+
+            // EF already indexes every FK column; these are the filters the services use that no FK covers.
+            b.Entity<ProjectTask>().HasIndex(x => new { x.Status, x.Deadline });    // deadline-warning job: In Progress, due within the horizon
+            b.Entity<ProjectTask>().HasIndex(x => x.Deadline);                      // calendar and report date ranges, search order
+            b.Entity<ResourceRequest>().HasIndex(x => new { x.Status, x.DateSubmitted }); // 48-hour escalation job, newest-first list
+            b.Entity<Meeting>().HasIndex(x => x.MeetingDate);                       // calendar and clash-check ranges
+            b.Entity<Event>().HasIndex(x => x.EventDate);                           // the unique (Location, EventDate) index cannot serve a date-only range
+            b.Entity<TaskStatusHistory>().HasIndex(x => new { x.NewStatus, x.TimeCreated }); // completed-in-period report; the table only grows
+            // Set-password links are looked up by token hash alone; unique also makes a clash impossible.
+            b.Entity<User>().HasIndex(x => x.PasswordTokenHash).IsUnique().HasFilter("[PasswordTokenHash] IS NOT NULL");
 
             // Staff directory reads a view that has no credential columns (defence in depth); created in
             // the SecurityAndIndexes migration alongside the Notification row-level security policy.
@@ -131,6 +142,84 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Data
                 "CK_Report_PeriodOrder", "[PeriodEnd] >= [PeriodStart]"));
             b.Entity<User>().ToTable(t => t.HasCheckConstraint(
                 "CK_User_FailedLoginCount", "[FailedLoginCount] >= 0"));
+
+            // Allowed-value rules: the SM-01/02/03 states in Lifecycle, so an unknown status cannot be
+            // stored even if a service guard is bypassed. Priority and project status are free text in the
+            // services, so these lists are the values the clients and seeder use today.
+            // Reference: Microsoft, "Check constraints - EF Core." Accessed: Oct. 20, 2026. [Online]. Available: https://learn.microsoft.com/en-us/ef/core/modeling/constraints#check-constraints
+            string[] taskStatuses = ["To Do", "In Progress", "Blocked", "Done", Lifecycle.TaskCancelled, Lifecycle.TaskArchived];
+            string[] requestStatuses = [Lifecycle.RequestStart, Lifecycle.RequestUnderReview, Lifecycle.RequestEscalated, "Approved", Lifecycle.RequestDeclined, "Completed"];
+            string[] userStatuses = [Lifecycle.UserPending, Lifecycle.UserActive, Lifecycle.UserLocked, Lifecycle.UserInactive, Lifecycle.UserAnonymised];
+            string[] priorities = ["Low", "Normal", "Medium", "High"];
+            string[] projectStatuses = ["Active", Lifecycle.ProjectClosed, Lifecycle.ProjectCancelled];
+            string[] days = Enum.GetNames<DayOfWeek>();
+
+            b.Entity<ProjectTask>().ToTable(t =>
+            {
+                t.HasCheckConstraint("CK_Task_Status", In("Status", taskStatuses));
+                t.HasCheckConstraint("CK_Task_Priority", In("Priority", priorities));
+            });
+            b.Entity<TaskStatusHistory>().ToTable(t => t.HasCheckConstraint("CK_TaskStatusHistory_NewStatus", In("NewStatus", taskStatuses)));
+            b.Entity<ResourceRequest>().ToTable(t =>
+            {
+                t.HasCheckConstraint("CK_ResourceRequest_Status", In("Status", requestStatuses));
+                t.HasCheckConstraint("CK_ResourceRequest_Priority", In("Priority", priorities));
+            });
+            b.Entity<RequestStatusHistory>().ToTable(t => t.HasCheckConstraint("CK_RequestStatusHistory_NewStatus", In("NewStatus", requestStatuses)));
+            b.Entity<User>().ToTable(t => t.HasCheckConstraint("CK_User_Status", In("Status", userStatuses)));
+            b.Entity<Project>().ToTable(t => t.HasCheckConstraint("CK_Project_Status", In("Status", projectStatuses)));
+            b.Entity<TaskSchedule>().ToTable(t => t.HasCheckConstraint("CK_TaskSchedule_DayOfWeek", In("DayOfWeek", days)));
+
+            // Cross-column rules: two columns that must agree. Lifecycle.MoveUser and the services keep
+            // them in step today; these stop any other write path from splitting them.
+            b.Entity<User>().ToTable(t =>
+            {
+                // IsActive mirrors "Status is Active" (Lifecycle.MoveUser).
+                t.HasCheckConstraint("CK_User_ActiveMatchesStatus",
+                    "([IsActive] = 1 AND [Status] = 'Active') OR ([IsActive] = 0 AND [Status] <> 'Active')");
+                t.HasCheckConstraint("CK_User_InactiveHasDate",
+                    "[Status] <> 'Inactive' OR [DeactivatedAt] IS NOT NULL");
+                // The emailed set-password token and its expiry are issued and cleared together.
+                t.HasCheckConstraint("CK_User_TokenPair",
+                    "([PasswordTokenHash] IS NULL AND [PasswordTokenExpires] IS NULL) OR ([PasswordTokenHash] IS NOT NULL AND [PasswordTokenExpires] IS NOT NULL)");
+            });
+            // A decision needs a decider; a resubmission clears ReviewedBy only on the move back to Pending.
+            b.Entity<ResourceRequest>().ToTable(t => t.HasCheckConstraint("CK_ResourceRequest_DecisionHasReviewer",
+                "[Status] NOT IN ('Approved', 'Declined') OR [ReviewedBy] IS NOT NULL"));
+            // TaskAssignmentService.MoveStatus records who finished it whenever it sets Done.
+            b.Entity<ProjectTask>().ToTable(t => t.HasCheckConstraint("CK_Task_DoneHasCompletedBy",
+                "[Status] <> 'Done' OR [CompletedBy] IS NOT NULL"));
+
+            // Required text must hold something: [MaxLength] allows '' and the DTO [Required] checks stop
+            // at the API, so these stop an empty or all-space value from any other write path.
+            // (Event.Location and the other optional text columns are deliberately left blank-able.)
+            b.Entity<Project>().ToTable(t => t.HasCheckConstraint("CK_Project_NameNotBlank", NotBlank("ProjectName")));
+            b.Entity<ProjectTask>().ToTable(t => t.HasCheckConstraint("CK_Task_TitleNotBlank", NotBlank("Title")));
+            b.Entity<Meeting>().ToTable(t => t.HasCheckConstraint("CK_Meeting_TitleNotBlank", NotBlank("Title")));
+            b.Entity<Event>().ToTable(t => t.HasCheckConstraint("CK_Event_TitleNotBlank", NotBlank("Title")));
+            b.Entity<FileUpload>().ToTable(t =>
+            {
+                t.HasCheckConstraint("CK_FileUpload_FileNameNotBlank", NotBlank("FileName"));
+                t.HasCheckConstraint("CK_FileUpload_FilePathNotBlank", NotBlank("FilePath"));
+            });
+            b.Entity<User>().ToTable(t =>
+            {
+                t.HasCheckConstraint("CK_User_FirstNameNotBlank", NotBlank("FirstName"));
+                t.HasCheckConstraint("CK_User_SurnameNotBlank", NotBlank("Surname"));
+                // Basic shape only (something@something.something); full validation stays in the DTO's [EmailAddress].
+                t.HasCheckConstraint("CK_User_EmailFormat", "[Email] LIKE '%_@_%._%'");
+            });
+
+            // Column defaults, so a row inserted outside EF (a script, a manual fix) still starts valid.
+            // Only non-bool values: EF treats the CLR default (false) as "unset", so a default of true would
+            // silently overwrite an explicit false.
+            b.Entity<User>().Property(x => x.Status).HasDefaultValue(Lifecycle.UserActive);
+            b.Entity<ProjectTask>().Property(x => x.PercentComplete).HasDefaultValue(0);
+
+            static string NotBlank(string column) => $"LEN(LTRIM(RTRIM([{column}]))) > 0";
+
+            static string In(string column, string[] values) =>
+                $"[{column}] IN ({string.Join(", ", values.Select(v => $"'{v}'"))})";
         }
     }
 }

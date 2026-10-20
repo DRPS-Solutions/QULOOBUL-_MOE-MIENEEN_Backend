@@ -113,6 +113,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Data
                     Email = SystemAccountEmail,
                     IsActive = false,
                     Status = Lifecycle.UserInactive,
+                    DeactivatedAt = DateTime.UtcNow, // CK_User_InactiveHasDate
                 });
                 db.SaveChanges();
             }
