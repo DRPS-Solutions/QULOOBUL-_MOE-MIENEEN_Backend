@@ -159,6 +159,26 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Data
             b.Entity<Project>().ToTable(t => t.HasCheckConstraint("CK_Project_Status", In("Status", projectStatuses)));
             b.Entity<TaskSchedule>().ToTable(t => t.HasCheckConstraint("CK_TaskSchedule_DayOfWeek", In("DayOfWeek", days)));
 
+            // Cross-column rules: two columns that must agree. Lifecycle.MoveUser and the services keep
+            // them in step today; these stop any other write path from splitting them.
+            b.Entity<User>().ToTable(t =>
+            {
+                // IsActive mirrors "Status is Active" (Lifecycle.MoveUser).
+                t.HasCheckConstraint("CK_User_ActiveMatchesStatus",
+                    "([IsActive] = 1 AND [Status] = 'Active') OR ([IsActive] = 0 AND [Status] <> 'Active')");
+                t.HasCheckConstraint("CK_User_InactiveHasDate",
+                    "[Status] <> 'Inactive' OR [DeactivatedAt] IS NOT NULL");
+                // The emailed set-password token and its expiry are issued and cleared together.
+                t.HasCheckConstraint("CK_User_TokenPair",
+                    "([PasswordTokenHash] IS NULL AND [PasswordTokenExpires] IS NULL) OR ([PasswordTokenHash] IS NOT NULL AND [PasswordTokenExpires] IS NOT NULL)");
+            });
+            // A decision needs a decider; a resubmission clears ReviewedBy only on the move back to Pending.
+            b.Entity<ResourceRequest>().ToTable(t => t.HasCheckConstraint("CK_ResourceRequest_DecisionHasReviewer",
+                "[Status] NOT IN ('Approved', 'Declined') OR [ReviewedBy] IS NOT NULL"));
+            // TaskAssignmentService.MoveStatus records who finished it whenever it sets Done.
+            b.Entity<ProjectTask>().ToTable(t => t.HasCheckConstraint("CK_Task_DoneHasCompletedBy",
+                "[Status] <> 'Done' OR [CompletedBy] IS NOT NULL"));
+
             static string In(string column, string[] values) =>
                 $"[{column}] IN ({string.Join(", ", values.Select(v => $"'{v}'"))})";
         }

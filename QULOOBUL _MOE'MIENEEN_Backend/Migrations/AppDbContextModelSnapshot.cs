@@ -381,9 +381,15 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
 
                     b.ToTable("User", t =>
                         {
+                            t.HasCheckConstraint("CK_User_ActiveMatchesStatus", "([IsActive] = 1 AND [Status] = 'Active') OR ([IsActive] = 0 AND [Status] <> 'Active')");
+
                             t.HasCheckConstraint("CK_User_FailedLoginCount", "[FailedLoginCount] >= 0");
 
+                            t.HasCheckConstraint("CK_User_InactiveHasDate", "[Status] <> 'Inactive' OR [DeactivatedAt] IS NOT NULL");
+
                             t.HasCheckConstraint("CK_User_Status", "[Status] IN ('Pending Activation', 'Active', 'Locked', 'Inactive', 'Anonymised')");
+
+                            t.HasCheckConstraint("CK_User_TokenPair", "([PasswordTokenHash] IS NULL AND [PasswordTokenExpires] IS NULL) OR ([PasswordTokenHash] IS NOT NULL AND [PasswordTokenExpires] IS NOT NULL)");
                         });
                 });
 
@@ -697,6 +703,8 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
 
                     b.ToTable("Task", t =>
                         {
+                            t.HasCheckConstraint("CK_Task_DoneHasCompletedBy", "[Status] <> 'Done' OR [CompletedBy] IS NOT NULL");
+
                             t.HasCheckConstraint("CK_Task_PercentComplete", "[PercentComplete] BETWEEN 0 AND 100");
 
                             t.HasCheckConstraint("CK_Task_Priority", "[Priority] IN ('Low', 'Normal', 'Medium', 'High')");
@@ -805,6 +813,8 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
 
                     b.ToTable("Resource_Request", t =>
                         {
+                            t.HasCheckConstraint("CK_ResourceRequest_DecisionHasReviewer", "[Status] NOT IN ('Approved', 'Declined') OR [ReviewedBy] IS NOT NULL");
+
                             t.HasCheckConstraint("CK_ResourceRequest_Priority", "[Priority] IN ('Low', 'Normal', 'Medium', 'High')");
 
                             t.HasCheckConstraint("CK_ResourceRequest_Status", "[Status] IN ('Pending', 'Under Review', 'Escalated', 'Approved', 'Declined', 'Completed')");

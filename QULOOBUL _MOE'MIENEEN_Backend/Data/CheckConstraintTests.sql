@@ -1,4 +1,4 @@
--- Proves the CHECK constraints (AddRangeCheckConstraints + AddAllowedValueCheckConstraints) reject bad data.
+-- Proves the CHECK constraints (Add{Range,AllowedValue,CrossColumn}CheckConstraints) reject bad data.
 -- Each test runs one invalid UPDATE against an existing row; the whole run is rolled back, so nothing changes.
 -- Run:  sqlcmd -S .\SQLEXPRESS -d QuloobulMoeMieneen -E -C -W -i Data/CheckConstraintTests.sql
 -- Expect: every "expect" = reject row shows the constraint that stopped it, and every accept (control) row
@@ -17,15 +17,27 @@ INSERT @tests (expect, test, stmt) VALUES
  ('accept', 'Task.Priority = ''Medium''',        N'UPDATE TOP (1) [Task] SET Priority = ''Medium'''),
  ('reject', 'Task_Status_History = ''Bogus''',   N'UPDATE TOP (1) [Task_Status_History] SET NewStatus = ''Bogus'''),
  ('reject', 'Resource_Request.Status = ''Bogus''',   N'UPDATE TOP (1) [Resource_Request] SET Status = ''Bogus'''),
- ('accept', 'Resource_Request.Status = ''Approved''',N'UPDATE TOP (1) [Resource_Request] SET Status = ''Approved'''),
+ ('accept', 'Resource_Request.Status = ''Approved''',N'UPDATE TOP (1) [Resource_Request] SET Status = ''Approved'', ReviewedBy = (SELECT TOP (1) UserId FROM [User])'),
  ('reject', 'Resource_Request.Priority = ''Urgent''',N'UPDATE TOP (1) [Resource_Request] SET Priority = ''Urgent'''),
  ('reject', 'Request_Status_History = ''Bogus''',N'UPDATE TOP (1) [Request_Status_History] SET NewStatus = ''Bogus'''),
- ('reject', 'User.Status = ''Bogus''',           N'UPDATE TOP (1) [User] SET Status = ''Bogus'''),
- ('accept', 'User.Status = ''Locked''',          N'UPDATE TOP (1) [User] SET Status = ''Locked'''),
+ ('reject', 'User.Status = ''Bogus''',           N'UPDATE TOP (1) [User] SET IsActive = 0, Status = ''Bogus'''),
+ ('accept', 'User.Status = ''Locked''',          N'UPDATE TOP (1) [User] SET IsActive = 0, Status = ''Locked'''),
  ('reject', 'Project.Status = ''Bogus''',        N'UPDATE TOP (1) [Project] SET Status = ''Bogus'''),
  ('accept', 'Project.Status = ''Closed''',       N'UPDATE TOP (1) [Project] SET Status = ''Closed'''),
  ('reject', 'Task_Schedule.DayOfWeek = ''Funday''',  N'UPDATE TOP (1) [Task_Schedule] SET DayOfWeek = ''Funday'''),
- ('accept', 'Task_Schedule.DayOfWeek = ''Friday''',  N'UPDATE TOP (1) [Task_Schedule] SET DayOfWeek = ''Friday''');
+ ('accept', 'Task_Schedule.DayOfWeek = ''Friday''',  N'UPDATE TOP (1) [Task_Schedule] SET DayOfWeek = ''Friday'''),
+ -- cross-column rules (AddCrossColumnCheckConstraints); each sets both columns so no particular row is needed
+ ('reject', 'User IsActive=0 but Status Active', N'UPDATE TOP (1) [User] SET IsActive = 0, Status = ''Active'''),
+ ('reject', 'User IsActive=1 but Status Locked', N'UPDATE TOP (1) [User] SET IsActive = 1, Status = ''Locked'''),
+ ('accept', 'User IsActive=0 and Status Locked', N'UPDATE TOP (1) [User] SET IsActive = 0, Status = ''Locked'''),
+ ('reject', 'User Inactive without DeactivatedAt',N'UPDATE TOP (1) [User] SET IsActive = 0, Status = ''Inactive'', DeactivatedAt = NULL'),
+ ('accept', 'User Inactive with DeactivatedAt',  N'UPDATE TOP (1) [User] SET IsActive = 0, Status = ''Inactive'', DeactivatedAt = SYSUTCDATETIME()'),
+ ('reject', 'User token hash without expiry',    N'UPDATE TOP (1) [User] SET PasswordTokenHash = ''x'', PasswordTokenExpires = NULL'),
+ ('accept', 'User token hash with expiry',       N'UPDATE TOP (1) [User] SET PasswordTokenHash = ''x'', PasswordTokenExpires = SYSUTCDATETIME()'),
+ ('reject', 'Request Declined without reviewer', N'UPDATE TOP (1) [Resource_Request] SET Status = ''Declined'', ReviewedBy = NULL'),
+ ('accept', 'Request Approved with reviewer',    N'UPDATE TOP (1) [Resource_Request] SET Status = ''Approved'', ReviewedBy = (SELECT TOP (1) UserId FROM [User])'),
+ ('reject', 'Task Done without CompletedBy',     N'UPDATE TOP (1) [Task] SET Status = ''Done'', CompletedBy = NULL'),
+ ('accept', 'Task Done with CompletedBy',        N'UPDATE TOP (1) [Task] SET Status = ''Done'', CompletedBy = (SELECT TOP (1) UserId FROM [User])');
 
 DECLARE @out TABLE (id int, test varchar(60), outcome varchar(120));
 DECLARE @id int = 1, @max int = (SELECT MAX(id) FROM @tests), @stmt nvarchar(400), @expect varchar(6), @test varchar(60), @err nvarchar(2000), @ck nvarchar(100);
