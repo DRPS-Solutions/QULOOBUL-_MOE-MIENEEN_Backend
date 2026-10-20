@@ -48,6 +48,8 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
 
                     b.HasKey("EventId");
 
+                    b.HasIndex("EventDate");
+
                     b.HasIndex("OrganiserId");
 
                     b.HasIndex("Location", "EventDate")
@@ -109,6 +111,8 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
                         .HasColumnType("nvarchar(200)");
 
                     b.HasKey("MeetingId");
+
+                    b.HasIndex("MeetingDate");
 
                     b.HasIndex("OrganiserId");
 
@@ -387,6 +391,10 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
                     b.HasIndex("Email")
                         .IsUnique();
 
+                    b.HasIndex("PasswordTokenHash")
+                        .IsUnique()
+                        .HasFilter("[PasswordTokenHash] IS NOT NULL");
+
                     b.HasIndex("RoleId");
 
                     b.ToTable("User", t =>
@@ -469,7 +477,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
 
                     b.HasIndex("Timestamp");
 
-                    b.HasIndex("UserId");
+                    b.HasIndex("UserId", "Timestamp");
 
                     b.ToTable("Audit_Log");
                 });
@@ -715,9 +723,13 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
 
                     b.HasIndex("CreatedBy");
 
+                    b.HasIndex("Deadline");
+
                     b.HasIndex("ScheduleId");
 
                     b.HasIndex("ProjectId", "Status");
+
+                    b.HasIndex("Status", "Deadline");
 
                     b.ToTable("Task", t =>
                         {
@@ -830,6 +842,8 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
                     b.HasIndex("RequestedBy");
 
                     b.HasIndex("ReviewedBy");
+
+                    b.HasIndex("Status", "DateSubmitted");
 
                     b.ToTable("Resource_Request", t =>
                         {
@@ -961,6 +975,8 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
                     b.HasIndex("ChangedBy");
 
                     b.HasIndex("TaskId");
+
+                    b.HasIndex("NewStatus", "TimeCreated");
 
                     b.ToTable("Task_Status_History", t =>
                         {

@@ -1,4 +1,5 @@
--- Proves the CHECK constraints (Add{Range,AllowedValue,CrossColumn,NotBlank}CheckConstraints) reject bad data.
+-- Proves the CHECK constraints (Add{Range,AllowedValue,CrossColumn,NotBlank}CheckConstraints) and the
+-- unique token index (AddQueryIndexes) reject bad data.
 -- Each test runs one invalid UPDATE against an existing row; the whole run is rolled back, so nothing changes.
 -- Run:  sqlcmd -S .\SQLEXPRESS -d QuloobulMoeMieneen -E -C -W -i Data/CheckConstraintTests.sql
 -- Expect: every "expect" = reject row shows the constraint that stopped it, and every accept (control) row
@@ -54,7 +55,10 @@ INSERT @tests (expect, test, stmt) VALUES
  ('accept', 'User names set',                    N'UPDATE TOP (1) [User] SET FirstName = ''A'', Surname = ''B'''),
  ('reject', 'User.Email no @',                   N'UPDATE TOP (1) [User] SET Email = ''not-an-email'''),
  ('reject', 'User.Email no dot after @',         N'UPDATE TOP (1) [User] SET Email = ''a@b'''),
- ('accept', 'User.Email well formed',            N'UPDATE TOP (1) [User] SET Email = ''a@b.co''');
+ ('accept', 'User.Email well formed',            N'UPDATE TOP (1) [User] SET Email = ''a@b.co'''),
+ -- unique index from AddQueryIndexes: two users cannot share a set-password token hash
+ ('reject', 'Two users, same PasswordTokenHash', N'UPDATE [User] SET PasswordTokenHash = ''dup'', PasswordTokenExpires = SYSUTCDATETIME() WHERE UserId IN (SELECT TOP (2) UserId FROM [User] ORDER BY UserId)'),
+ ('accept', 'Two users, different token hashes', N'UPDATE [User] SET PasswordTokenHash = CAST(UserId AS varchar(10)), PasswordTokenExpires = SYSUTCDATETIME() WHERE UserId IN (SELECT TOP (2) UserId FROM [User] ORDER BY UserId)');
 
 DECLARE @out TABLE (id int, test varchar(60), outcome varchar(120));
 DECLARE @id int = 1, @max int = (SELECT MAX(id) FROM @tests), @stmt nvarchar(400), @expect varchar(6), @test varchar(60), @err nvarchar(2000), @ck nvarchar(100);
@@ -69,9 +73,13 @@ BEGIN
         INSERT @out VALUES (@id, @test, CASE @expect WHEN 'accept' THEN 'ok: accepted' ELSE 'FAIL: NOT REJECTED' END);
     ELSE
     BEGIN
-        SET @ck = CASE WHEN @err LIKE '%CHECK constraint "%' THEN
-            SUBSTRING(@err, CHARINDEX('CHECK constraint "', @err) + 18,
-                      CHARINDEX('"', @err, CHARINDEX('CHECK constraint "', @err) + 18) - CHARINDEX('CHECK constraint "', @err) - 18)
+        SET @ck = CASE
+            WHEN @err LIKE '%CHECK constraint "%' THEN
+                SUBSTRING(@err, CHARINDEX('CHECK constraint "', @err) + 18,
+                          CHARINDEX('"', @err, CHARINDEX('CHECK constraint "', @err) + 18) - CHARINDEX('CHECK constraint "', @err) - 18)
+            WHEN @err LIKE '%unique index ''%' THEN -- a unique index rejects the write instead
+                SUBSTRING(@err, CHARINDEX('unique index ''', @err) + 14,
+                          CHARINDEX('''', @err, CHARINDEX('unique index ''', @err) + 14) - CHARINDEX('unique index ''', @err) - 14)
             END;
         INSERT @out VALUES (@id, @test,
             CASE WHEN @expect = 'reject' AND @ck IS NOT NULL THEN 'ok: rejected by ' + @ck

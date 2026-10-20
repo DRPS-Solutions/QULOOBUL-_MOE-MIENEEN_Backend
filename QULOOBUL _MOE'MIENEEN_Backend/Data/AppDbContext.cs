@@ -91,6 +91,17 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Data
             b.Entity<ProjectTask>().HasIndex(x => new { x.ProjectId, x.Status });   // the task board
             b.Entity<Notification>().HasIndex(x => new { x.UserId, x.IsRead });     // the unread badge
             b.Entity<AuditLog>().HasIndex(x => x.Timestamp);                        // time-ranged audit queries
+            b.Entity<AuditLog>().HasIndex(x => new { x.UserId, x.Timestamp });      // a user's newest activity (replaces the plain UserId FK index)
+
+            // EF already indexes every FK column; these are the filters the services use that no FK covers.
+            b.Entity<ProjectTask>().HasIndex(x => new { x.Status, x.Deadline });    // deadline-warning job: In Progress, due within the horizon
+            b.Entity<ProjectTask>().HasIndex(x => x.Deadline);                      // calendar and report date ranges, search order
+            b.Entity<ResourceRequest>().HasIndex(x => new { x.Status, x.DateSubmitted }); // 48-hour escalation job, newest-first list
+            b.Entity<Meeting>().HasIndex(x => x.MeetingDate);                       // calendar and clash-check ranges
+            b.Entity<Event>().HasIndex(x => x.EventDate);                           // the unique (Location, EventDate) index cannot serve a date-only range
+            b.Entity<TaskStatusHistory>().HasIndex(x => new { x.NewStatus, x.TimeCreated }); // completed-in-period report; the table only grows
+            // Set-password links are looked up by token hash alone; unique also makes a clash impossible.
+            b.Entity<User>().HasIndex(x => x.PasswordTokenHash).IsUnique().HasFilter("[PasswordTokenHash] IS NOT NULL");
 
             // Staff directory reads a view that has no credential columns (defence in depth); created in
             // the SecurityAndIndexes migration alongside the Notification row-level security policy.
