@@ -382,6 +382,8 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
                     b.ToTable("User", t =>
                         {
                             t.HasCheckConstraint("CK_User_FailedLoginCount", "[FailedLoginCount] >= 0");
+
+                            t.HasCheckConstraint("CK_User_Status", "[Status] IN ('Pending Activation', 'Active', 'Locked', 'Inactive', 'Anonymised')");
                         });
                 });
 
@@ -605,7 +607,10 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
 
                     b.HasIndex("OwnerId");
 
-                    b.ToTable("Project");
+                    b.ToTable("Project", t =>
+                        {
+                            t.HasCheckConstraint("CK_Project_Status", "[Status] IN ('Active', 'Closed', 'Cancelled')");
+                        });
                 });
 
             modelBuilder.Entity("QULOOBUL__MOE_MIENEEN_Backend.Models.Project.ProjectMember", b =>
@@ -693,6 +698,10 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
                     b.ToTable("Task", t =>
                         {
                             t.HasCheckConstraint("CK_Task_PercentComplete", "[PercentComplete] BETWEEN 0 AND 100");
+
+                            t.HasCheckConstraint("CK_Task_Priority", "[Priority] IN ('Low', 'Normal', 'Medium', 'High')");
+
+                            t.HasCheckConstraint("CK_Task_Status", "[Status] IN ('To Do', 'In Progress', 'Blocked', 'Done', 'Cancelled', 'Archived')");
                         });
                 });
 
@@ -746,7 +755,10 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
 
                     b.HasIndex("RequestId");
 
-                    b.ToTable("Request_Status_History");
+                    b.ToTable("Request_Status_History", t =>
+                        {
+                            t.HasCheckConstraint("CK_RequestStatusHistory_NewStatus", "[NewStatus] IN ('Pending', 'Under Review', 'Escalated', 'Approved', 'Declined', 'Completed')");
+                        });
                 });
 
             modelBuilder.Entity("QULOOBUL__MOE_MIENEEN_Backend.Models.Request.ResourceRequest", b =>
@@ -791,7 +803,12 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
 
                     b.HasIndex("ReviewedBy");
 
-                    b.ToTable("Resource_Request");
+                    b.ToTable("Resource_Request", t =>
+                        {
+                            t.HasCheckConstraint("CK_ResourceRequest_Priority", "[Priority] IN ('Low', 'Normal', 'Medium', 'High')");
+
+                            t.HasCheckConstraint("CK_ResourceRequest_Status", "[Status] IN ('Pending', 'Under Review', 'Escalated', 'Approved', 'Declined', 'Completed')");
+                        });
                 });
 
             modelBuilder.Entity("QULOOBUL__MOE_MIENEEN_Backend.Models.Task.TaskAssignment", b =>
@@ -881,7 +898,10 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
 
                     b.HasIndex("CreatedBy");
 
-                    b.ToTable("Task_Schedule");
+                    b.ToTable("Task_Schedule", t =>
+                        {
+                            t.HasCheckConstraint("CK_TaskSchedule_DayOfWeek", "[DayOfWeek] IN ('Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday')");
+                        });
                 });
 
             modelBuilder.Entity("QULOOBUL__MOE_MIENEEN_Backend.Models.Task.TaskStatusHistory", b =>
@@ -912,7 +932,10 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
 
                     b.HasIndex("TaskId");
 
-                    b.ToTable("Task_Status_History");
+                    b.ToTable("Task_Status_History", t =>
+                        {
+                            t.HasCheckConstraint("CK_TaskStatusHistory_NewStatus", "[NewStatus] IN ('To Do', 'In Progress', 'Blocked', 'Done', 'Cancelled', 'Archived')");
+                        });
                 });
 
             modelBuilder.Entity("QULOOBUL__MOE_MIENEEN_Backend.Models.Collaboration.Event", b =>

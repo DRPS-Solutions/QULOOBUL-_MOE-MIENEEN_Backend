@@ -131,6 +131,36 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Data
                 "CK_Report_PeriodOrder", "[PeriodEnd] >= [PeriodStart]"));
             b.Entity<User>().ToTable(t => t.HasCheckConstraint(
                 "CK_User_FailedLoginCount", "[FailedLoginCount] >= 0"));
+
+            // Allowed-value rules: the SM-01/02/03 states in Lifecycle, so an unknown status cannot be
+            // stored even if a service guard is bypassed. Priority and project status are free text in the
+            // services, so these lists are the values the clients and seeder use today.
+            // Reference: Microsoft, "Check constraints - EF Core." Accessed: Oct. 20, 2026. [Online]. Available: https://learn.microsoft.com/en-us/ef/core/modeling/constraints#check-constraints
+            string[] taskStatuses = ["To Do", "In Progress", "Blocked", "Done", Lifecycle.TaskCancelled, Lifecycle.TaskArchived];
+            string[] requestStatuses = [Lifecycle.RequestStart, Lifecycle.RequestUnderReview, Lifecycle.RequestEscalated, "Approved", Lifecycle.RequestDeclined, "Completed"];
+            string[] userStatuses = [Lifecycle.UserPending, Lifecycle.UserActive, Lifecycle.UserLocked, Lifecycle.UserInactive, Lifecycle.UserAnonymised];
+            string[] priorities = ["Low", "Normal", "Medium", "High"];
+            string[] projectStatuses = ["Active", Lifecycle.ProjectClosed, Lifecycle.ProjectCancelled];
+            string[] days = Enum.GetNames<DayOfWeek>();
+
+            b.Entity<ProjectTask>().ToTable(t =>
+            {
+                t.HasCheckConstraint("CK_Task_Status", In("Status", taskStatuses));
+                t.HasCheckConstraint("CK_Task_Priority", In("Priority", priorities));
+            });
+            b.Entity<TaskStatusHistory>().ToTable(t => t.HasCheckConstraint("CK_TaskStatusHistory_NewStatus", In("NewStatus", taskStatuses)));
+            b.Entity<ResourceRequest>().ToTable(t =>
+            {
+                t.HasCheckConstraint("CK_ResourceRequest_Status", In("Status", requestStatuses));
+                t.HasCheckConstraint("CK_ResourceRequest_Priority", In("Priority", priorities));
+            });
+            b.Entity<RequestStatusHistory>().ToTable(t => t.HasCheckConstraint("CK_RequestStatusHistory_NewStatus", In("NewStatus", requestStatuses)));
+            b.Entity<User>().ToTable(t => t.HasCheckConstraint("CK_User_Status", In("Status", userStatuses)));
+            b.Entity<Project>().ToTable(t => t.HasCheckConstraint("CK_Project_Status", In("Status", projectStatuses)));
+            b.Entity<TaskSchedule>().ToTable(t => t.HasCheckConstraint("CK_TaskSchedule_DayOfWeek", In("DayOfWeek", days)));
+
+            static string In(string column, string[] values) =>
+                $"[{column}] IN ({string.Join(", ", values.Select(v => $"'{v}'"))})";
         }
     }
 }
