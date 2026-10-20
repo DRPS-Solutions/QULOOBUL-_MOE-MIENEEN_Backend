@@ -378,8 +378,10 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
 
                     b.Property<string>("Status")
                         .IsRequired()
+                        .ValueGeneratedOnAdd()
                         .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)");
+                        .HasColumnType("nvarchar(30)")
+                        .HasDefaultValue("Active");
 
                     b.Property<string>("Surname")
                         .IsRequired()
@@ -694,7 +696,9 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
                         .HasColumnType("nvarchar(2000)");
 
                     b.Property<int>("PercentComplete")
-                        .HasColumnType("int");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
 
                     b.Property<string>("Priority")
                         .IsRequired()
@@ -703,6 +707,12 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
 
                     b.Property<int>("ProjectId")
                         .HasColumnType("int");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
 
                     b.Property<int?>("ScheduleId")
                         .HasColumnType("int");
@@ -829,6 +839,12 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
 
                     b.Property<int?>("ReviewedBy")
                         .HasColumnType("int");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
 
                     b.Property<string>("Status")
                         .IsRequired()

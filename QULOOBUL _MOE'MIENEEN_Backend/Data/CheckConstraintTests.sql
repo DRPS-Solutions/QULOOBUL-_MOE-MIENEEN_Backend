@@ -1,5 +1,5 @@
 -- Proves the CHECK constraints (Add{Range,AllowedValue,CrossColumn,NotBlank}CheckConstraints) and the
--- unique token index (AddQueryIndexes) reject bad data.
+-- unique token index (AddQueryIndexes) reject bad data, and that column defaults and RowVersion work.
 -- Each test runs one invalid UPDATE against an existing row; the whole run is rolled back, so nothing changes.
 -- Run:  sqlcmd -S .\SQLEXPRESS -d QuloobulMoeMieneen -E -C -W -i Data/CheckConstraintTests.sql
 -- Expect: every "expect" = reject row shows the constraint that stopped it, and every accept (control) row
@@ -87,6 +87,39 @@ BEGIN
     END
     SET @id += 1;
 END
+
+-- column defaults and optimistic concurrency (AddDefaultsAndRowVersion); counted in the same failure total
+DECLARE @tid int, @rid int, @rv1 varbinary(8), @rv2 varbinary(8), @rows int;
+INSERT [Task] (ProjectId, CreatedBy, Title, Priority, Status, Deadline)
+    SELECT TOP (1) ProjectId, CreatedBy, 'default test', 'Normal', 'To Do', SYSUTCDATETIME() FROM [Task];
+SET @tid = SCOPE_IDENTITY();
+INSERT @out VALUES (@max + 1, 'Task.PercentComplete defaults to 0',
+    CASE WHEN (SELECT PercentComplete FROM [Task] WHERE TaskId = @tid) = 0 THEN 'ok: default applied' ELSE 'FAIL: default not applied' END);
+INSERT [User] (RoleId, FirstName, Surname, Email, CellNo, PasswordHash, IsActive, FailedLoginCount, MustChangePassword)
+    SELECT TOP (1) RoleId, 'D', 'T', 'default@test.co', '', '', 1, 0, 0 FROM [User];
+INSERT @out VALUES (@max + 2, 'User.Status defaults to Active',
+    CASE WHEN (SELECT Status FROM [User] WHERE Email = 'default@test.co') = 'Active' THEN 'ok: default applied' ELSE 'FAIL: default not applied' END);
+
+SELECT @rv1 = RowVersion FROM [Task] WHERE TaskId = @tid;
+UPDATE [Task] SET Title = 'changed' WHERE TaskId = @tid;
+SELECT @rv2 = RowVersion FROM [Task] WHERE TaskId = @tid;
+INSERT @out VALUES (@max + 3, 'Task.RowVersion changes on update',
+    CASE WHEN @rv1 <> @rv2 THEN 'ok: token changed' ELSE 'FAIL: token unchanged' END);
+UPDATE [Task] SET Title = 'stale writer' WHERE TaskId = @tid AND RowVersion = @rv1; -- the WHERE EF adds to every save
+SET @rows = @@ROWCOUNT;
+INSERT @out VALUES (@max + 4, 'Task update with stale RowVersion',
+    CASE WHEN @rows = 0 THEN 'ok: matched 0 rows (EF raises a concurrency error)' ELSE 'FAIL: stale write went through' END);
+
+SET @rid = (SELECT TOP (1) RequestId FROM [Resource_Request]);
+SELECT @rv1 = RowVersion FROM [Resource_Request] WHERE RequestId = @rid;
+UPDATE [Resource_Request] SET Priority = 'High' WHERE RequestId = @rid;
+SELECT @rv2 = RowVersion FROM [Resource_Request] WHERE RequestId = @rid;
+INSERT @out VALUES (@max + 5, 'Resource_Request.RowVersion changes on update',
+    CASE WHEN @rv1 <> @rv2 THEN 'ok: token changed' ELSE 'FAIL: token unchanged' END);
+UPDATE [Resource_Request] SET Priority = 'Low' WHERE RequestId = @rid AND RowVersion = @rv1;
+SET @rows = @@ROWCOUNT;
+INSERT @out VALUES (@max + 6, 'Request update with stale RowVersion',
+    CASE WHEN @rows = 0 THEN 'ok: matched 0 rows (EF raises a concurrency error)' ELSE 'FAIL: stale write went through' END);
 ROLLBACK;
 
 SELECT test, outcome FROM @out ORDER BY id;

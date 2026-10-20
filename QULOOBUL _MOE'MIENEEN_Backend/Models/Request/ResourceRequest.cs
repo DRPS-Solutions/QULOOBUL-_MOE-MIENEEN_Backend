@@ -18,6 +18,9 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Models.Request
         /// <summary>Not in the original ERD; UC-05's request form describes what is needed.</summary>
         [MaxLength(1000)] public string? Detail { get; set; }
 
+        /// <summary>Optimistic-concurrency token: two reviewers deciding the same request cannot both win.</summary>
+        [Timestamp] public byte[] RowVersion { get; set; } = [];
+
         [ForeignKey(nameof(RequestedBy))] public User? Requester { get; set; }
         [ForeignKey(nameof(CategoryId))] public RequestCategory? Category { get; set; }
         [ForeignKey(nameof(ReviewedBy))] public User? Reviewer { get; set; }

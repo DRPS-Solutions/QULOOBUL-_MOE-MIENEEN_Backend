@@ -210,6 +210,12 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Data
                 t.HasCheckConstraint("CK_User_EmailFormat", "[Email] LIKE '%_@_%._%'");
             });
 
+            // Column defaults, so a row inserted outside EF (a script, a manual fix) still starts valid.
+            // Only non-bool values: EF treats the CLR default (false) as "unset", so a default of true would
+            // silently overwrite an explicit false.
+            b.Entity<User>().Property(x => x.Status).HasDefaultValue(Lifecycle.UserActive);
+            b.Entity<ProjectTask>().Property(x => x.PercentComplete).HasDefaultValue(0);
+
             static string NotBlank(string column) => $"LEN(LTRIM(RTRIM([{column}]))) > 0";
 
             static string In(string column, string[] values) =>
