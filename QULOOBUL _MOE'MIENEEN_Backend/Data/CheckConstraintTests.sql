@@ -1,9 +1,10 @@
--- Proves the CHECK constraints (Add{Range,AllowedValue,CrossColumn}CheckConstraints) reject bad data.
+-- Proves the CHECK constraints (Add{Range,AllowedValue,CrossColumn,NotBlank}CheckConstraints) reject bad data.
 -- Each test runs one invalid UPDATE against an existing row; the whole run is rolled back, so nothing changes.
 -- Run:  sqlcmd -S .\SQLEXPRESS -d QuloobulMoeMieneen -E -C -W -i Data/CheckConstraintTests.sql
 -- Expect: every "expect" = reject row shows the constraint that stopped it, and every accept (control) row
 -- shows "accepted". Any "NOT REJECTED" / "REJECTED (unexpected)" line is a failure. Needs >= 1 row per table.
 SET NOCOUNT ON;
+SET QUOTED_IDENTIFIER ON; -- sqlcmd defaults it off, and Event's filtered index refuses updates without it
 DECLARE @tests TABLE (id int IDENTITY, expect varchar(6), test varchar(60), stmt nvarchar(400));
 INSERT @tests (expect, test, stmt) VALUES
  ('reject', 'Task.PercentComplete = 101',        N'UPDATE TOP (1) [Task] SET PercentComplete = 101'),
@@ -37,7 +38,23 @@ INSERT @tests (expect, test, stmt) VALUES
  ('reject', 'Request Declined without reviewer', N'UPDATE TOP (1) [Resource_Request] SET Status = ''Declined'', ReviewedBy = NULL'),
  ('accept', 'Request Approved with reviewer',    N'UPDATE TOP (1) [Resource_Request] SET Status = ''Approved'', ReviewedBy = (SELECT TOP (1) UserId FROM [User])'),
  ('reject', 'Task Done without CompletedBy',     N'UPDATE TOP (1) [Task] SET Status = ''Done'', CompletedBy = NULL'),
- ('accept', 'Task Done with CompletedBy',        N'UPDATE TOP (1) [Task] SET Status = ''Done'', CompletedBy = (SELECT TOP (1) UserId FROM [User])');
+ ('accept', 'Task Done with CompletedBy',        N'UPDATE TOP (1) [Task] SET Status = ''Done'', CompletedBy = (SELECT TOP (1) UserId FROM [User])'),
+ -- non-empty text rules (AddNotBlankCheckConstraints)
+ ('reject', 'Project.ProjectName empty',         N'UPDATE TOP (1) [Project] SET ProjectName = '''''),
+ ('accept', 'Project.ProjectName set',           N'UPDATE TOP (1) [Project] SET ProjectName = ''Test'''),
+ ('reject', 'Task.Title spaces only',            N'UPDATE TOP (1) [Task] SET Title = ''   '''),
+ ('accept', 'Task.Title set',                    N'UPDATE TOP (1) [Task] SET Title = ''Test'''),
+ ('reject', 'Meeting.Title empty',               N'UPDATE TOP (1) [Meeting] SET Title = '''''),
+ ('reject', 'Event.Title empty',                 N'UPDATE TOP (1) [Event] SET Title = '''''),
+ ('reject', 'File_Upload.FileName empty',        N'UPDATE TOP (1) [File_Upload] SET FileName = '''''),
+ ('reject', 'File_Upload.FilePath spaces only',  N'UPDATE TOP (1) [File_Upload] SET FilePath = ''   '''),
+ ('accept', 'File_Upload name and path set',     N'UPDATE TOP (1) [File_Upload] SET FileName = ''a.pdf'', FilePath = ''c/a.pdf'''),
+ ('reject', 'User.FirstName empty',              N'UPDATE TOP (1) [User] SET FirstName = '''''),
+ ('reject', 'User.Surname spaces only',          N'UPDATE TOP (1) [User] SET Surname = ''  '''),
+ ('accept', 'User names set',                    N'UPDATE TOP (1) [User] SET FirstName = ''A'', Surname = ''B'''),
+ ('reject', 'User.Email no @',                   N'UPDATE TOP (1) [User] SET Email = ''not-an-email'''),
+ ('reject', 'User.Email no dot after @',         N'UPDATE TOP (1) [User] SET Email = ''a@b'''),
+ ('accept', 'User.Email well formed',            N'UPDATE TOP (1) [User] SET Email = ''a@b.co''');
 
 DECLARE @out TABLE (id int, test varchar(60), outcome varchar(120));
 DECLARE @id int = 1, @max int = (SELECT MAX(id) FROM @tests), @stmt nvarchar(400), @expect varchar(6), @test varchar(60), @err nvarchar(2000), @ck nvarchar(100);

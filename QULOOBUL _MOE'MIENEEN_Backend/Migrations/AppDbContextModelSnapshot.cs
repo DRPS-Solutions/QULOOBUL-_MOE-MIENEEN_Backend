@@ -54,7 +54,10 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
                         .IsUnique()
                         .HasFilter("[Location] <> ''");
 
-                    b.ToTable("Event");
+                    b.ToTable("Event", t =>
+                        {
+                            t.HasCheckConstraint("CK_Event_TitleNotBlank", "LEN(LTRIM(RTRIM([Title]))) > 0");
+                        });
                 });
 
             modelBuilder.Entity("QULOOBUL__MOE_MIENEEN_Backend.Models.Collaboration.EventAttendee", b =>
@@ -109,7 +112,10 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
 
                     b.HasIndex("OrganiserId");
 
-                    b.ToTable("Meeting");
+                    b.ToTable("Meeting", t =>
+                        {
+                            t.HasCheckConstraint("CK_Meeting_TitleNotBlank", "LEN(LTRIM(RTRIM([Title]))) > 0");
+                        });
                 });
 
             modelBuilder.Entity("QULOOBUL__MOE_MIENEEN_Backend.Models.Collaboration.MeetingAttendee", b =>
@@ -245,6 +251,10 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
 
                     b.ToTable("File_Upload", t =>
                         {
+                            t.HasCheckConstraint("CK_FileUpload_FileNameNotBlank", "LEN(LTRIM(RTRIM([FileName]))) > 0");
+
+                            t.HasCheckConstraint("CK_FileUpload_FilePathNotBlank", "LEN(LTRIM(RTRIM([FilePath]))) > 0");
+
                             t.HasCheckConstraint("CK_FileUpload_OneContext", "((CASE WHEN [TaskId] IS NULL THEN 0 ELSE 1 END) + (CASE WHEN [MeetingId] IS NULL THEN 0 ELSE 1 END) + (CASE WHEN [PeriodMonth] IS NULL THEN 0 ELSE 1 END)) <= 1");
                         });
                 });
@@ -383,11 +393,17 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
                         {
                             t.HasCheckConstraint("CK_User_ActiveMatchesStatus", "([IsActive] = 1 AND [Status] = 'Active') OR ([IsActive] = 0 AND [Status] <> 'Active')");
 
+                            t.HasCheckConstraint("CK_User_EmailFormat", "[Email] LIKE '%_@_%._%'");
+
                             t.HasCheckConstraint("CK_User_FailedLoginCount", "[FailedLoginCount] >= 0");
+
+                            t.HasCheckConstraint("CK_User_FirstNameNotBlank", "LEN(LTRIM(RTRIM([FirstName]))) > 0");
 
                             t.HasCheckConstraint("CK_User_InactiveHasDate", "[Status] <> 'Inactive' OR [DeactivatedAt] IS NOT NULL");
 
                             t.HasCheckConstraint("CK_User_Status", "[Status] IN ('Pending Activation', 'Active', 'Locked', 'Inactive', 'Anonymised')");
+
+                            t.HasCheckConstraint("CK_User_SurnameNotBlank", "LEN(LTRIM(RTRIM([Surname]))) > 0");
 
                             t.HasCheckConstraint("CK_User_TokenPair", "([PasswordTokenHash] IS NULL AND [PasswordTokenExpires] IS NULL) OR ([PasswordTokenHash] IS NOT NULL AND [PasswordTokenExpires] IS NOT NULL)");
                         });
@@ -615,6 +631,8 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
 
                     b.ToTable("Project", t =>
                         {
+                            t.HasCheckConstraint("CK_Project_NameNotBlank", "LEN(LTRIM(RTRIM([ProjectName]))) > 0");
+
                             t.HasCheckConstraint("CK_Project_Status", "[Status] IN ('Active', 'Closed', 'Cancelled')");
                         });
                 });
@@ -710,6 +728,8 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
                             t.HasCheckConstraint("CK_Task_Priority", "[Priority] IN ('Low', 'Normal', 'Medium', 'High')");
 
                             t.HasCheckConstraint("CK_Task_Status", "[Status] IN ('To Do', 'In Progress', 'Blocked', 'Done', 'Cancelled', 'Archived')");
+
+                            t.HasCheckConstraint("CK_Task_TitleNotBlank", "LEN(LTRIM(RTRIM([Title]))) > 0");
                         });
                 });
 

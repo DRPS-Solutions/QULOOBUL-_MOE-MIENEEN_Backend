@@ -179,6 +179,28 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Data
             b.Entity<ProjectTask>().ToTable(t => t.HasCheckConstraint("CK_Task_DoneHasCompletedBy",
                 "[Status] <> 'Done' OR [CompletedBy] IS NOT NULL"));
 
+            // Required text must hold something: [MaxLength] allows '' and the DTO [Required] checks stop
+            // at the API, so these stop an empty or all-space value from any other write path.
+            // (Event.Location and the other optional text columns are deliberately left blank-able.)
+            b.Entity<Project>().ToTable(t => t.HasCheckConstraint("CK_Project_NameNotBlank", NotBlank("ProjectName")));
+            b.Entity<ProjectTask>().ToTable(t => t.HasCheckConstraint("CK_Task_TitleNotBlank", NotBlank("Title")));
+            b.Entity<Meeting>().ToTable(t => t.HasCheckConstraint("CK_Meeting_TitleNotBlank", NotBlank("Title")));
+            b.Entity<Event>().ToTable(t => t.HasCheckConstraint("CK_Event_TitleNotBlank", NotBlank("Title")));
+            b.Entity<FileUpload>().ToTable(t =>
+            {
+                t.HasCheckConstraint("CK_FileUpload_FileNameNotBlank", NotBlank("FileName"));
+                t.HasCheckConstraint("CK_FileUpload_FilePathNotBlank", NotBlank("FilePath"));
+            });
+            b.Entity<User>().ToTable(t =>
+            {
+                t.HasCheckConstraint("CK_User_FirstNameNotBlank", NotBlank("FirstName"));
+                t.HasCheckConstraint("CK_User_SurnameNotBlank", NotBlank("Surname"));
+                // Basic shape only (something@something.something); full validation stays in the DTO's [EmailAddress].
+                t.HasCheckConstraint("CK_User_EmailFormat", "[Email] LIKE '%_@_%._%'");
+            });
+
+            static string NotBlank(string column) => $"LEN(LTRIM(RTRIM([{column}]))) > 0";
+
             static string In(string column, string[] values) =>
                 $"[{column}] IN ({string.Join(", ", values.Select(v => $"'{v}'"))})";
         }
