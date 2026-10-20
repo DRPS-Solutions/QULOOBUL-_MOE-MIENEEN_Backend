@@ -521,7 +521,7 @@ public sealed class AppState : Observable
             await Alert("Live updates are unavailable; other people's changes appear when you reopen a page.");
         }
     }
-
+//----------------------------------------------------------------------------------------------------------------------//
     private void On(string eventName, params Func<Task>[] refreshes) =>
         _hub!.On<JsonElement>(eventName, _ => Task.WhenAll(refreshes.Select(refresh => refresh())));
 
@@ -535,7 +535,7 @@ public sealed class AppState : Observable
 
     public async Task<bool> SendAsync(HttpMethod method, string url, object? body = null) =>
         await Send(method, url, body) is not null;
-
+//----------------------------------------------------------------------------------------------------------------------//
     private async Task<HttpResponseMessage?> Send(HttpMethod method, string url, object? body)
     {
         HttpResponseMessage res;
@@ -564,7 +564,7 @@ public sealed class AppState : Observable
         }
         return null;
     }
-
+//----------------------------------------------------------------------------------------------------------------------//
     // The API's own errors are ErrorResponse { message }; model validation failures are ProblemDetails.
     private static async Task<string> ErrorMessage(HttpResponseMessage res)
     {
@@ -623,3 +623,4 @@ public sealed class AppState : Observable
         return new UriBuilder(serverUri) { Host = "10.0.2.2" }.Uri;
     }
 }
+//---------------------------DDDDDDDDDDDoooooooooooooo END OF FILE DDDDDDDDDDDoooooooooooooo---------------------------//

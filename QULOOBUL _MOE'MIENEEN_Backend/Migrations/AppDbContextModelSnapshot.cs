@@ -17,7 +17,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.11")
+                .HasAnnotation("ProductVersion", "10.0.13")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
@@ -379,7 +379,10 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
 
                     b.HasIndex("RoleId");
 
-                    b.ToTable("User");
+                    b.ToTable("User", t =>
+                        {
+                            t.HasCheckConstraint("CK_User_FailedLoginCount", "[FailedLoginCount] >= 0");
+                        });
                 });
 
             modelBuilder.Entity("QULOOBUL__MOE_MIENEEN_Backend.Models.IdentityAndAccess.UserDirectoryEntry", b =>
@@ -568,7 +571,10 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
 
                     b.HasIndex("SubjectUserId");
 
-                    b.ToTable("Report");
+                    b.ToTable("Report", t =>
+                        {
+                            t.HasCheckConstraint("CK_Report_PeriodOrder", "[PeriodEnd] >= [PeriodStart]");
+                        });
                 });
 
             modelBuilder.Entity("QULOOBUL__MOE_MIENEEN_Backend.Models.Project.Project", b =>
@@ -684,7 +690,10 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
 
                     b.HasIndex("ProjectId", "Status");
 
-                    b.ToTable("Task");
+                    b.ToTable("Task", t =>
+                        {
+                            t.HasCheckConstraint("CK_Task_PercentComplete", "[PercentComplete] BETWEEN 0 AND 100");
+                        });
                 });
 
             modelBuilder.Entity("QULOOBUL__MOE_MIENEEN_Backend.Models.Request.RequestCategory", b =>

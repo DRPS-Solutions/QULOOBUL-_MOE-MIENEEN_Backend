@@ -121,6 +121,16 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Data
                 "((CASE WHEN [TaskId] IS NULL THEN 0 ELSE 1 END) + " +
                 "(CASE WHEN [MeetingId] IS NULL THEN 0 ELSE 1 END) + " +
                 "(CASE WHEN [PeriodMonth] IS NULL THEN 0 ELSE 1 END)) <= 1"));
+
+            // Domain (range) rules held by the database as well as the services, so a bad write from
+            // any path (a future endpoint, a script, a manual UPDATE) is rejected rather than stored.
+            // Reference: T. M. Connolly and C. E. Begg, Database Systems: A Practical Approach to Design, Implementation, and Management. Boston, MA, USA: Addison-Wesley, 2010.
+            b.Entity<ProjectTask>().ToTable(t => t.HasCheckConstraint(
+                "CK_Task_PercentComplete", "[PercentComplete] BETWEEN 0 AND 100"));
+            b.Entity<Report>().ToTable(t => t.HasCheckConstraint(
+                "CK_Report_PeriodOrder", "[PeriodEnd] >= [PeriodStart]"));
+            b.Entity<User>().ToTable(t => t.HasCheckConstraint(
+                "CK_User_FailedLoginCount", "[FailedLoginCount] >= 0"));
         }
     }
 }
