@@ -26,6 +26,8 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
         /// </summary>
         public async Task<TaskAssignment> AssignAsync(int taskId, int assigneeId, int assignedById)
         {
+            // Without this a stranger could assign themselves, and an assignee may open the task.
+            await guard.EnsureTaskAsync(assignedById, taskId);
             var task = await db.Tasks.FindAsync(taskId)
                 ?? throw new KeyNotFoundException($"Task {taskId} not found.");
 
@@ -61,6 +63,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
         /// assigning: nobody removes someone more senior than themselves.</summary>
         public async Task UnassignAsync(int taskId, int userId, int actorId)
         {
+            await guard.EnsureTaskAsync(actorId, taskId);
             var assignment = await db.TaskAssignments.Include(a => a.User).Include(a => a.Task)
                 .FirstOrDefaultAsync(a => a.TaskId == taskId && a.UserId == userId)
                 ?? throw new KeyNotFoundException("That user is not assigned to this task.");

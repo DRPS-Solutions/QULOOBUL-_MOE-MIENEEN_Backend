@@ -282,7 +282,9 @@ State machines SM-01 (`ProjectTask`), SM-02 (`ResourceRequest`) and SM-03 (`User
 ### Rules worth knowing
 
 - **Sign-in.** An account locks after 5 consecutive failed sign-ins (`AuthService.MaxFailedLogins`)
-  and the admins are notified. New accounts get an emailed set-password link. An admin's Reset
+  and the admins are notified. The lock lifts itself after 15 minutes (`AuthService.LockoutPeriod`,
+  read from the `user.locked` audit row) so a stranger cannot lock the sole admin out for good; an
+  admin's reset still unlocks it at once. New accounts get an emailed set-password link. An admin's Reset
   Password issues a temporary password, shown once; it unlocks only the change-password route
   until the user picks their own.
 - **Forgot password** notifies the admins rather than emailing a link. The notification shows the

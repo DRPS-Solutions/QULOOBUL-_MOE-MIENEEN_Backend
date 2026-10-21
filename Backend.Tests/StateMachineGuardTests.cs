@@ -37,6 +37,53 @@ public class StateMachineGuardTests
         Assert.False(user.IsActive);
     }
 //----------------------------------------------------------------------------------------------------------------------//
+    // Anyone who knows an email can trigger the lock, so it has to expire or the sole admin is locked out for good.
+    [Fact]
+    public async Task A_locked_account_unlocks_itself_after_the_lockout_period()
+    {
+        using var db = NewDb();
+        var user = new User { Role = new Role { RoleName = Roles.Staff }, Email = "alice@test" };
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+        var auth = Auth(db);
+        user.PasswordHash = auth.Hash(user, "right-pass1");
+        await db.SaveChangesAsync();
+        Task Wrong() => auth.LoginAsync(new LoginRequest { Email = "alice@test", Password = "wrong" });
+
+        for (var i = 0; i < AuthService.MaxFailedLogins; i++)
+            await Assert.ThrowsAsync<UnauthorizedAccessException>(Wrong);
+        Assert.Contains("locked", (await Assert.ThrowsAsync<UnauthorizedAccessException>(Wrong)).Message);
+
+        (await db.AuditLogs.SingleAsync(a => a.Action == "user.locked")).Timestamp =
+            DateTime.UtcNow - AuthService.LockoutPeriod - TimeSpan.FromMinutes(1);
+        await db.SaveChangesAsync();
+
+        // Past the period the attempt reaches the password check instead of being refused as locked.
+        Assert.Equal("Invalid email or password.", (await Assert.ThrowsAsync<UnauthorizedAccessException>(Wrong)).Message);
+        Assert.Equal(Lifecycle.UserActive, user.Status);
+        Assert.Equal(1, user.FailedLoginCount);
+    }
+//----------------------------------------------------------------------------------------------------------------------//
+    // Assigning makes you an assignee, and an assignee may open the task: so assigning needs access first.
+    [Fact]
+    public async Task A_stranger_cannot_assign_themselves_to_or_unassign_anyone_from_a_task_they_cannot_see()
+    {
+        using var db = NewDb();
+        var role = new Role { RoleName = Roles.Staff, HierarchyLevel = 4 };
+        User owner = new() { Role = role, Email = "o@test", IsActive = true },
+             stranger = new() { Role = role, Email = "s@test", IsActive = true },
+             assignee = new() { Role = role, Email = "a@test", IsActive = true };
+        var task = new ProjectTask { Project = new Project { Owner = owner }, Creator = owner, Status = "To Do" };
+        db.AddRange(owner, stranger, assignee, task, new TaskAssignment { Task = task, User = assignee });
+        await db.SaveChangesAsync();
+        var tasks = Tasks(db);
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => tasks.AssignAsync(task.TaskId, stranger.UserId, stranger.UserId));
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => tasks.UnassignAsync(task.TaskId, assignee.UserId, stranger.UserId));
+
+        Assert.Equal(assignee.UserId, (await db.TaskAssignments.SingleAsync()).UserId);
+    }
+//----------------------------------------------------------------------------------------------------------------------//
     [Fact]
     public async Task A_task_cannot_start_without_an_assignee_and_reopening_needs_ReopenTask()
     {

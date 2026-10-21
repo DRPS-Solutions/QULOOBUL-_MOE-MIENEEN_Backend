@@ -27,6 +27,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
         public const string FailedAction = "auth.login.failed";
         public const int MaxFailedLogins = 5;
         public static readonly TimeSpan PasswordTokenLifetime = TimeSpan.FromDays(3);
+        public static readonly TimeSpan LockoutPeriod = TimeSpan.FromMinutes(15);
 //----------------------------------------------------------------------------------------------------------------------//
         public async Task<AuthResponse> LoginAsync(LoginRequest req)
         {
@@ -41,6 +42,16 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
                 throw new UnauthorizedAccessException("Invalid email or password.");
             }
 
+            // Anyone who knows an email can lock that account with failed sign-ins, so the lock lifts itself;
+            // otherwise the sole admin could be locked out for good.
+            if (user.Status == Lifecycle.UserLocked && await LockedAtAsync(user.UserId) is { } at
+                && DateTime.UtcNow - at >= LockoutPeriod)
+            {
+                Lifecycle.MoveUser(user, Lifecycle.UserActive);
+                user.FailedLoginCount = 0;
+                audit.Record(user.UserId, "user.unlocked", nameof(User), user.UserId);
+            }
+
             // SM-03 note: pending, locked and deactivated are all "not active" but are told apart at login.
             if (!user.IsActive)
             {
@@ -48,7 +59,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
                 throw new UnauthorizedAccessException(user.Status switch
                 {
                     Lifecycle.UserPending => "This account has not been activated. Use the link in your activation email.",
-                    Lifecycle.UserLocked => "This account is locked after too many failed sign-ins. Use the Forgot password link to ask the system admin for a temporary password.",
+                    Lifecycle.UserLocked => $"This account is locked after too many failed sign-ins. Try again in {LockoutPeriod.TotalMinutes:0} minutes, or use the Forgot password link to ask the system admin for a temporary password.",
                     _ => "This account is deactivated.",
                 });
             }
@@ -215,6 +226,11 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
 //----------------------------------------------------------------------------------------------------------------------//
         private static string HashToken(string token) =>
             Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
+//----------------------------------------------------------------------------------------------------------------------//
+        /// <summary>When the account was last locked: the audit trail already holds it, so no extra column.</summary>
+        private Task<DateTime?> LockedAtAsync(int userId) =>
+            db.AuditLogs.Where(a => a.UserId == userId && a.Action == "user.locked")
+                .MaxAsync(a => (DateTime?)a.Timestamp);
 //----------------------------------------------------------------------------------------------------------------------//
         private Task RecordFailureAsync(int userId) =>
             audit.RecordAndSaveAsync(userId, FailedAction, nameof(User), userId);

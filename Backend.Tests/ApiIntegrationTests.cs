@@ -161,6 +161,37 @@ public class ApiIntegrationTests(ApiFactory api) : IClassFixture<ApiFactory>
             new { userIds = new[] { 1 }, message = "hi" })).StatusCode);
     }
 //----------------------------------------------------------------------------------------------------------------------//
+    // The route policies read "perm" claims out of the token, so a changed role has to end that token.
+    [Fact]
+    public async Task A_token_stops_working_when_its_users_role_changes()
+    {
+        var (admin, _) = await api.SignInAsync(ApiFactory.AdminEmail);
+        string email;
+        int userId;
+        using (var scope = api.Services.CreateScope())
+        {
+            var db = api.Db(scope);
+            var user = new User
+            {
+                RoleId = await db.Roles.Where(r => r.RoleName == Roles.Staff).Select(r => r.RoleId).SingleAsync(),
+                FirstName = "Role", Surname = "Change", Email = $"{Guid.NewGuid():N}@test.local",
+            };
+            user.PasswordHash = new PasswordHasher<User>().HashPassword(user, ApiFactory.Password);
+            db.Users.Add(user);
+            await db.SaveChangesAsync();
+            (email, userId) = (user.Email, user.UserId);
+        }
+        var (client, _) = await api.SignInAsync(email);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/users/me")).StatusCode);
+
+        var fm = (await admin.GetFromJsonAsync<List<RoleDto>>("/api/roles"))!.First(r => r.RoleName == Roles.FacilityManager).RoleId;
+        (await admin.PatchAsJsonAsync($"/api/users/{userId}", new UpdateUserRequest { RoleId = fm })).EnsureSuccessStatusCode();
+
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/users/me")).StatusCode);
+        var (fresh, _) = await api.SignInAsync(email);
+        Assert.Equal(HttpStatusCode.OK, (await fresh.GetAsync("/api/users/me")).StatusCode);
+    }
+//----------------------------------------------------------------------------------------------------------------------//
     [Fact]
     public async Task Only_the_admin_reads_a_users_audit_trail()
     {

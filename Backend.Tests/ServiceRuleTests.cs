@@ -2,7 +2,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using QULOOBUL__MOE_MIENEEN_Backend.Data;
 using QULOOBUL__MOE_MIENEEN_Backend.Models.Collaboration;
+using QULOOBUL__MOE_MIENEEN_Backend.Models.File;
 using QULOOBUL__MOE_MIENEEN_Backend.Models.IdentityAndAccess;
+using QULOOBUL__MOE_MIENEEN_Backend.Models.Project;
 using QULOOBUL__MOE_MIENEEN_Backend.Models.Request;
 using QULOOBUL__MOE_MIENEEN_Backend.Services;
 using Xunit;
@@ -113,7 +115,7 @@ public class ServiceRuleTests
     public async Task Uploads_are_validated_before_a_SAS_is_issued(string fileName, long size, bool permitted)
     {
         using var db = NewDb();
-        var uploads = new FileUploadService(db, null!, new AuditService(db), new ConfigurationBuilder().Build());
+        var uploads = new FileUploadService(db, null!, new AuditService(db), new ConfigurationBuilder().Build(), new AccessGuard(db));
         var context = new FileUploadService.AttachmentContext();
 
         var attempt = () => uploads.CreateUploadAsync(1, 1, fileName, "application/octet-stream", size, context);
@@ -124,6 +126,30 @@ public class ServiceRuleTests
             await Assert.ThrowsAsync<InvalidOperationException>(attempt);
         else
             await Assert.ThrowsAsync<ArgumentException>(attempt);
+    }
+//----------------------------------------------------------------------------------------------------------------------//
+    // A file inherits the access of what it is attached to, so you cannot attach one to what you cannot open.
+    [Fact]
+    public async Task Uploads_cannot_be_attached_to_a_task_or_meeting_the_caller_cannot_see()
+    {
+        using var db = NewDb();
+        var role = new Role { RoleName = Roles.Staff, HierarchyLevel = 4 };
+        User owner = new() { Role = role, Email = "o@test", IsActive = true },
+             stranger = new() { Role = role, Email = "s@test", IsActive = true };
+        var task = new ProjectTask
+            { Project = new Project { Owner = owner }, Creator = owner, Status = "To Do" };
+        var meeting = new Meeting { Organiser = owner, Title = "Closed session" };
+        db.AddRange(owner, stranger, task, meeting, new FileCategory { CategoryName = "Minutes" });
+        await db.SaveChangesAsync();
+        var uploads = new FileUploadService(db, null!, new AuditService(db), new ConfigurationBuilder().Build(), new AccessGuard(db));
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => uploads.CreateUploadAsync(
+            stranger.UserId, 1, "a.pdf", "application/pdf", 1024, new FileUploadService.AttachmentContext(TaskId: task.TaskId)));
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => uploads.CreateUploadAsync(
+            stranger.UserId, 1, "a.pdf", "application/pdf", 1024, new FileUploadService.AttachmentContext(MeetingId: meeting.MeetingId)));
+        await Assert.ThrowsAsync<KeyNotFoundException>(() => uploads.CreateUploadAsync(
+            stranger.UserId, 1, "a.pdf", "application/pdf", 1024, new FileUploadService.AttachmentContext(TaskId: 9999)));
+        Assert.Empty(db.FileUploads);
     }
 //----------------------------------------------------------------------------------------------------------------------//
     // Reference: Microsoft, "Testing without your production database system - EF Core." Accessed: Oct. 04, 2026. [Online]. Available: https://learn.microsoft.com/en-us/ef/core/testing/testing-without-the-database
