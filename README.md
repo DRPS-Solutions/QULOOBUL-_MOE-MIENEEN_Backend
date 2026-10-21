@@ -20,6 +20,7 @@ live updates from the SignalR hub. See [What's not built yet](#whats-not-built-y
 - [Data model](#data-model)
   - [Database integrity](#database-integrity)
 - [API](#api)
+  - [API contract (OpenAPI)](#api-contract-openapi)
 - [Services](#services)
   - [Rules worth knowing](#rules-worth-knowing)
 - [Clients](#clients-1)
@@ -253,6 +254,23 @@ doc's layering: `Api.Controller` → `Api.Services` → `Api.DataAccess`.
 
 `Auth`, `Tasks`, `TaskSchedules`, `Projects`, `Requests`, `Meetings`, `Events`, `Notifications`,
 `Users`, `Files`, `Reports`, `Search`, plus `ApiControllerBase`.
+
+### API contract (OpenAPI)
+
+The API publishes its OpenAPI 3 document in every environment, not only in development:
+
+- **Live (Azure):** `https://<API-HOSTNAME>.azurewebsites.net/openapi/v1.json`
+  <!-- TODO: replace <API-HOSTNAME> with the deployed API's host (infra/main.bicep names it app-<name>-api-<env>-<suffix>) once CD has run. -->
+- **Local:** `http://localhost:5012/openapi/v1.json`
+
+The document needs no sign-in. It lists every route with its request and response shapes, declares
+the JWT bearer scheme (use **Authorize** in a client such as Postman, with the token from
+`POST /api/auth/login`), and notes the 401, 403 and 429 responses common to the routes. Import the
+URL into Postman, or any OpenAPI client, to generate a collection.
+
+Outside development it is controlled by the `OpenApi__Enabled` app setting, which `infra/main.bicep`
+sets to `true`; set it to `false` and redeploy to take the contract offline. It is JSON only, with
+no UI, so the API keeps its strict `default-src 'none'` Content-Security-Policy.
 
 ## Services
 

@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "QULOOBUL MOE'MIENEEN API",
-    "description": "Runs top to bottom: logs in as the seeded admin and the Staff dev user, then walks each controller. IDs created along the way are chained through collection variables. Set adminEmail/adminPassword/devPassword in the environment (from `dotnet user-secrets list`), never commit them.",
+    "description": "Runs top to bottom: logs in as the seeded admin and the Staff dev user, then walks each controller. IDs created along the way are chained through collection variables. Set adminEmail/adminPassword/devPassword in the environment (from `dotnet user-secrets list`), never commit them. The API contract is published as OpenAPI at <API-HOSTNAME>/openapi/v1.json (https://<API-HOSTNAME>.azurewebsites.net/openapi/v1.json once deployed; baseUrl/openapi/v1.json locally): import that URL to regenerate this collection.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
