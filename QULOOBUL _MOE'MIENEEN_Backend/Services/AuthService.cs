@@ -28,6 +28,20 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
         public const int MaxFailedLogins = 5;
         public static readonly TimeSpan PasswordTokenLifetime = TimeSpan.FromDays(3);
         public static readonly TimeSpan LockoutPeriod = TimeSpan.FromMinutes(15);
+
+        /// <summary>Audit action for a new password; a token issued before the latest one is refused (Program.cs).</summary>
+        public const string PasswordSetAction = "user.password.set";
+
+        /// <summary>
+        /// Every sign-in failure says this, whether the email is unknown, the password wrong, or the account
+        /// pending, locked or deactivated: telling them apart would let anyone probe which emails have accounts
+        /// and what state they are in. It explains the lock so a locked-out user is not left guessing.
+        /// </summary>
+        public static readonly string LoginFailed =
+            $"Invalid email or password. {MaxFailedLogins} failed attempts lock an account for {LockoutPeriod.TotalMinutes:0} minutes; use Forgot password to ask an admin for help.";
+
+        // Checked against when the email is unknown, so that case costs as much time as a real attempt.
+        private static readonly string DummyHash = Hasher.HashPassword(new User(), "not-a-real-password");
 //----------------------------------------------------------------------------------------------------------------------//
         public async Task<AuthResponse> LoginAsync(LoginRequest req)
         {
@@ -38,8 +52,9 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             {
                 // SD-01 writes LOGIN_FAILED against a user id; an unknown address has none, and
                 // Audit_Log's FK must resolve to a real person. Logged instead of audited.
+                Hasher.VerifyHashedPassword(new User(), DummyHash, req.Password);
                 log.LogWarning("Login attempt for unknown email address");
-                throw new UnauthorizedAccessException("Invalid email or password.");
+                throw new UnauthorizedAccessException(LoginFailed);
             }
 
             // Anyone who knows an email can lock that account with failed sign-ins, so the lock lifts itself;
@@ -52,29 +67,36 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
                 audit.Record(user.UserId, "user.unlocked", nameof(User), user.UserId);
             }
 
-            // SM-03 note: pending, locked and deactivated are all "not active" but are told apart at login.
+            // Verified even for an inactive account (and never acted on), so timing does not reveal its state.
+            var passwordOk = Hasher.VerifyHashedPassword(user, user.PasswordHash, req.Password)
+                != PasswordVerificationResult.Failed;
+
+            // SM-03 note: pending, locked and deactivated are all "not active"; the caller is told nothing more.
             if (!user.IsActive)
             {
                 await RecordFailureAsync(user.UserId);
-                throw new UnauthorizedAccessException(user.Status switch
-                {
-                    Lifecycle.UserPending => "This account has not been activated. Use the link in your activation email.",
-                    Lifecycle.UserLocked => $"This account is locked after too many failed sign-ins. Try again in {LockoutPeriod.TotalMinutes:0} minutes, or use the Forgot password link to ask the system admin for a temporary password.",
-                    _ => "This account is deactivated.",
-                });
+                throw new UnauthorizedAccessException(LoginFailed);
             }
 
-            if (Hasher.VerifyHashedPassword(user, user.PasswordHash, req.Password)
-                == PasswordVerificationResult.Failed)
+            if (!passwordOk)
             {
                 // SD-01, alt [valid = false]; SM-03 Authenticate [5 consecutive failures] → Locked.
                 user.FailedLoginCount++;
                 audit.Record(user.UserId, FailedAction, nameof(User), user.UserId);
                 if (user.FailedLoginCount >= MaxFailedLogins) await LockAsync(user);
                 else await db.SaveChangesAsync();
-                throw new UnauthorizedAccessException("Invalid email or password.");
+                throw new UnauthorizedAccessException(LoginFailed);
             }
 
+            var response = await IssueAsync(user);
+            user.FailedLoginCount = 0; // "consecutive": a success resets the count
+            await audit.RecordAndSaveAsync(user.UserId, "auth.login", nameof(User), user.UserId);
+            return response;
+        }
+//----------------------------------------------------------------------------------------------------------------------//
+        /// <summary>The signed token and the user details a client needs, for sign-in and for a password change.</summary>
+        private async Task<AuthResponse> IssueAsync(User user)
+        {
             var permissions = await (
                 from rp in db.RolePermissions
                 join p in db.Permissions on rp.PermissionId equals p.PermissionId
@@ -83,9 +105,6 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
 
             var roleName = user.Role?.RoleName ?? "Staff";
             var (token, expires) = tokens.Create(user, roleName, permissions);
-
-            user.FailedLoginCount = 0; // "consecutive": a success resets the count
-            await audit.RecordAndSaveAsync(user.UserId, "auth.login", nameof(User), user.UserId);
             return new AuthResponse(token, expires, user.UserId,
                 $"{user.FirstName} {user.Surname}", roleName, permissions, user.MustChangePassword);
         }
@@ -111,14 +130,19 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             user.PasswordTokenExpires = null;
             user.FailedLoginCount = 0;
             user.MustChangePassword = false;
-            await audit.RecordAndSaveAsync(user.UserId, "user.password.set", nameof(User), user.UserId);
+            await audit.RecordAndSaveAsync(user.UserId, PasswordSetAction, nameof(User), user.UserId);
         }
 //----------------------------------------------------------------------------------------------------------------------//
-        /// <summary>A signed-in user swaps their current (possibly temporary) password for one of their own.</summary>
-        public async Task ChangePasswordAsync(int userId, ChangePasswordRequest req)
+        /// <summary>
+        /// A signed-in user swaps their current (possibly temporary) password for one of their own. Every token
+        /// issued before now stops working (Program.cs), so a stolen session ends here; the caller gets a fresh
+        /// token to carry on with.
+        /// </summary>
+        public async Task<AuthResponse> ChangePasswordAsync(int userId, ChangePasswordRequest req)
         {
             EnsurePolicy(req.NewPassword);
-            var user = await db.Users.FindAsync(userId) ?? throw new KeyNotFoundException($"User {userId} not found.");
+            var user = await db.Users.Include(u => u.Role).FirstOrDefaultAsync(u => u.UserId == userId)
+                ?? throw new KeyNotFoundException($"User {userId} not found.");
             if (Hasher.VerifyHashedPassword(user, user.PasswordHash, req.CurrentPassword) == PasswordVerificationResult.Failed)
                 throw new InvalidOperationException("Your current password is incorrect.");
             if (req.NewPassword == req.CurrentPassword)
@@ -128,7 +152,8 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             user.MustChangePassword = false;
             user.PasswordTokenHash = null;
             user.PasswordTokenExpires = null;
-            await audit.RecordAndSaveAsync(userId, "user.password.set", nameof(User), userId);
+            await audit.RecordAndSaveAsync(userId, PasswordSetAction, nameof(User), userId);
+            return await IssueAsync(user);
         }
 //----------------------------------------------------------------------------------------------------------------------//
         /// <summary>A one-off password an admin can read out: 6 letters + 4 digits so it meets the policy,

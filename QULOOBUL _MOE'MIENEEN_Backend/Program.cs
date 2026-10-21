@@ -2,6 +2,7 @@ using Azure.Monitor.OpenTelemetry.AspNetCore;
 using Azure.Storage.Blobs;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using QULOOBUL__MOE_MIENEEN_Backend.SharedClasses.Auth;
@@ -131,6 +132,13 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                 // keep its old powers until the token expires.
                 else if (user.RoleName != c.Principal!.FindFirstValue(ClaimTypes.Role))
                     c.Fail("Your role changed. Sign in again.");
+                // A new password ends every older token, so a stolen session does not outlive the change. "iat" is
+                // whole seconds, hence the second of slack: the token issued with the change is never caught by it.
+                // The audit trail already holds when each password was set, so there is no extra column.
+                else if (c.SecurityToken is JsonWebToken { IssuedAt: var issued } && issued > DateTime.MinValue
+                    && await db.AuditLogs.AnyAsync(a => a.UserId == id && a.Action == AuthService.PasswordSetAction
+                        && a.Timestamp >= issued.AddSeconds(1)))
+                    c.Fail("Your password changed. Sign in again.");
                 // A temporary password unlocks only the change-password route.
                 else if (user.MustChangePassword && c.Request.Path != "/api/users/me/password")
                     c.Fail("Change your temporary password first.");

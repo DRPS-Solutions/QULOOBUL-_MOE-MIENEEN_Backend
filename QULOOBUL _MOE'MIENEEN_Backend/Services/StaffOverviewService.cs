@@ -20,9 +20,12 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
                 .ToListAsync();
 //----------------------------------------------------------------------------------------------------------------------//
         /// <summary>The seeded automation account is an implementation detail, not a colleague.</summary>
-        public Task<List<UserSummaryDto>> StaffAsync() =>
+        /// <remarks>Emails are the sign-in names, and Pending/Locked says which accounts are worth attacking,
+        /// so colleagues get neither: a blank email and only Active or Inactive.</remarks>
+        public Task<List<UserSummaryDto>> StaffAsync(bool seeAccountDetails) =>
             db.UserDirectory.Where(u => u.Email != SystemAccountEmail).Select(u => new UserSummaryDto(
-                u.UserId, u.FullName, u.Email, u.RoleName, u.IsActive, u.Status)).ToListAsync();
+                u.UserId, u.FullName, seeAccountDetails ? u.Email : "", u.RoleName, u.IsActive,
+                seeAccountDetails ? u.Status : u.IsActive ? "Active" : "Inactive")).ToListAsync();
     }
 }
 //---------------------------DDDDDDDDDDDoooooooooooooo END OF FILE DDDDDDDDDDDoooooooooooooo---------------------------//

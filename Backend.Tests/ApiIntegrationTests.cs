@@ -125,11 +125,36 @@ public class ApiIntegrationTests(ApiFactory api) : IClassFixture<ApiFactory>
     [Fact]
     public async Task The_directory_is_read_through_the_view_and_hides_the_system_account()
     {
-        var (client, _) = await api.SignInAsync(ApiFactory.StaffEmail);
-        var users = await client.GetFromJsonAsync<List<UserSummaryDto>>("/api/users");
+        var (admin, _) = await api.SignInAsync(ApiFactory.AdminEmail);
+        var users = await admin.GetFromJsonAsync<List<UserSummaryDto>>("/api/users");
 
         Assert.Contains(users!, u => u.Email == ApiFactory.AdminEmail && u.Role == Roles.Admin);
         Assert.DoesNotContain(users!, u => u.Email == SystemAccountEmail);
+    }
+//----------------------------------------------------------------------------------------------------------------------//
+    // Emails are sign-in names and Pending/Locked marks which accounts are worth attacking: colleagues get neither.
+    [Fact]
+    public async Task A_colleague_sees_names_but_not_login_emails_or_exact_account_status()
+    {
+        var pending = await AddStaffAsync();   // a user who has not activated their account yet
+        using (var scope = api.Services.CreateScope())
+        {
+            var db = api.Db(scope);
+            var user = (await db.Users.FindAsync(pending))!;
+            user.Status = Lifecycle.UserPending;
+            user.IsActive = false;
+            await db.SaveChangesAsync();
+        }
+        var (staff, _) = await api.SignInAsync(ApiFactory.StaffEmail);
+        var (admin, _) = await api.SignInAsync(ApiFactory.AdminEmail);
+
+        var seen = (await staff.GetFromJsonAsync<List<UserSummaryDto>>("/api/users"))!;
+        Assert.Contains(seen, u => u.Role == Roles.Admin && u.FullName.Length > 0);
+        Assert.All(seen, u => Assert.Equal("", u.Email));
+        Assert.Equal("Inactive", seen.Single(u => u.UserId == pending).Status);
+
+        var adminSees = (await admin.GetFromJsonAsync<List<UserSummaryDto>>("/api/users"))!;
+        Assert.Equal(Lifecycle.UserPending, adminSees.Single(u => u.UserId == pending).Status);
     }
 //----------------------------------------------------------------------------------------------------------------------//
     [Fact]
@@ -166,21 +191,7 @@ public class ApiIntegrationTests(ApiFactory api) : IClassFixture<ApiFactory>
     public async Task A_token_stops_working_when_its_users_role_changes()
     {
         var (admin, _) = await api.SignInAsync(ApiFactory.AdminEmail);
-        string email;
-        int userId;
-        using (var scope = api.Services.CreateScope())
-        {
-            var db = api.Db(scope);
-            var user = new User
-            {
-                RoleId = await db.Roles.Where(r => r.RoleName == Roles.Staff).Select(r => r.RoleId).SingleAsync(),
-                FirstName = "Role", Surname = "Change", Email = $"{Guid.NewGuid():N}@test.local",
-            };
-            user.PasswordHash = new PasswordHasher<User>().HashPassword(user, ApiFactory.Password);
-            db.Users.Add(user);
-            await db.SaveChangesAsync();
-            (email, userId) = (user.Email, user.UserId);
-        }
+        var (email, userId) = await AddStaffWithPasswordAsync();
         var (client, _) = await api.SignInAsync(email);
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/users/me")).StatusCode);
 
@@ -360,9 +371,36 @@ public class ApiIntegrationTests(ApiFactory api) : IClassFixture<ApiFactory>
 
         Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync("/api/users/me/password",
             new ChangePasswordRequest { CurrentPassword = "wrong", NewPassword = "brandnew99" })).StatusCode);
-        Assert.Equal(HttpStatusCode.NoContent, (await client.PostAsJsonAsync("/api/users/me/password",
-            new ChangePasswordRequest { CurrentPassword = temp, NewPassword = "brandnew99" })).StatusCode);
+        await Task.Delay(1100);   // tokens carry whole-second issue times; the change must land in a later second
+        var changed = await client.PostAsJsonAsync("/api/users/me/password",
+            new ChangePasswordRequest { CurrentPassword = temp, NewPassword = "brandnew99" });
+        Assert.Equal(HttpStatusCode.OK, changed.StatusCode);
+        var fresh = (await changed.Content.ReadFromJsonAsync<AuthResponse>())!;
+        Assert.False(fresh.MustChangePassword);
+
+        // The temporary-password token ends with the change; the fresh one carries on.
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/tasks")).StatusCode);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", fresh.Token);
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/tasks")).StatusCode);
+    }
+//----------------------------------------------------------------------------------------------------------------------//
+    // A stolen session must not survive the owner changing their password.
+    [Fact]
+    public async Task Changing_a_password_ends_every_other_session_but_not_the_one_that_changed_it()
+    {
+        var (email, _) = await AddStaffWithPasswordAsync();
+        var (thief, _) = await api.SignInAsync(email);
+        var (owner, _) = await api.SignInAsync(email);
+        Assert.Equal(HttpStatusCode.OK, (await thief.GetAsync("/api/users/me")).StatusCode);
+
+        await Task.Delay(1100);   // tokens carry whole-second issue times; the change must land in a later second
+        var changed = await owner.PostAsJsonAsync("/api/users/me/password",
+            new ChangePasswordRequest { CurrentPassword = ApiFactory.Password, NewPassword = "brandnew99" });
+        owner.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer",
+            (await changed.Content.ReadFromJsonAsync<AuthResponse>())!.Token);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, (await thief.GetAsync("/api/users/me")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await owner.GetAsync("/api/users/me")).StatusCode);
     }
 
     [Fact]
@@ -427,6 +465,22 @@ public class ApiIntegrationTests(ApiFactory api) : IClassFixture<ApiFactory>
         var mine = (await staff.GetFromJsonAsync<List<ResourceRequestDto>>("/api/requests"))!.Single(r => r.RequestId == id);
         Assert.Equal("Declined", mine.Status);
         Assert.Equal("Borrow the hall's one", mine.History.Single(h => h.NewStatus == "Declined").Note);
+    }
+//----------------------------------------------------------------------------------------------------------------------//
+    /// <summary>A staff user who can sign in with <see cref="ApiFactory.Password"/>.</summary>
+    private async Task<(string Email, int UserId)> AddStaffWithPasswordAsync()
+    {
+        using var scope = api.Services.CreateScope();
+        var db = api.Db(scope);
+        var user = new User
+        {
+            RoleId = await db.Roles.Where(r => r.RoleName == Roles.Staff).Select(r => r.RoleId).SingleAsync(),
+            FirstName = "Signed", Surname = "In", Email = $"{Guid.NewGuid():N}@test.local",
+        };
+        user.PasswordHash = new PasswordHasher<User>().HashPassword(user, ApiFactory.Password);
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+        return (user.Email, user.UserId);
     }
 //----------------------------------------------------------------------------------------------------------------------//
     private async Task<int> AddStaffAsync()

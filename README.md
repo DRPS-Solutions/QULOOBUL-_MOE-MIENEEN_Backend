@@ -288,7 +288,13 @@ State machines SM-01 (`ProjectTask`), SM-02 (`ResourceRequest`) and SM-03 (`User
   read from the `user.locked` audit row) so a stranger cannot lock the sole admin out for good; an
   admin's reset still unlocks it at once. New accounts get an emailed set-password link. An admin's Reset
   Password issues a temporary password, shown once; it unlocks only the change-password route
-  until the user picks their own.
+  until the user picks their own. Every sign-in failure (unknown email, wrong password, pending,
+  locked or deactivated) gets the same message (`AuthService.LoginFailed`), so nobody can probe which
+  emails have accounts. Setting a new password ends every older token (a stolen session does not
+  survive it): the token's `iat` is compared with the `user.password.set` audit row in `Program.cs`,
+  and `POST api/users/me/password` returns a fresh `AuthResponse` for the caller to carry on with.
+  `GET api/users` gives colleagues names and roles only; the login email and exact account status
+  (Pending, Locked) go to `ManageUsers` holders.
 - **Forgot password** notifies the admins rather than emailing a link. The notification shows the
   account's own name, and flags it when the name typed on the form doesn't match.
 - **Deactivate / reactivate** (SM-03 Active ↔ Inactive). Deactivating reassigns the user's open tasks.

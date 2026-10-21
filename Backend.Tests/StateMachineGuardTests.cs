@@ -53,16 +53,48 @@ public class StateMachineGuardTests
 
         for (var i = 0; i < AuthService.MaxFailedLogins; i++)
             await Assert.ThrowsAsync<UnauthorizedAccessException>(Wrong);
-        Assert.Contains("locked", (await Assert.ThrowsAsync<UnauthorizedAccessException>(Wrong)).Message);
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(Wrong);   // refused while locked, and not counted
+        Assert.Equal(Lifecycle.UserLocked, user.Status);
+        Assert.Equal(AuthService.MaxFailedLogins, user.FailedLoginCount);
 
         (await db.AuditLogs.SingleAsync(a => a.Action == "user.locked")).Timestamp =
             DateTime.UtcNow - AuthService.LockoutPeriod - TimeSpan.FromMinutes(1);
         await db.SaveChangesAsync();
 
         // Past the period the attempt reaches the password check instead of being refused as locked.
-        Assert.Equal("Invalid email or password.", (await Assert.ThrowsAsync<UnauthorizedAccessException>(Wrong)).Message);
+        Assert.Equal(AuthService.LoginFailed, (await Assert.ThrowsAsync<UnauthorizedAccessException>(Wrong)).Message);
         Assert.Equal(Lifecycle.UserActive, user.Status);
         Assert.Equal(1, user.FailedLoginCount);
+    }
+//----------------------------------------------------------------------------------------------------------------------//
+    // One answer for every failure, even with the right password, so a stranger cannot probe which emails
+    // have accounts or what state they are in.
+    [Fact]
+    public async Task Every_sign_in_failure_gets_the_same_answer()
+    {
+        using var db = NewDb();
+        var role = new Role { RoleName = Roles.Staff };
+        var auth = Auth(db);
+        User active = new() { Role = role, Email = "active@test", IsActive = true },
+             pending = new() { Role = role, Email = "pending@test", Status = Lifecycle.UserPending, IsActive = false },
+             locked = new() { Role = role, Email = "locked@test", Status = Lifecycle.UserLocked, IsActive = false },
+             inactive = new() { Role = role, Email = "inactive@test", Status = Lifecycle.UserInactive, IsActive = false };
+        db.AddRange(active, pending, locked, inactive);
+        await db.SaveChangesAsync();
+        foreach (var u in new[] { active, locked, inactive }) u.PasswordHash = auth.Hash(u, "right-pass1");
+        await db.SaveChangesAsync();
+
+        var attempts = new[]
+        {
+            ("nobody@test", "right-pass1"),      // no such account
+            ("active@test", "wrong"),            // wrong password
+            ("pending@test", "right-pass1"),     // not activated yet
+            ("locked@test", "right-pass1"),      // locked, right password
+            ("inactive@test", "right-pass1"),    // deactivated, right password
+        };
+        foreach (var (email, password) in attempts)
+            Assert.Equal(AuthService.LoginFailed, (await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+                auth.LoginAsync(new LoginRequest { Email = email, Password = password }))).Message);
     }
 //----------------------------------------------------------------------------------------------------------------------//
     // Assigning makes you an assignee, and an assignee may open the task: so assigning needs access first.
