@@ -21,7 +21,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             [".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
              ".txt", ".csv", ".png", ".jpg", ".jpeg", ".gif", ".webp"];
 
-        private long MaxBytes => config.GetValue<long?>("Files:MaxBytes") ?? DefaultMaxBytes;
+        public long MaxBytes => config.GetValue<long?>("Files:MaxBytes") ?? DefaultMaxBytes;
 
         private string[] AllowedExtensions =>
             config.GetSection("Files:AllowedExtensions").Get<string[]>() ?? DefaultExtensions;

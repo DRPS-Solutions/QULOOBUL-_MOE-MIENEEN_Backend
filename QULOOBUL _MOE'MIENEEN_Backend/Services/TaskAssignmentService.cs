@@ -100,6 +100,11 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
                 throw new InvalidOperationException("Assign the task to someone before starting it.");
             if (completedById is { } cid && !await db.Users.AnyAsync(u => u.UserId == cid && u.IsActive))
                 throw new InvalidOperationException("The person who completed the task must be an active user.");
+            // Crediting someone else is a manager's call (a daily task ticked off on a team member's behalf),
+            // so only someone senior to them may; anyone could otherwise put their work on a colleague's record.
+            if (completedById is { } who && who != changedById
+                && await LevelOfUserAsync(changedById) >= await LevelOfUserAsync(who))
+                throw new UnauthorizedAccessException("You can only credit completion to someone below you in the hierarchy.");
 
             MoveStatus(task, newStatus, changedById, completedById);
 
@@ -227,6 +232,9 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             if (strictlyDown && from == to)
                 throw new InvalidOperationException("Daily tasks are assigned to someone below you in the hierarchy.");
         }
+//----------------------------------------------------------------------------------------------------------------------//
+        private Task<int> LevelOfUserAsync(int userId) =>
+            db.Users.Where(u => u.UserId == userId).Select(u => u.Role!.HierarchyLevel).FirstAsync();
 //----------------------------------------------------------------------------------------------------------------------//
         private async Task<int> LevelOf(int roleId)
         {

@@ -269,7 +269,9 @@ case; the `DbContext` is the unit of work, one `SaveChanges` per operation.
 
 `MaintenanceJobs` is the one `IHostedService`: SM-02's 48-hour escalation, SM-01's deadline
 reminders, and `Task_Schedule`'s recurring-task generation - the transitions driven by a clock
-rather than a user action. It sweeps hourly; each sweep is idempotent.
+rather than a user action. It sweeps hourly; each sweep is idempotent. The same sweep deletes any
+attachment bigger than `Files:MaxBytes` (and its metadata row): a SAS cannot cap what the holder
+writes, so the declared size is only checked up front.
 
 `AccessGuard` is the object-level authorisation check (the anti-IDOR requirement), called from
 every service that reads or changes a user's work. It reads permissions from the database, not

@@ -11,6 +11,7 @@ using QULOOBUL__MOE_MIENEEN_Backend.Models.Request;
 using QULOOBUL__MOE_MIENEEN_Backend.Models.Task;
 using QULOOBUL__MOE_MIENEEN_Backend.Services;
 using QULOOBUL__MOE_MIENEEN_Shared.Auth;
+using QULOOBUL__MOE_MIENEEN_Shared.Directory;
 using Xunit;
 using static QULOOBUL__MOE_MIENEEN_Shared.Classes.Common;
 
@@ -82,6 +83,55 @@ public class StateMachineGuardTests
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() => tasks.UnassignAsync(task.TaskId, assignee.UserId, stranger.UserId));
 
         Assert.Equal(assignee.UserId, (await db.TaskAssignments.SingleAsync()).UserId);
+    }
+//----------------------------------------------------------------------------------------------------------------------//
+    // CompletedBy feeds the reports, so naming somebody else is a manager's call, not any colleague's.
+    [Fact]
+    public async Task Only_someone_senior_may_credit_a_task_to_somebody_else()
+    {
+        using var db = NewDb();
+        var staffRole = new Role { RoleName = Roles.Staff, HierarchyLevel = 4 };
+        var managerRole = new Role { RoleName = Roles.FacilityManager, HierarchyLevel = 3 };
+        User staff = new() { Role = staffRole, Email = "s@test", IsActive = true },
+             peer = new() { Role = staffRole, Email = "p@test", IsActive = true },
+             manager = new() { Role = managerRole, Email = "m@test", IsActive = true };
+        var project = new Project { Owner = manager };
+        ProjectTask[] t = [.. Enumerable.Range(0, 4).Select(_ => new ProjectTask { Project = project, Creator = manager, Status = "In Progress" })];
+        db.AddRange(staff, peer, manager, t[0], t[1], t[2], t[3]);
+        await db.SaveChangesAsync();
+        var tasks = Tasks(db);
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => tasks.ChangeStatusAsync(t[0].TaskId, "Done", staff.UserId, peer.UserId));    // a peer
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => tasks.ChangeStatusAsync(t[1].TaskId, "Done", staff.UserId, manager.UserId)); // someone above
+        await tasks.ChangeStatusAsync(t[2].TaskId, "Done", staff.UserId, staff.UserId);          // themselves
+        await tasks.ChangeStatusAsync(t[3].TaskId, "Done", manager.UserId, staff.UserId);        // a manager, for a team member
+
+        Assert.Equal("In Progress", t[0].Status);
+        Assert.Equal(staff.UserId, t[3].CompletedBy);
+    }
+//----------------------------------------------------------------------------------------------------------------------//
+    // Ownership brings access and management rights, so only an admin or secondary admin may give a new project to somebody else.
+    [Fact]
+    public async Task Only_an_admin_or_secondary_admin_creates_a_project_owned_by_someone_else()
+    {
+        using var db = NewDb();
+        var staffRole = new Role { RoleName = Roles.Staff, HierarchyLevel = 4 };
+        User admin = new() { Role = new Role { RoleName = Roles.Admin, HierarchyLevel = 1 }, Email = "a@test", IsActive = true },
+             secondary = new() { Role = new Role { RoleName = Roles.SecondaryAdmin, HierarchyLevel = 2 }, Email = "sa@test", IsActive = true },
+             manager = new() { Role = new Role { RoleName = Roles.FacilityManager, HierarchyLevel = 3 }, Email = "m@test", IsActive = true },
+             staff = new() { Role = staffRole, Email = "s@test", IsActive = true },
+             other = new() { Role = staffRole, Email = "o@test", IsActive = true };
+        db.AddRange(admin, secondary, manager, staff, other);
+        await db.SaveChangesAsync();
+        var projects = new ProjectService(db, new AuditService(db), new NotificationService(db, null!), new AccessGuard(db), Tasks(db));
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            projects.CreateAsync(new CreateProjectRequest { ProjectName = "Gift", OwnerId = other.UserId }, staff.UserId));
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            projects.CreateAsync(new CreateProjectRequest { ProjectName = "Gift", OwnerId = other.UserId }, manager.UserId));
+        Assert.Equal(staff.UserId, (await projects.CreateAsync(new CreateProjectRequest { ProjectName = "Mine" }, staff.UserId)).OwnerId);
+        foreach (var who in new[] { admin, secondary })
+            Assert.Equal(other.UserId, (await projects.CreateAsync(new CreateProjectRequest { ProjectName = "Assigned", OwnerId = other.UserId }, who.UserId)).OwnerId);
     }
 //----------------------------------------------------------------------------------------------------------------------//
     [Fact]
