@@ -41,6 +41,9 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
         public async Task<ProjectDto> CreateAsync(CreateProjectRequest req, int actorId)
         {
             var ownerId = req.OwnerId ?? actorId;
+            // Ownership brings access and management rights, so nobody hands it to someone else unasked.
+            if (ownerId != actorId && !await IsAnyAdminAsync(actorId))
+                throw new UnauthorizedAccessException("Only an admin or secondary admin may create a project owned by someone else.");
             await EnsureActiveUser(ownerId);
             var p = new Project { OwnerId = ownerId, ProjectName = req.ProjectName, Status = req.Status, Description = req.Description };
             db.Projects.Add(p);
@@ -129,6 +132,11 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             audit.Record(actorId, "project.member.remove", nameof(ProjectMember), projectId);
             await db.SaveChangesAsync();
         }
+//----------------------------------------------------------------------------------------------------------------------//
+        /// <summary>Admin or Secondary Admin: the two roles that hand work out across the organisation.</summary>
+        private Task<bool> IsAnyAdminAsync(int userId) =>
+            db.Users.AnyAsync(u => u.UserId == userId && u.IsActive
+                && (u.Role!.RoleName == Roles.Admin || u.Role.RoleName == Roles.SecondaryAdmin));
 //----------------------------------------------------------------------------------------------------------------------//
         private async Task EnsureActiveUser(int userId)
         {

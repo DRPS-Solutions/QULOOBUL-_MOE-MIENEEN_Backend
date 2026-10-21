@@ -20,6 +20,7 @@ live updates from the SignalR hub. See [What's not built yet](#whats-not-built-y
 - [Data model](#data-model)
   - [Database integrity](#database-integrity)
 - [API](#api)
+  - [API contract (OpenAPI)](#api-contract-openapi)
 - [Services](#services)
   - [Rules worth knowing](#rules-worth-knowing)
 - [Clients](#clients-1)
@@ -254,6 +255,23 @@ doc's layering: `Api.Controller` → `Api.Services` → `Api.DataAccess`.
 `Auth`, `Tasks`, `TaskSchedules`, `Projects`, `Requests`, `Meetings`, `Events`, `Notifications`,
 `Users`, `Files`, `Reports`, `Search`, plus `ApiControllerBase`.
 
+### API contract (OpenAPI)
+
+The API publishes its OpenAPI 3 document in every environment, not only in development:
+
+- **Live (Azure):** `https://<API-HOSTNAME>.azurewebsites.net/openapi/v1.json`
+  <!-- TODO: replace <API-HOSTNAME> with the deployed API's host (infra/main.bicep names it app-<name>-api-<env>-<suffix>) once CD has run. -->
+- **Local:** `http://localhost:5012/openapi/v1.json`
+
+The document needs no sign-in. It lists every route with its request and response shapes, declares
+the JWT bearer scheme (use **Authorize** in a client such as Postman, with the token from
+`POST /api/auth/login`), and notes the 401, 403 and 429 responses common to the routes. Import the
+URL into Postman, or any OpenAPI client, to generate a collection.
+
+Outside development it is controlled by the `OpenApi__Enabled` app setting, which `infra/main.bicep`
+sets to `true`; set it to `false` and redeploy to take the contract offline. It is JSON only, with
+no UI, so the API keeps its strict `default-src 'none'` Content-Security-Policy.
+
 ## Services
 
 21 services under `Services/`, all registered in `Program.cs`. One use-case handler per use
@@ -269,7 +287,9 @@ case; the `DbContext` is the unit of work, one `SaveChanges` per operation.
 
 `MaintenanceJobs` is the one `IHostedService`: SM-02's 48-hour escalation, SM-01's deadline
 reminders, and `Task_Schedule`'s recurring-task generation - the transitions driven by a clock
-rather than a user action. It sweeps hourly; each sweep is idempotent.
+rather than a user action. It sweeps hourly; each sweep is idempotent. The same sweep deletes any
+attachment bigger than `Files:MaxBytes` (and its metadata row): a SAS cannot cap what the holder
+writes, so the declared size is only checked up front.
 
 `AccessGuard` is the object-level authorisation check (the anti-IDOR requirement), called from
 every service that reads or changes a user's work. It reads permissions from the database, not
@@ -282,9 +302,17 @@ State machines SM-01 (`ProjectTask`), SM-02 (`ResourceRequest`) and SM-03 (`User
 ### Rules worth knowing
 
 - **Sign-in.** An account locks after 5 consecutive failed sign-ins (`AuthService.MaxFailedLogins`)
-  and the admins are notified. New accounts get an emailed set-password link. An admin's Reset
+  and the admins are notified. The lock lifts itself after 15 minutes (`AuthService.LockoutPeriod`,
+  read from the `user.locked` audit row) so a stranger cannot lock the sole admin out for good; an
+  admin's reset still unlocks it at once. New accounts get an emailed set-password link. An admin's Reset
   Password issues a temporary password, shown once; it unlocks only the change-password route
-  until the user picks their own.
+  until the user picks their own. Every sign-in failure (unknown email, wrong password, pending,
+  locked or deactivated) gets the same message (`AuthService.LoginFailed`), so nobody can probe which
+  emails have accounts. Setting a new password ends every older token (a stolen session does not
+  survive it): the token's `iat` is compared with the `user.password.set` audit row in `Program.cs`,
+  and `POST api/users/me/password` returns a fresh `AuthResponse` for the caller to carry on with.
+  `GET api/users` gives colleagues names and roles only; the login email and exact account status
+  (Pending, Locked) go to `ManageUsers` holders.
 - **Forgot password** notifies the admins rather than emailing a link. The notification shows the
   account's own name, and flags it when the name typed on the form doesn't match.
 - **Deactivate / reactivate** (SM-03 Active ↔ Inactive). Deactivating reassigns the user's open tasks.

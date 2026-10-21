@@ -11,6 +11,7 @@ using QULOOBUL__MOE_MIENEEN_Backend.Models.Request;
 using QULOOBUL__MOE_MIENEEN_Backend.Models.Task;
 using QULOOBUL__MOE_MIENEEN_Backend.Services;
 using QULOOBUL__MOE_MIENEEN_Shared.Auth;
+using QULOOBUL__MOE_MIENEEN_Shared.Directory;
 using Xunit;
 using static QULOOBUL__MOE_MIENEEN_Shared.Classes.Common;
 
@@ -35,6 +36,134 @@ public class StateMachineGuardTests
 
         Assert.Equal(Lifecycle.UserLocked, user.Status);
         Assert.False(user.IsActive);
+    }
+//----------------------------------------------------------------------------------------------------------------------//
+    // Anyone who knows an email can trigger the lock, so it has to expire or the sole admin is locked out for good.
+    [Fact]
+    public async Task A_locked_account_unlocks_itself_after_the_lockout_period()
+    {
+        using var db = NewDb();
+        var user = new User { Role = new Role { RoleName = Roles.Staff }, Email = "alice@test" };
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+        var auth = Auth(db);
+        user.PasswordHash = auth.Hash(user, "right-pass1");
+        await db.SaveChangesAsync();
+        Task Wrong() => auth.LoginAsync(new LoginRequest { Email = "alice@test", Password = "wrong" });
+
+        for (var i = 0; i < AuthService.MaxFailedLogins; i++)
+            await Assert.ThrowsAsync<UnauthorizedAccessException>(Wrong);
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(Wrong);   // refused while locked, and not counted
+        Assert.Equal(Lifecycle.UserLocked, user.Status);
+        Assert.Equal(AuthService.MaxFailedLogins, user.FailedLoginCount);
+
+        (await db.AuditLogs.SingleAsync(a => a.Action == "user.locked")).Timestamp =
+            DateTime.UtcNow - AuthService.LockoutPeriod - TimeSpan.FromMinutes(1);
+        await db.SaveChangesAsync();
+
+        // Past the period the attempt reaches the password check instead of being refused as locked.
+        Assert.Equal(AuthService.LoginFailed, (await Assert.ThrowsAsync<UnauthorizedAccessException>(Wrong)).Message);
+        Assert.Equal(Lifecycle.UserActive, user.Status);
+        Assert.Equal(1, user.FailedLoginCount);
+    }
+//----------------------------------------------------------------------------------------------------------------------//
+    // One answer for every failure, even with the right password, so a stranger cannot probe which emails
+    // have accounts or what state they are in.
+    [Fact]
+    public async Task Every_sign_in_failure_gets_the_same_answer()
+    {
+        using var db = NewDb();
+        var role = new Role { RoleName = Roles.Staff };
+        var auth = Auth(db);
+        User active = new() { Role = role, Email = "active@test", IsActive = true },
+             pending = new() { Role = role, Email = "pending@test", Status = Lifecycle.UserPending, IsActive = false },
+             locked = new() { Role = role, Email = "locked@test", Status = Lifecycle.UserLocked, IsActive = false },
+             inactive = new() { Role = role, Email = "inactive@test", Status = Lifecycle.UserInactive, IsActive = false };
+        db.AddRange(active, pending, locked, inactive);
+        await db.SaveChangesAsync();
+        foreach (var u in new[] { active, locked, inactive }) u.PasswordHash = auth.Hash(u, "right-pass1");
+        await db.SaveChangesAsync();
+
+        var attempts = new[]
+        {
+            ("nobody@test", "right-pass1"),      // no such account
+            ("active@test", "wrong"),            // wrong password
+            ("pending@test", "right-pass1"),     // not activated yet
+            ("locked@test", "right-pass1"),      // locked, right password
+            ("inactive@test", "right-pass1"),    // deactivated, right password
+        };
+        foreach (var (email, password) in attempts)
+            Assert.Equal(AuthService.LoginFailed, (await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+                auth.LoginAsync(new LoginRequest { Email = email, Password = password }))).Message);
+    }
+//----------------------------------------------------------------------------------------------------------------------//
+    // Assigning makes you an assignee, and an assignee may open the task: so assigning needs access first.
+    [Fact]
+    public async Task A_stranger_cannot_assign_themselves_to_or_unassign_anyone_from_a_task_they_cannot_see()
+    {
+        using var db = NewDb();
+        var role = new Role { RoleName = Roles.Staff, HierarchyLevel = 4 };
+        User owner = new() { Role = role, Email = "o@test", IsActive = true },
+             stranger = new() { Role = role, Email = "s@test", IsActive = true },
+             assignee = new() { Role = role, Email = "a@test", IsActive = true };
+        var task = new ProjectTask { Project = new Project { Owner = owner }, Creator = owner, Status = "To Do" };
+        db.AddRange(owner, stranger, assignee, task, new TaskAssignment { Task = task, User = assignee });
+        await db.SaveChangesAsync();
+        var tasks = Tasks(db);
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => tasks.AssignAsync(task.TaskId, stranger.UserId, stranger.UserId));
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => tasks.UnassignAsync(task.TaskId, assignee.UserId, stranger.UserId));
+
+        Assert.Equal(assignee.UserId, (await db.TaskAssignments.SingleAsync()).UserId);
+    }
+//----------------------------------------------------------------------------------------------------------------------//
+    // CompletedBy feeds the reports, so naming somebody else is a manager's call, not any colleague's.
+    [Fact]
+    public async Task Only_someone_senior_may_credit_a_task_to_somebody_else()
+    {
+        using var db = NewDb();
+        var staffRole = new Role { RoleName = Roles.Staff, HierarchyLevel = 4 };
+        var managerRole = new Role { RoleName = Roles.FacilityManager, HierarchyLevel = 3 };
+        User staff = new() { Role = staffRole, Email = "s@test", IsActive = true },
+             peer = new() { Role = staffRole, Email = "p@test", IsActive = true },
+             manager = new() { Role = managerRole, Email = "m@test", IsActive = true };
+        var project = new Project { Owner = manager };
+        ProjectTask[] t = [.. Enumerable.Range(0, 4).Select(_ => new ProjectTask { Project = project, Creator = manager, Status = "In Progress" })];
+        db.AddRange(staff, peer, manager, t[0], t[1], t[2], t[3]);
+        await db.SaveChangesAsync();
+        var tasks = Tasks(db);
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => tasks.ChangeStatusAsync(t[0].TaskId, "Done", staff.UserId, peer.UserId));    // a peer
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => tasks.ChangeStatusAsync(t[1].TaskId, "Done", staff.UserId, manager.UserId)); // someone above
+        await tasks.ChangeStatusAsync(t[2].TaskId, "Done", staff.UserId, staff.UserId);          // themselves
+        await tasks.ChangeStatusAsync(t[3].TaskId, "Done", manager.UserId, staff.UserId);        // a manager, for a team member
+
+        Assert.Equal("In Progress", t[0].Status);
+        Assert.Equal(staff.UserId, t[3].CompletedBy);
+    }
+//----------------------------------------------------------------------------------------------------------------------//
+    // Ownership brings access and management rights, so only an admin or secondary admin may give a new project to somebody else.
+    [Fact]
+    public async Task Only_an_admin_or_secondary_admin_creates_a_project_owned_by_someone_else()
+    {
+        using var db = NewDb();
+        var staffRole = new Role { RoleName = Roles.Staff, HierarchyLevel = 4 };
+        User admin = new() { Role = new Role { RoleName = Roles.Admin, HierarchyLevel = 1 }, Email = "a@test", IsActive = true },
+             secondary = new() { Role = new Role { RoleName = Roles.SecondaryAdmin, HierarchyLevel = 2 }, Email = "sa@test", IsActive = true },
+             manager = new() { Role = new Role { RoleName = Roles.FacilityManager, HierarchyLevel = 3 }, Email = "m@test", IsActive = true },
+             staff = new() { Role = staffRole, Email = "s@test", IsActive = true },
+             other = new() { Role = staffRole, Email = "o@test", IsActive = true };
+        db.AddRange(admin, secondary, manager, staff, other);
+        await db.SaveChangesAsync();
+        var projects = new ProjectService(db, new AuditService(db), new NotificationService(db, null!), new AccessGuard(db), Tasks(db));
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            projects.CreateAsync(new CreateProjectRequest { ProjectName = "Gift", OwnerId = other.UserId }, staff.UserId));
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            projects.CreateAsync(new CreateProjectRequest { ProjectName = "Gift", OwnerId = other.UserId }, manager.UserId));
+        Assert.Equal(staff.UserId, (await projects.CreateAsync(new CreateProjectRequest { ProjectName = "Mine" }, staff.UserId)).OwnerId);
+        foreach (var who in new[] { admin, secondary })
+            Assert.Equal(other.UserId, (await projects.CreateAsync(new CreateProjectRequest { ProjectName = "Assigned", OwnerId = other.UserId }, who.UserId)).OwnerId);
     }
 //----------------------------------------------------------------------------------------------------------------------//
     [Fact]
