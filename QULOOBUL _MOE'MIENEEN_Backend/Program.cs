@@ -217,6 +217,12 @@ builder.Services.AddScoped<SearchService>();
 if (builder.Configuration.GetValue("Jobs:Enabled", true))
     builder.Services.AddHostedService<MaintenanceJobs>();
 
+// Mobile push through Azure Notification Hubs (architecture document): NotificationService queues every saved
+// notification, PushDispatcher hands it to the hub in the background. Off until NotificationHub is set
+builder.Services.AddSingleton<PushQueue>();
+builder.Services.AddSingleton<PushHubService>();
+builder.Services.AddHostedService<PushDispatcher>();
+
 var app = builder.Build();
 
 // The contract is public (the WASM client already exposes every route) but off in production unless

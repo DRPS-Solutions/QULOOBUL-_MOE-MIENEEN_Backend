@@ -1,6 +1,15 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-	<application android:usesCleartextTraffic="false"android:allowBackup="false" android:icon="@mipmap/appicon" android:roundIcon="@mipmap/appicon_round" android:supportsRtl="true"></application>
+	<application android:usesCleartextTraffic="false" android:allowBackup="false" android:icon="@mipmap/appicon" android:roundIcon="@mipmap/appicon_round" android:supportsRtl="true">
+		<!-- Push notifications (Firebase Cloud Messaging, sent through Azure Notification Hubs). The receiving
+		     service itself is declared by the [Service] attribute on Platforms/Android/PushMessagingService.cs. -->
+		<!-- Notifications Android shows while the app is closed use our channel and monochrome icon. -->
+		<meta-data android:name="com.google.firebase.messaging.default_notification_channel_id" android:value="qm_general" />
+		<meta-data android:name="com.google.firebase.messaging.default_notification_icon" android:resource="@drawable/ic_stat_notify" />
+		<meta-data android:name="com.google.firebase.messaging.default_notification_color" android:resource="@color/notification_accent" />
+	</application>
 	<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 	<uses-permission android:name="android.permission.INTERNET" />
+	<!-- Android 13+: asked for at runtime after sign-in (PushNotifications.EnableAsync). -->
+	<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 </manifest>

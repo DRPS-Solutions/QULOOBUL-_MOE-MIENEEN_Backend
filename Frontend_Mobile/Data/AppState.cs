@@ -198,12 +198,17 @@ public sealed class AppState : Observable
         await Task.WhenAll(RefreshUsersAsync(), RefreshProjectsAsync(), RefreshNotificationsAsync());
         CurrentUser = auth;
         await ConnectHubAsync();
+
+        // Not awaited: the permission prompt and push registration should not hold up the first screen
+        _ = PushNotifications.EnableAsync();
     }
 
     public async Task LogoutAsync()
     {
         CurrentUser = null;
         _pendingAuth = null;
+        // While the token is still on the client, so the API can take this phone off the hub
+        await PushNotifications.DisableAsync();
         _http.DefaultRequestHeaders.Authorization = null;
         try { SecureStorage.Default.Remove(SessionKey); }
         catch (Exception) { /* nothing was stored */ }
@@ -525,6 +530,29 @@ public sealed class AppState : Observable
 //----------------------------------------------------------------------------------------------------------------------//
     private void On(string eventName, params Func<Task>[] refreshes) =>
         _hub!.On<JsonElement>(eventName, _ => Task.WhenAll(refreshes.Select(refresh => refresh())));
+
+    // Phone push (see PushNotifications). These bypass Send on purpose: they run in the
+    // background, so a failure must not pop up an alert, and a 401 here must not trigger another
+    // sign-out (LogoutAsync itself calls RemovePushInstallationAsync)
+    public async Task RegisterPushInstallationAsync(string installationId, string token)
+    {
+        try
+        {
+            await _http.PutAsJsonAsync("api/notifications/installations", new PushInstallationRequest
+            {
+                InstallationId = installationId,
+                PushChannel = token,
+                Platform = DeviceInfo.Platform.ToString().ToLowerInvariant(),
+            });
+        }
+        catch (Exception) { /* offline: the next sign-in registers again */ }
+    }
+
+    public async Task RemovePushInstallationAsync(string installationId)
+    {
+        try { await _http.DeleteAsync($"api/notifications/installations/{Uri.EscapeDataString(installationId)}"); }
+        catch (Exception) { /* offline: deleting the FCM token still stops delivery */ }
+    }
 
     // ----- HTTP. A failed call shows an alert and returns null/false. -----
 

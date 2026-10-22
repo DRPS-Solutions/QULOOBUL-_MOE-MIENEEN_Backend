@@ -20,6 +20,9 @@ public partial class AppShell : Shell
         if (Current is not AppShell shell) return;
         shell.FlyoutBehavior = FlyoutBehavior.Flyout;
         await Current.GoToAsync("//home");
+
+        // Opened the app by tapping a push notification: go on to what it was about
+        await PushNotifications.OpenPendingAsync();
     }
 
     public static async Task SignOutAsync()
