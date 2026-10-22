@@ -34,12 +34,14 @@ namespace Backend.Tests;
 public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
     public const string AdminEmail = "admin@test.local", StaffEmail = "staff@test.local", Password = "Passw0rd!Passw0rd";
-//----------------------------------------------------------------------------------------------------------------------//
+
+    //----------------------------------------------------------------------------------------------------------------------//
     public string ConnectionString { get; } = new SqlConnectionStringBuilder(
         Environment.GetEnvironmentVariable("TEST_SQL_CONNECTION")
         ?? @"Server=(localdb)\mssqllocaldb;Trusted_Connection=True;TrustServerCertificate=True")
     { InitialCatalog = $"QM_Test_{Guid.NewGuid():N}" }.ConnectionString;
-//----------------------------------------------------------------------------------------------------------------------//
+
+    //----------------------------------------------------------------------------------------------------------------------//
     protected override void ConfigureWebHost(IWebHostBuilder b)
     {
         // The ' in the project folder name breaks the MSBuild expression Mvc.Testing writes into
@@ -53,10 +55,12 @@ public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         b.UseSetting("Seed:AdminEmail", AdminEmail);
         b.UseSetting("Seed:AdminPassword", Password);
         b.UseSetting("RateLimit:AuthPerMinute", "1000");   // every test signs in; one test lowers it
+        b.UseSetting("NotificationHub:ConnectionString", "");   // push stays off even if a developer configured a hub
         // The clock-driven jobs would race the assertions; MaintenanceJobTests covers them.
         b.ConfigureServices(s => s.RemoveAll<IHostedService>());
     }
-//----------------------------------------------------------------------------------------------------------------------//
+    
+    //----------------------------------------------------------------------------------------------------------------------//
     public async Task InitializeAsync()
     {
         using var scope = Services.CreateScope();
@@ -72,14 +76,16 @@ public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         db.Users.Add(staff);
         await db.SaveChangesAsync();
     }
-//----------------------------------------------------------------------------------------------------------------------//
+    
+    //----------------------------------------------------------------------------------------------------------------------//
     public new async Task DisposeAsync()
     {
         using (var scope = Services.CreateScope())
             await scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.EnsureDeletedAsync();
         await base.DisposeAsync();
     }
-//----------------------------------------------------------------------------------------------------------------------//
+    
+    //----------------------------------------------------------------------------------------------------------------------//
     public async Task<(HttpClient Client, AuthResponse Me)> SignInAsync(string email)
     {
         var client = CreateClient();
@@ -89,9 +95,11 @@ public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", me.Token);
         return (client, me);
     }
-//----------------------------------------------------------------------------------------------------------------------//
+    
+    //----------------------------------------------------------------------------------------------------------------------//
     public AppDbContext Db(IServiceScope scope) => scope.ServiceProvider.GetRequiredService<AppDbContext>();
 }
+
 //----------------------------------------------------------------------------------------------------------------------//
 //----------------------------------------New integration tests go here, not in LifecycleTests.cs----------------------------------------//
 //----------------------------------------------------------------------------------------------------------------------//
@@ -105,7 +113,8 @@ public class ApiIntegrationTests(ApiFactory api) : IClassFixture<ApiFactory>
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/health")).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/tasks")).StatusCode);
     }
-//----------------------------------------------------------------------------------------------------------------------//
+
+    //----------------------------------------------------------------------------------------------------------------------//
     [Fact]
     public async Task Health_is_unavailable_when_the_database_is_unreachable()
     {
@@ -113,7 +122,8 @@ public class ApiIntegrationTests(ApiFactory api) : IClassFixture<ApiFactory>
         var client = api.WithWebHostBuilder(b => b.UseSetting("ConnectionStrings:Default", missingDb.ConnectionString)).CreateClient();
         Assert.Equal(HttpStatusCode.ServiceUnavailable, (await client.GetAsync("/health")).StatusCode);
     }
-//----------------------------------------------------------------------------------------------------------------------//
+    
+    //----------------------------------------------------------------------------------------------------------------------//
     [Fact]
     public async Task Responses_carry_the_security_headers()
     {
@@ -121,7 +131,8 @@ public class ApiIntegrationTests(ApiFactory api) : IClassFixture<ApiFactory>
         Assert.Contains("default-src 'none'", res.Headers.GetValues("Content-Security-Policy").Single());
         Assert.Equal("nosniff", res.Headers.GetValues("X-Content-Type-Options").Single());
     }
-//----------------------------------------------------------------------------------------------------------------------//
+
+    //----------------------------------------------------------------------------------------------------------------------//
     [Fact]
     public async Task The_directory_is_read_through_the_view_and_hides_the_system_account()
     {
@@ -131,7 +142,8 @@ public class ApiIntegrationTests(ApiFactory api) : IClassFixture<ApiFactory>
         Assert.Contains(users!, u => u.Email == ApiFactory.AdminEmail && u.Role == Roles.Admin);
         Assert.DoesNotContain(users!, u => u.Email == SystemAccountEmail);
     }
-//----------------------------------------------------------------------------------------------------------------------//
+    
+    //----------------------------------------------------------------------------------------------------------------------//
     [Fact]
     public async Task A_user_reads_and_edits_their_own_profile_but_not_their_role()
     {
@@ -151,7 +163,8 @@ public class ApiIntegrationTests(ApiFactory api) : IClassFixture<ApiFactory>
             new UpdateUserRequest { Email = ApiFactory.AdminEmail })).IsSuccessStatusCode);
         Assert.Equal(HttpStatusCode.NoContent, (await client.PostAsync("/api/users/me/password-link", null)).StatusCode);
     }
-//----------------------------------------------------------------------------------------------------------------------//
+
+    //----------------------------------------------------------------------------------------------------------------------//
     [Fact]
     public async Task Staff_cannot_reach_admin_routes()
     {
@@ -160,7 +173,8 @@ public class ApiIntegrationTests(ApiFactory api) : IClassFixture<ApiFactory>
         Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync("/api/notifications/send",
             new { userIds = new[] { 1 }, message = "hi" })).StatusCode);
     }
-//----------------------------------------------------------------------------------------------------------------------//
+
+    //----------------------------------------------------------------------------------------------------------------------//
     [Fact]
     public async Task Only_the_admin_reads_a_users_audit_trail()
     {
@@ -171,7 +185,8 @@ public class ApiIntegrationTests(ApiFactory api) : IClassFixture<ApiFactory>
         var trail = await admin.GetFromJsonAsync<List<AuditEntryDto>>($"/api/users/{staffMe.UserId}/audit");
         Assert.Contains(trail!, e => e.Action == "auth.login");
     }
-//----------------------------------------------------------------------------------------------------------------------//
+    
+    //----------------------------------------------------------------------------------------------------------------------//
     [Fact]
     public async Task Only_the_admin_deletes_a_user_and_their_details_are_erased()
     {
@@ -191,7 +206,8 @@ public class ApiIntegrationTests(ApiFactory api) : IClassFixture<ApiFactory>
         Assert.Equal("Anonymised", gone.Status);
         Assert.DoesNotContain("delete-me", gone.Email);
     }
-//----------------------------------------------------------------------------------------------------------------------//
+    
+    //----------------------------------------------------------------------------------------------------------------------//
     [Fact]
     public async Task Only_the_organiser_or_an_admin_changes_an_events_attendees()
     {
@@ -210,7 +226,8 @@ public class ApiIntegrationTests(ApiFactory api) : IClassFixture<ApiFactory>
         Assert.Equal(HttpStatusCode.Forbidden, (await staff.DeleteAsync($"/api/events/{ev.EventId}/attendees/{adminMe.UserId}")).StatusCode);
         Assert.Equal(HttpStatusCode.NoContent, (await staff.DeleteAsync($"/api/events/{ev.EventId}/attendees/{staffMe.UserId}")).StatusCode);
     }
-//----------------------------------------------------------------------------------------------------------------------//
+    
+    //----------------------------------------------------------------------------------------------------------------------//
     [Fact]
     public async Task Row_level_security_hides_other_users_notifications_even_from_a_raw_query()
     {
@@ -242,7 +259,8 @@ public class ApiIntegrationTests(ApiFactory api) : IClassFixture<ApiFactory>
         var (staff, _) = await api.SignInAsync(ApiFactory.StaffEmail);
         Assert.Equal(HttpStatusCode.OK, (await staff.GetAsync("/api/notifications")).StatusCode);
     }
-//----------------------------------------------------------------------------------------------------------------------//
+    
+    //----------------------------------------------------------------------------------------------------------------------//
     [Fact]
     public async Task Deleting_a_task_cascades_its_comments_and_unlinks_its_files()
     {
@@ -272,7 +290,8 @@ public class ApiIntegrationTests(ApiFactory api) : IClassFixture<ApiFactory>
         Assert.False(await db.Set<TaskComment>().AnyAsync(c => c.TaskId == card.TaskId));
         Assert.Null(await db.FileUploads.Where(f => f.FileId == file.FileId).Select(f => f.TaskId).SingleAsync());
     }
-//----------------------------------------------------------------------------------------------------------------------//
+    
+    //----------------------------------------------------------------------------------------------------------------------//
     [Fact]
     public async Task Anyone_creates_daily_tasks_and_records_who_completed_one_not_assigned_to_them()
     {
@@ -301,7 +320,7 @@ public class ApiIntegrationTests(ApiFactory api) : IClassFixture<ApiFactory>
         Assert.Equal(staffMe.UserId, (await admin.GetFromJsonAsync<TaskDetailDto>($"/api/tasks/{card.TaskId}"))!.CompletedBy);
     }
 
-//----------------------------------------------------------------------------------------------------------------------//
+    //----------------------------------------------------------------------------------------------------------------------//
     [Fact]
     public async Task An_admin_changes_a_role_and_issues_a_temporary_password_the_user_must_replace()
     {
@@ -380,7 +399,8 @@ public class ApiIntegrationTests(ApiFactory api) : IClassFixture<ApiFactory>
         Assert.False((await admin.PostAsJsonAsync($"/api/projects/{project.ProjectId}/cancel", new CancelProjectRequest()))
             .IsSuccessStatusCode);
     }
-//----------------------------------------------------------------------------------------------------------------------//
+    
+    //----------------------------------------------------------------------------------------------------------------------//
     [Fact]
     public async Task A_decline_reason_is_kept_on_the_request_for_the_requester()
     {
@@ -397,7 +417,8 @@ public class ApiIntegrationTests(ApiFactory api) : IClassFixture<ApiFactory>
         Assert.Equal("Declined", mine.Status);
         Assert.Equal("Borrow the hall's one", mine.History.Single(h => h.NewStatus == "Declined").Note);
     }
-//----------------------------------------------------------------------------------------------------------------------//
+    
+    //----------------------------------------------------------------------------------------------------------------------//
     private async Task<int> AddStaffAsync()
     {
         using var scope = api.Services.CreateScope();
@@ -417,7 +438,8 @@ public class ApiIntegrationTests(ApiFactory api) : IClassFixture<ApiFactory>
         using var scope = api.Services.CreateScope();
         return api.Db(scope).Users.Where(u => u.Email == SystemAccountEmail).Select(u => u.UserId).Single();
     }
-//----------------------------------------------------------------------------------------------------------------------//
+    
+    //----------------------------------------------------------------------------------------------------------------------//
     [Fact]
     public async Task The_login_route_is_rate_limited_per_client()
     {
@@ -429,6 +451,23 @@ public class ApiIntegrationTests(ApiFactory api) : IClassFixture<ApiFactory>
 
         Assert.NotEqual(HttpStatusCode.TooManyRequests, codes[0]);
         Assert.Equal(HttpStatusCode.TooManyRequests, codes[2]);
+    }
+
+    //----------------------------------------------------------------------------------------------------------------------//
+    // Mobile push: the app registers its phone after sign-in and removes it on sign-out. With no hub
+    // configured both succeed as no-ops, so the app behaves the same against a local API.
+    [Fact]
+    public async Task A_signed_in_phone_can_register_and_remove_itself_for_push()
+    {
+        var (staff, _) = await api.SignInAsync(ApiFactory.StaffEmail);
+        var install = new PushInstallationRequest { InstallationId = Guid.NewGuid().ToString("N"), PushChannel = "fcm-token" };
+
+        Assert.Equal(HttpStatusCode.NoContent, (await staff.PutAsJsonAsync("/api/notifications/installations", install)).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await staff.DeleteAsync($"/api/notifications/installations/{install.InstallationId}")).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest,
+            (await staff.PutAsJsonAsync("/api/notifications/installations", install with { Platform = "ios" })).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized,
+            (await api.CreateClient().PutAsJsonAsync("/api/notifications/installations", install)).StatusCode);
     }
 }
 //---------------------------DDDDDDDDDDDoooooooooooooo END OF FILE DDDDDDDDDDDoooooooooooooo---------------------------//
