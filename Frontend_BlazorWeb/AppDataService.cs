@@ -116,15 +116,15 @@ public class AppDataService(HttpClient http, ISnackbar snackbar, IDialogService 
     /// <summary>Replaces the signed-in user's password; after a temporary one, this starts the session.</summary>
     public async Task<bool> ChangePasswordAsync(string current, string next)
     {
-        if (!await SendAsync(HttpMethod.Post, "api/users/me/password",
-                new ChangePasswordRequest { CurrentPassword = current, NewPassword = next })) return false;
-        if (CurrentUser is { MustChangePassword: true })
-        {
-            await StartSessionAsync();
-            CurrentUser = CurrentUser with { MustChangePassword = false };
-            await SaveSessionAsync();
-            Changed();
-        }
+        // A new password ends every older token, so carry on with the fresh one the API returns.
+        if (await SendAsync<AuthResponse>(HttpMethod.Post, "api/users/me/password",
+                new ChangePasswordRequest { CurrentPassword = current, NewPassword = next }) is not { } auth) return false;
+        http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth.Token);
+        var startSession = CurrentUser is { MustChangePassword: true };
+        if (startSession) await StartSessionAsync();
+        CurrentUser = auth;
+        await SaveSessionAsync();
+        if (startSession) Changed();
         return true;
     }
 

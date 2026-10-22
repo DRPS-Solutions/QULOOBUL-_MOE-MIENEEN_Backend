@@ -68,6 +68,8 @@ var appSettings = concat([
   { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', value: appi.properties.ConnectionString }
   { name: 'Cors__Origins__0', value: webOrigin }
   { name: 'App__BaseUrl', value: webOrigin }
+  // Serves /openapi/v1.json outside development. Set to 'false' to take the contract offline.
+  { name: 'OpenApi__Enabled', value: 'true' }
   { name: 'Email__ConnectionString', value: kvRef(kv.name, '${env}-acs-connection') }
   { name: 'Email__From', value: 'DoNotReply@${emailDomain.properties.fromSenderDomain}' }
 ], isProd ? [

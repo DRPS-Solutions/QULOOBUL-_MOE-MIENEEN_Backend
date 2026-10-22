@@ -77,6 +77,36 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
                 await notify.PushAsync(d.Notification.UserId, d.EventName, d.Payload);
                 await email.SendAsync(d.Notification, d.EmailSubject);
             }
+
+            // Last, and on its own: a storage outage must not skip the reminders above.
+            try
+            {
+                await PurgeOversizedUploadsAsync(db, scope.ServiceProvider.GetRequiredService<BlobStorageService>(),
+                    scope.ServiceProvider.GetRequiredService<FileUploadService>().MaxBytes, log, ct);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                log.LogWarning(ex, "Oversized-upload purge failed; the next sweep retries");
+            }
+        }
+//----------------------------------------------------------------------------------------------------------------------//
+        /// <summary>
+        /// A SAS cannot cap what the holder writes, so the 25 MB limit that gates the SAS (against the size the
+        /// client declared) is enforced here against what actually landed: an oversized blob and its metadata row go.
+        /// </summary>
+        public static async Task<int> PurgeOversizedUploadsAsync(
+            AppDbContext db, BlobStorageService blob, long maxBytes, ILogger log, CancellationToken ct = default)
+        {
+            var names = await blob.BlobsLargerThanAsync(FileUploadService.Container, maxBytes, ct);
+            foreach (var name in names)
+            {
+                await blob.DeleteAsync(FileUploadService.Container, name);
+                var path = $"{FileUploadService.Container}/{name}";
+                db.FileUploads.RemoveRange(db.FileUploads.Where(f => f.FilePath == path));
+                log.LogWarning("Deleted oversized upload {Blob}", name);
+            }
+            await db.SaveChangesAsync(ct);
+            return names.Count;
         }
 //----------------------------------------------------------------------------------------------------------------------//
         /// <summary>

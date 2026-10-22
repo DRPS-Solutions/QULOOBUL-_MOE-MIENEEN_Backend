@@ -10,9 +10,11 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Controllers
 {
     public class UsersController(StaffOverviewService staff, UserService users, AuditService audit, AuthService auth) : ApiControllerBase
     {
-        /// <summary>Staff directory: every signed-in user needs it for names and assignee pickers.</summary>
+        /// <summary>Staff directory: every signed-in user needs it for names and assignee pickers; only a
+        /// ManageUsers holder also gets each person's login email and exact account status.</summary>
         [HttpGet]
-        public async Task<ActionResult<List<UserSummaryDto>>> Directory() => Ok(await staff.StaffAsync());
+        public async Task<ActionResult<List<UserSummaryDto>>> Directory() =>
+            Ok(await staff.StaffAsync(User.HasClaim("perm", Permissions.ManageUsers)));
 //----------------------------------------------------------------------------------------------------------------------//
         /// <summary>UC-06 per-person workload counts.</summary>
         [HttpGet("overview"), Authorize(Policy = Permissions.ManageUsers)]
@@ -46,11 +48,8 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Controllers
         /// <summary>Replace the current password, e.g. an admin's temporary one. The one route a temporary
         /// password unlocks (Program.cs); rate-limited like login since it checks a password.</summary>
         [HttpPost("me/password"), EnableRateLimiting(AuthController.RateLimitPolicy)]
-        public async Task<IActionResult> ChangePassword(ChangePasswordRequest req)
-        {
-            await auth.ChangePasswordAsync(UserId(), req);
-            return NoContent();
-        }
+        public async Task<ActionResult<AuthResponse>> ChangePassword(ChangePasswordRequest req) =>
+            Ok(await auth.ChangePasswordAsync(UserId(), req));
 //----------------------------------------------------------------------------------------------------------------------//
         /// <summary>SM-03 updateProfile: self, or an admin (who alone may change the role).</summary>
         [HttpPatch("{id:int}")]

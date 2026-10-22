@@ -10,7 +10,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
     /// the bytes go straight from the client to Blob Storage.
     /// </summary>
     public class FileUploadService(
-        AppDbContext db, BlobStorageService blob, AuditService audit, IConfiguration config)
+        AppDbContext db, BlobStorageService blob, AuditService audit, IConfiguration config, AccessGuard guard)
     {
         public const string Container = "attachments";
 
@@ -21,7 +21,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             [".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
              ".txt", ".csv", ".png", ".jpg", ".jpeg", ".gif", ".webp"];
 
-        private long MaxBytes => config.GetValue<long?>("Files:MaxBytes") ?? DefaultMaxBytes;
+        public long MaxBytes => config.GetValue<long?>("Files:MaxBytes") ?? DefaultMaxBytes;
 
         private string[] AllowedExtensions =>
             config.GetSection("Files:AllowedExtensions").Get<string[]>() ?? DefaultExtensions;
@@ -61,10 +61,10 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
                 throw new InvalidOperationException("A file may be attached to only one of: task, meeting, period.");
             if (!await db.FileCategories.AnyAsync(c => c.CategoryId == categoryId))
                 throw new InvalidOperationException($"Unknown file category {categoryId}.");
-            if (context.TaskId is int t && !await db.Tasks.AnyAsync(x => x.TaskId == t))
-                throw new InvalidOperationException($"Unknown task {t}.");
-            if (context.MeetingId is int m && !await db.Meetings.AnyAsync(x => x.MeetingId == m))
-                throw new InvalidOperationException($"Unknown meeting {m}.");
+            // A file inherits the access rule of what it is attached to, so attaching needs that access too
+            // (404 when it does not exist, 403 when it is not the caller's).
+            if (context.TaskId is int t) await guard.EnsureTaskAsync(uploadedBy, t);
+            if (context.MeetingId is int m) await guard.EnsureMeetingAsync(uploadedBy, m);
 
             var blobName = $"{Guid.NewGuid():N}{extension}";
 

@@ -2,7 +2,9 @@ using Azure.Monitor.OpenTelemetry.AspNetCore;
 using Azure.Storage.Blobs;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi;
 using QULOOBUL__MOE_MIENEEN_Backend.SharedClasses.Auth;
 using QULOOBUL__MOE_MIENEEN_Backend.Controllers;
 using QULOOBUL__MOE_MIENEEN_Backend.Data;
@@ -31,7 +33,36 @@ if (File.Exists(".env"))
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
-builder.Services.AddOpenApi();
+// Declares the JWT bearer scheme so API clients (Postman, Scalar, etc.) offer an Authorize step.
+// The document carries the scheme's name only, never a token.
+// Reference: Microsoft, "Customize OpenAPI documents." Accessed: Oct. 21, 2026. [Online]. Available: https://learn.microsoft.com/en-us/aspnet/core/fundamentals/openapi/customize-openapi?view=aspnetcore-10.0
+// The shared error responses are added here rather than as [ProducesResponseType] on the base controller,
+// which would suppress the 200/204 and response schemas ASP.NET infers from each action's return type.
+builder.Services.AddOpenApi(o =>
+{
+    o.AddDocumentTransformer((doc, _, _) =>
+    {
+        doc.Components ??= new OpenApiComponents();
+        doc.Components.SecuritySchemes = new Dictionary<string, IOpenApiSecurityScheme>
+        {
+            ["Bearer"] = new OpenApiSecurityScheme { Type = SecuritySchemeType.Http, Scheme = "bearer", BearerFormat = "JWT" },
+        };
+        doc.Security = [new OpenApiSecurityRequirement { [new OpenApiSecuritySchemeReference("Bearer", doc)] = [] }];
+        return Task.CompletedTask;
+    });
+    o.AddOperationTransformer((op, ctx, _) =>
+    {
+        op.Responses ??= [];
+        var anonymous = ctx.Description.ActionDescriptor.EndpointMetadata.OfType<Microsoft.AspNetCore.Authorization.IAllowAnonymous>().Any();
+        if (!anonymous)
+        {
+            op.Responses.TryAdd("401", new OpenApiResponse { Description = "Missing or invalid bearer token." });
+            op.Responses.TryAdd("403", new OpenApiResponse { Description = "Authenticated, but the role lacks the required permission." });
+        }
+        op.Responses.TryAdd("429", new OpenApiResponse { Description = "Rate limit exceeded." });
+        return Task.CompletedTask;
+    });
+});
 
 // UseSeeding runs after `dotnet ef database update` (and Migrate/EnsureCreated).
 // Reference: Microsoft, "Implementing the infrastructure persistence layer with Entity Framework Core." Accessed: Aug. 08, 2026. [Online]. Available: https://learn.microsoft.com/en-us/dotnet/architecture/microservices/microservice-ddd-cqrs-patterns/infrastructure-persistence-layer-implementation-entity-framework-core
@@ -94,9 +125,20 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                 var id = int.Parse(c.Principal!.FindFirstValue(ClaimTypes.NameIdentifier)!);
                 var db = c.HttpContext.RequestServices.GetRequiredService<AppDbContext>();
                 var user = await db.Users.Where(u => u.UserId == id && u.IsActive)
-                    .Select(u => new { u.MustChangePassword }).FirstOrDefaultAsync();
+                    .Select(u => new { u.MustChangePassword, RoleName = u.Role!.RoleName }).FirstOrDefaultAsync();
                 if (user is null)
                     c.Fail("This account is no longer active.");
+                // The token's "perm" claims feed the route policies, so a changed role would otherwise
+                // keep its old powers until the token expires.
+                else if (user.RoleName != c.Principal!.FindFirstValue(ClaimTypes.Role))
+                    c.Fail("Your role changed. Sign in again.");
+                // A new password ends every older token, so a stolen session does not outlive the change. "iat" is
+                // whole seconds, hence the second of slack: the token issued with the change is never caught by it.
+                // The audit trail already holds when each password was set, so there is no extra column.
+                else if (c.SecurityToken is JsonWebToken { IssuedAt: var issued } && issued > DateTime.MinValue
+                    && await db.AuditLogs.AnyAsync(a => a.UserId == id && a.Action == AuthService.PasswordSetAction
+                        && a.Timestamp >= issued.AddSeconds(1)))
+                    c.Fail("Your password changed. Sign in again.");
                 // A temporary password unlocks only the change-password route.
                 else if (user.MustChangePassword && c.Request.Path != "/api/users/me/password")
                     c.Fail("Change your temporary password first.");
@@ -183,7 +225,9 @@ builder.Services.AddHostedService<PushDispatcher>();
 
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment()) app.MapOpenApi();
+// The contract is public (the WASM client already exposes every route) but off in production unless
+// OpenApi__Enabled=true is set. JSON only: a UI would need a looser CSP. The global rate limiter covers it.
+if (app.Environment.IsDevelopment() || app.Configuration.GetValue("OpenApi:Enabled", false)) app.MapOpenApi();
 
 app.UseHttpsRedirection();
 // The API only ever returns JSON, so it may load nothing and be framed by nobody. The web client's

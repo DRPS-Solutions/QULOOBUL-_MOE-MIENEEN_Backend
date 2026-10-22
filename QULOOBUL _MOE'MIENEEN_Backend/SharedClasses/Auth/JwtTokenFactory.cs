@@ -26,6 +26,8 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.SharedClasses.Auth
                 new(ClaimTypes.NameIdentifier, user.UserId.ToString()),
                 new(ClaimTypes.Name, $"{user.FirstName} {user.Surname}"),
                 new(ClaimTypes.Role, roleName),
+                // When it was issued, so a password change can end every older token (Program.cs).
+                new(JwtRegisteredClaimNames.Iat, EpochTime.GetIntDate(DateTime.UtcNow).ToString(), ClaimValueTypes.Integer64),
             };
             claims.AddRange(permissions.Select(p => new Claim("perm", p)));
 

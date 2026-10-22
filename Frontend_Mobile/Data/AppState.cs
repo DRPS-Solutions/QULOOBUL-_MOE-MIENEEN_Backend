@@ -157,10 +157,11 @@ public sealed class AppState : Observable
     /// <summary>Replaces the temporary password and starts the session. False if the API refused it (already alerted).</summary>
     public async Task<bool> ChangePasswordAsync(string current, string next)
     {
-        if (_pendingAuth is not { } auth || !await SendAsync(HttpMethod.Post, "api/users/me/password",
-                new ChangePasswordRequest { CurrentPassword = current, NewPassword = next })) return false;
+        if (_pendingAuth is null) return false;
+        // A new password ends every older token, so carry on with the fresh one the API returns.
+        if (await SendAsync<AuthResponse>(HttpMethod.Post, "api/users/me/password",
+                new ChangePasswordRequest { CurrentPassword = current, NewPassword = next }) is not { } auth) return false;
         _pendingAuth = null;
-        auth = auth with { MustChangePassword = false };
         await StartSessionAsync(auth);
         await RememberAsync(auth);
         return true;
@@ -526,7 +527,7 @@ public sealed class AppState : Observable
             await Alert("Live updates are unavailable; other people's changes appear when you reopen a page.");
         }
     }
-
+//----------------------------------------------------------------------------------------------------------------------//
     private void On(string eventName, params Func<Task>[] refreshes) =>
         _hub!.On<JsonElement>(eventName, _ => Task.WhenAll(refreshes.Select(refresh => refresh())));
 
@@ -563,7 +564,7 @@ public sealed class AppState : Observable
 
     public async Task<bool> SendAsync(HttpMethod method, string url, object? body = null) =>
         await Send(method, url, body) is not null;
-
+//----------------------------------------------------------------------------------------------------------------------//
     private async Task<HttpResponseMessage?> Send(HttpMethod method, string url, object? body)
     {
         HttpResponseMessage res;
@@ -592,7 +593,7 @@ public sealed class AppState : Observable
         }
         return null;
     }
-
+//----------------------------------------------------------------------------------------------------------------------//
     // The API's own errors are ErrorResponse { message }; model validation failures are ProblemDetails.
     private static async Task<string> ErrorMessage(HttpResponseMessage res)
     {
@@ -651,3 +652,4 @@ public sealed class AppState : Observable
         return new UriBuilder(serverUri) { Host = "10.0.2.2" }.Uri;
     }
 }
+//---------------------------DDDDDDDDDDDoooooooooooooo END OF FILE DDDDDDDDDDDoooooooooooooo---------------------------//

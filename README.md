@@ -5,7 +5,7 @@ resource requests, meetings and file storage for one organisation's staff and vo
 Serves both clients in this solution: a Blazor WebAssembly web app and a .NET MAUI app.
 
 **Status: API built, both clients wired to it, deployed to Azure.** The API has a DbContext,
-four migrations, 12 controllers and 21 services. The web and MAUI clients both sign in against
+ten migrations, 12 controllers and 21 services. The web and MAUI clients both sign in against
 `AuthController`, read and write through the controllers using the `Shared` DTOs, and take
 live updates from the SignalR hub. See [What's not built yet](#whats-not-built-yet).
 
@@ -18,7 +18,9 @@ live updates from the SignalR hub. See [What's not built yet](#whats-not-built-y
   - [Seed accounts](#seed-accounts)
   - [Clients](#clients)
 - [Data model](#data-model)
+  - [Database integrity](#database-integrity)
 - [API](#api)
+  - [API contract (OpenAPI)](#api-contract-openapi)
 - [Services](#services)
   - [Rules worth knowing](#rules-worth-knowing)
 - [Clients](#clients-1)
@@ -164,8 +166,8 @@ Six modelling decisions carry business rules and shouldn't be "tidied away":
 Delete behaviour is set per relationship: `Cascade` for rows meaningless without their parent
 (task comments and assignments, project members, meeting and event attendees), `SetNull` for a
 file's task/meeting link, and `NoAction` everywhere else, including every FK to `User` and the
-history tables. Unique pairs, a `CK_FileUpload_OneContext` check constraint, and indexes on the
-task board (`ProjectId, Status`), the unread badge (`UserId, IsRead`) and `Audit_Log.Timestamp`.
+history tables. Integrity beyond the foreign keys (unique pairs, 27 check constraints, indexes,
+defaults and concurrency tokens) is listed under [Database integrity](#database-integrity).
 
 Database-side defence in depth (migration `SecurityAndIndexes`):
 
@@ -174,7 +176,76 @@ Database-side defence in depth (migration `SecurityAndIndexes`):
   user's rows. No user (login, background jobs, migrations) means no filter.
 - **`vw_UserDirectory`**: the staff directory reads a view with no password hash or token columns.
 
-Four migrations: `InitialCreate`, `SecurityAndIndexes`, `TemporaryPassword`, `RequestDecisionNote`.
+Ten migrations: `InitialCreate`, `SecurityAndIndexes`, `TemporaryPassword`, `RequestDecisionNote`, then the
+integrity set `AddRangeCheckConstraints`, `AddAllowedValueCheckConstraints`, `AddCrossColumnCheckConstraints`,
+`AddNotBlankCheckConstraints`, `AddQueryIndexes` and `AddDefaultsAndRowVersion`.
+
+### Database integrity
+
+Every rule below is enforced by SQL Server itself, so a bad write from any path (a future endpoint, a
+script, a manual `UPDATE`) is rejected, not only one that goes through a service. The services still
+check the same rules first so the user gets a clear message; the database is the backstop. All of it
+is configured in `AppDbContext.OnModelCreating`.
+
+**Check constraints (27)**
+
+| Group | Constraint | Table | Business rule |
+|---|---|---|---|
+| Range | `CK_Task_PercentComplete` | `Task` | Progress is 0 to 100 |
+| Range | `CK_Report_PeriodOrder` | `Report` | A report period ends on or after it starts |
+| Range | `CK_User_FailedLoginCount` | `User` | The failed-login counter never goes negative |
+| Allowed values | `CK_Task_Status`, `CK_TaskStatusHistory_NewStatus` | `Task`, `Task_Status_History` | Only the SM-01 states: To Do, In Progress, Blocked, Done, Cancelled, Archived |
+| Allowed values | `CK_ResourceRequest_Status`, `CK_RequestStatusHistory_NewStatus` | `Resource_Request`, `Request_Status_History` | Only the SM-02 states: Pending, Under Review, Escalated, Approved, Declined, Completed |
+| Allowed values | `CK_User_Status` | `User` | Only the SM-03 states: Pending Activation, Active, Locked, Inactive, Anonymised |
+| Allowed values | `CK_Task_Priority`, `CK_ResourceRequest_Priority` | `Task`, `Resource_Request` | Low, Normal, Medium or High |
+| Allowed values | `CK_Project_Status` | `Project` | Active, Closed or Cancelled |
+| Allowed values | `CK_TaskSchedule_DayOfWeek` | `Task_Schedule` | A real day name, as `DayOfWeek.ToString()` writes it |
+| Cross-column | `CK_User_ActiveMatchesStatus` | `User` | `IsActive` is true exactly when `Status` is Active (`Lifecycle.MoveUser`) |
+| Cross-column | `CK_User_InactiveHasDate` | `User` | An inactive account records when it was deactivated |
+| Cross-column | `CK_User_TokenPair` | `User` | The set-password token hash and its expiry are both present or both absent |
+| Cross-column | `CK_ResourceRequest_DecisionHasReviewer` | `Resource_Request` | An approved or declined request names who decided it |
+| Cross-column | `CK_Task_DoneHasCompletedBy` | `Task` | A finished task records who completed it |
+| Cross-column | `CK_FileUpload_OneContext` | `File_Upload` | A file attaches to at most one of task, meeting, or period |
+| Non-empty text | `CK_Project_NameNotBlank`, `CK_Task_TitleNotBlank`, `CK_Meeting_TitleNotBlank`, `CK_Event_TitleNotBlank` | `Project`, `Task`, `Meeting`, `Event` | Names and titles are not empty or all spaces |
+| Non-empty text | `CK_FileUpload_FileNameNotBlank`, `CK_FileUpload_FilePathNotBlank` | `File_Upload` | A file has a name and a storage path |
+| Non-empty text | `CK_User_FirstNameNotBlank`, `CK_User_SurnameNotBlank` | `User` | A user has a first name and surname |
+| Format | `CK_User_EmailFormat` | `User` | Email has the shape `something@something.something` |
+
+Priority and project status are free text in the services, so their lists are the values the clients and
+seeder use today; add a value to the constraint and the service together.
+
+**Unique constraints and indexes**
+
+| Index | Table | Purpose |
+|---|---|---|
+| Unique pair per junction table | `Task_Assignment`, `Project_Member`, `Meeting_Attendee`, `Event_Attendee`, `Role_Permission`, `Notification_Preference` | No duplicate membership or assignment |
+| `IX_User_Email` (unique) | `User` | One account per email |
+| `IX_User_PasswordTokenHash` (unique, filtered to non-null) | `User` | Set-password link lookup by token; no two users share a token |
+| `IX_Event_Location_EventDate` (unique, filtered to non-empty location) | `Event` | One event per venue per slot, even under concurrent bookings |
+| `(ProjectId, Status)` | `Task` | The task board |
+| `(Status, Deadline)`, `(Deadline)` | `Task` | Deadline-warning job; calendar and report date ranges |
+| `(Status, DateSubmitted)` | `Resource_Request` | 48-hour escalation job; newest-first list |
+| `(UserId, IsRead)` | `Notification` | The unread badge |
+| `(NewStatus, TimeCreated)` | `Task_Status_History` | Completed-in-period report |
+| `(UserId, Timestamp)`, `(Timestamp)` | `Audit_Log` | A user's recent activity; time-ranged audit queries |
+| `(MeetingDate)`, `(EventDate)` | `Meeting`, `Event` | Calendar and clash-check ranges |
+
+EF Core also indexes every foreign-key column, so those are not repeated here.
+
+**Defaults and concurrency**
+
+- `User.Status` defaults to `Active` and `Task.PercentComplete` to `0`, so a row inserted outside EF starts valid.
+- `Task` and `Resource_Request` carry a `RowVersion` (`rowversion`) concurrency token. A save whose row
+  changed since it was loaded fails, and the API answers 409 "Someone else changed this at the same time".
+  The clients do not send the token back, so this guards overlapping requests, not a stale screen.
+
+**Proof.** `QULOOBUL _MOE'MIENEEN_Backend/Data/CheckConstraintTests.sql` tries an invalid write for each
+rule inside a transaction it rolls back, plus a valid write as a control, and prints a failure count
+(0 = every rule held). It also checks the defaults and that a stale `RowVersion` update matches no rows.
+
+```bash
+sqlcmd -S .\SQLEXPRESS -d QuloobulMoeMieneen -E -C -W -i "QULOOBUL _MOE'MIENEEN_Backend/Data/CheckConstraintTests.sql"
+```
 
 ## API
 
@@ -183,6 +254,23 @@ doc's layering: `Api.Controller` → `Api.Services` → `Api.DataAccess`.
 
 `Auth`, `Tasks`, `TaskSchedules`, `Projects`, `Requests`, `Meetings`, `Events`, `Notifications`,
 `Users`, `Files`, `Reports`, `Search`, plus `ApiControllerBase`.
+
+### API contract (OpenAPI)
+
+The API publishes its OpenAPI 3 document in every environment, not only in development:
+
+- **Live (Azure):** `https://<API-HOSTNAME>.azurewebsites.net/openapi/v1.json`
+  <!-- TODO: replace <API-HOSTNAME> with the deployed API's host (infra/main.bicep names it app-<name>-api-<env>-<suffix>) once CD has run. -->
+- **Local:** `http://localhost:5012/openapi/v1.json`
+
+The document needs no sign-in. It lists every route with its request and response shapes, declares
+the JWT bearer scheme (use **Authorize** in a client such as Postman, with the token from
+`POST /api/auth/login`), and notes the 401, 403 and 429 responses common to the routes. Import the
+URL into Postman, or any OpenAPI client, to generate a collection.
+
+Outside development it is controlled by the `OpenApi__Enabled` app setting, which `infra/main.bicep`
+sets to `true`; set it to `false` and redeploy to take the contract offline. It is JSON only, with
+no UI, so the API keeps its strict `default-src 'none'` Content-Security-Policy.
 
 ## Services
 
@@ -199,7 +287,9 @@ case; the `DbContext` is the unit of work, one `SaveChanges` per operation.
 
 `MaintenanceJobs` is the one `IHostedService`: SM-02's 48-hour escalation, SM-01's deadline
 reminders, and `Task_Schedule`'s recurring-task generation - the transitions driven by a clock
-rather than a user action. It sweeps hourly; each sweep is idempotent.
+rather than a user action. It sweeps hourly; each sweep is idempotent. The same sweep deletes any
+attachment bigger than `Files:MaxBytes` (and its metadata row): a SAS cannot cap what the holder
+writes, so the declared size is only checked up front.
 
 `AccessGuard` is the object-level authorisation check (the anti-IDOR requirement), called from
 every service that reads or changes a user's work. It reads permissions from the database, not
@@ -212,9 +302,17 @@ State machines SM-01 (`ProjectTask`), SM-02 (`ResourceRequest`) and SM-03 (`User
 ### Rules worth knowing
 
 - **Sign-in.** An account locks after 5 consecutive failed sign-ins (`AuthService.MaxFailedLogins`)
-  and the admins are notified. New accounts get an emailed set-password link. An admin's Reset
+  and the admins are notified. The lock lifts itself after 15 minutes (`AuthService.LockoutPeriod`,
+  read from the `user.locked` audit row) so a stranger cannot lock the sole admin out for good; an
+  admin's reset still unlocks it at once. New accounts get an emailed set-password link. An admin's Reset
   Password issues a temporary password, shown once; it unlocks only the change-password route
-  until the user picks their own.
+  until the user picks their own. Every sign-in failure (unknown email, wrong password, pending,
+  locked or deactivated) gets the same message (`AuthService.LoginFailed`), so nobody can probe which
+  emails have accounts. Setting a new password ends every older token (a stolen session does not
+  survive it): the token's `iat` is compared with the `user.password.set` audit row in `Program.cs`,
+  and `POST api/users/me/password` returns a fresh `AuthResponse` for the caller to carry on with.
+  `GET api/users` gives colleagues names and roles only; the login email and exact account status
+  (Pending, Locked) go to `ManageUsers` holders.
 - **Forgot password** notifies the admins rather than emailing a link. The notification shows the
   account's own name, and flags it when the name typed on the form doesn't match.
 - **Deactivate / reactivate** (SM-03 Active ↔ Inactive). Deactivating reassigns the user's open tasks.

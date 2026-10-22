@@ -28,3 +28,4 @@ public static class MauiProgram
 		return builder.Build();
 	}
 }
+//---------------------------DDDDDDDDDDDoooooooooooooo END OF FILE DDDDDDDDDDDoooooooooooooo---------------------------//
