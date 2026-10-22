@@ -131,7 +131,6 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
                     {
                         channel_id = ChannelId,
                         icon = "ic_stat_notify",
-                        color = "#12271F",
                         tag = $"n{pushJob.NotificationId}"
                     }
                 },

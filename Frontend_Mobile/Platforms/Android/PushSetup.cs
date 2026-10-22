@@ -68,6 +68,7 @@ namespace Frontend_Mobile.Platforms.Android
             // nullable Builder, so chaining them is a nullable warning (an error in CI)
             var builder = new NotificationCompat.Builder(context, PushNotifications.ChannelId);
             builder.SetSmallIcon(Resource.Drawable.ic_stat_notify);
+            builder.SetColor(AndroidX.Core.Content.ContextCompat.GetColor(context, Resource.Color.notification_accent));
             builder.SetContentTitle(title);
             builder.SetContentText(body);
             
