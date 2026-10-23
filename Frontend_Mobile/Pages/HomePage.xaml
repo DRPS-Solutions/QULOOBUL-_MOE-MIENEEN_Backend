@@ -46,7 +46,7 @@
                                         Padding="12,8">
                                     <Grid ColumnDefinitions="Auto,*" ColumnSpacing="4">
                                         <CheckBox IsChecked="{Binding IsDone, Mode=OneWay}"
-                                                  CheckedChanged="OnDailyTaskToggled"
+                                                  CheckedChanged="OnDailyTaskToggled" SemanticProperties.Description="Mark task done"
                                                   VerticalOptions="Center" />
                                         <VerticalStackLayout Grid.Column="1" VerticalOptions="Center">
                                             <Label Text="{Binding Title}"

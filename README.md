@@ -457,9 +457,21 @@ unlabelled navbar menu buttons on every page and the unlabelled file and categor
 
 Tested by hand with the keyboard only: skip link (Tab, Enter lands in the page), a card's
 Enter/Space, the ⋮ menu moving a task In Progress to Blocked, and New task / Task details opening
-on their first field, closing on Escape and returning focus. Not done: a screen reader pass,
-Lighthouse, keyboard use of every dialog, and the MAUI app, none of which axe covers. Automated
-tools find only part of the problems, so treat 0 as "no machine-detectable failures", not "accessible".
+on their first field, closing on Escape and returning focus.
+
+Lighthouse 12 (accessibility category) scores 100 on the signed-out login page, with 22 audits passed
+and none failed. It was not run on the signed-in pages, which need a session; axe covers those above.
+
+**MAUI app.** Reviewed by reading the XAML, not on a device. Text buttons are read by their label
+already; what had no accessible name now has a `SemanticProperties.Description`: the search and
+notification buttons in the shell, the previous/next week arrows, the unlabelled check boxes (task
+done, all day, event staff) and the two switches. The password eye buttons already had one, and the
+file category picker had an empty `Title`, now "Category". The Android target still builds with no warnings.
+
+Not done: a screen reader pass (TalkBack, NVDA) on either client, keyboard use of every dialog, and
+testing the MAUI changes with TalkBack on a device. Cards that open on tap in the MAUI app use a
+`TapGestureRecognizer` and are not announced as buttons. Automated tools find only part of the
+problems, so treat 0 as "no machine-detectable failures", not "accessible".
 
 ### `Frontend_Mobile` - .NET MAUI
 

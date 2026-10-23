@@ -37,7 +37,7 @@
                    VerticalOptions="Center" />
 
             <Button Grid.Column="1"
-                    Text="&#x1F50D;"
+                    Text="&#x1F50D;" SemanticProperties.Description="Search"
                     Clicked="OnOpenSearch"
                     BackgroundColor="Transparent"
                     TextColor="{StaticResource White}"
@@ -47,7 +47,7 @@
                     CornerRadius="0" />
 
             <Grid Grid.Column="2" WidthRequest="46">
-                <Button Text="&#x1F514;"
+                <Button Text="&#x1F514;" SemanticProperties.Description="Notifications"
                         Clicked="OnOpenNotifications"
                         BackgroundColor="Transparent"
                         TextColor="{StaticResource White}"

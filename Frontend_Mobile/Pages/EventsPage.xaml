@@ -151,7 +151,7 @@
                                 <BindableLayout.ItemTemplate>
                                     <DataTemplate x:DataType="models:StaffPick">
                                         <HorizontalStackLayout Spacing="4">
-                                            <CheckBox IsChecked="{Binding IsSelected}" VerticalOptions="Center" />
+                                            <CheckBox IsChecked="{Binding IsSelected}" SemanticProperties.Description="{Binding Name}" VerticalOptions="Center" />
                                             <Label Text="{Binding Name}" FontSize="12" VerticalOptions="Center" />
                                         </HorizontalStackLayout>
                                     </DataTemplate>

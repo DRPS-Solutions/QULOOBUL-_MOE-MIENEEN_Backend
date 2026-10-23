@@ -72,7 +72,7 @@
             <Border Style="{StaticResource Card}">
                 <VerticalStackLayout>
                     <HorizontalStackLayout Spacing="8" Margin="0,0,0,12">
-                        <Switch x:Name="ShowPastSwitch" Toggled="OnShowPastToggled" />
+                        <Switch x:Name="ShowPastSwitch" SemanticProperties.Description="Include past events" Toggled="OnShowPastToggled" />
                         <Label Text="Include past events" VerticalOptions="Center" />
                     </HorizontalStackLayout>
 

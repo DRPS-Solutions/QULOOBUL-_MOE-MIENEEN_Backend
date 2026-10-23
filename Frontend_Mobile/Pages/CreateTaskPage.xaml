@@ -33,7 +33,7 @@
             </Grid>
 
             <HorizontalStackLayout Spacing="4">
-                <CheckBox x:Name="AllDayBox" CheckedChanged="OnAllDayChanged" VerticalOptions="Center" />
+                <CheckBox x:Name="AllDayBox" SemanticProperties.Description="All day" CheckedChanged="OnAllDayChanged" VerticalOptions="Center" />
                 <Label Text="All day" VerticalOptions="Center" />
             </HorizontalStackLayout>
 
