@@ -466,12 +466,32 @@ and none failed. It was not run on the signed-in pages, which need a session; ax
 already; what had no accessible name now has a `SemanticProperties.Description`: the search and
 notification buttons in the shell, the previous/next week arrows, the unlabelled check boxes (task
 done, all day, event staff) and the two switches. The password eye buttons already had one, and the
-file category picker had an empty `Title`, now "Category". The Android target still builds with no warnings.
+file category picker had an empty `Title`, now "Category". Cards and rows that open on tap use a
+`TapGestureRecognizer`, which TalkBack reads as plain text; `Platforms/Android/TapAsButton.cs` gives
+every such view the Button role ("button, double-tap to activate"), keeping any delegate MAUI already
+set. The Android target still builds with no warnings.
 
-Not done: a screen reader pass (TalkBack, NVDA) on either client, keyboard use of every dialog, and
-testing the MAUI changes with TalkBack on a device. Cards that open on tap in the MAUI app use a
-`TapGestureRecognizer` and are not announced as buttons. Automated tools find only part of the
-problems, so treat 0 as "no machine-detectable failures", not "accessible".
+Checked on the Android emulator by reading the accessibility tree (`uiautomator dump`), which is what
+TalkBack reads from: on the signed-out login page every control has a name, and the password eye
+button is announced as "Show password".
+
+**Dialogs (web).** Every MudBlazor dialog focuses its first field (`DefaultFocus.FirstChild`). Escape
+now closes every dialog, including the confirm boxes for deleting a file and changing a role,
+resetting a password, deactivating or deleting a user, through `CloseOnEscapeKey` on the
+`MudDialogProvider` in `MainLayout.razor`. The temporary-password dialog opts out on purpose, so the
+password can't be dismissed before it is copied.
+
+Not done:
+
+- The signed-in screens of the MAUI app (the shell buttons, cards, check boxes and switches above)
+  were not checked on the emulator or a device; the changes are verified by build only.
+- The web dialogs were reviewed in code, not used with the keyboard in the running app; only New
+  task and Task details were tested by hand (above).
+- No screen reader pass (TalkBack, NVDA) on either client. The emulator check shows what TalkBack
+  is given, not how it sounds in use.
+
+Automated tools find only part of the problems, so treat 0 as "no machine-detectable failures", not
+"accessible".
 
 ### `Frontend_Mobile` - .NET MAUI
 
