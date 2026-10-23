@@ -122,7 +122,19 @@ public class ApiIntegrationTests(ApiFactory api) : IClassFixture<ApiFactory>
         var client = api.WithWebHostBuilder(b => b.UseSetting("ConnectionStrings:Default", missingDb.ConnectionString)).CreateClient();
         Assert.Equal(HttpStatusCode.ServiceUnavailable, (await client.GetAsync("/health")).StatusCode);
     }
-    
+
+    //----------------------------------------------------------------------------------------------------------------------//
+    [Theory]
+    [InlineData("true", HttpStatusCode.OK)]
+    [InlineData("false", HttpStatusCode.NotFound)]
+    public async Task OpenApi_outside_development_follows_the_OpenApi_Enabled_setting(string enabled, HttpStatusCode expected)
+    {
+        var client = api.WithWebHostBuilder(b => b.UseEnvironment("Production").UseSetting("OpenApi:Enabled", enabled)).CreateClient();
+        var res = await client.GetAsync("/openapi/v1.json");
+        Assert.Equal(expected, res.StatusCode);
+        if (expected == HttpStatusCode.OK) Assert.Contains("\"openapi\"", await res.Content.ReadAsStringAsync());
+    }
+
     //----------------------------------------------------------------------------------------------------------------------//
     [Fact]
     public async Task Responses_carry_the_security_headers()
