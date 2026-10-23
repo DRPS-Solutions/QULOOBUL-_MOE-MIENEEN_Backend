@@ -70,7 +70,8 @@ dotnet run --project "QULOOBUL _MOE'MIENEEN_Backend/QULOOBUL _MOE'MIENEEN_Backen
 ```
 
 `http://localhost:5012`, or `https://localhost:7272` on the `https` profile. OpenAPI is at
-`/openapi/v1.json` in Development only; `/health` is anonymous and always mapped.
+`/openapi/v1.json` (see [API contract](#api-contract-openapi)); `/health` is anonymous and always
+mapped (see [Health check](#health-check)).
 
 ### Database
 
@@ -271,6 +272,34 @@ URL into Postman, or any OpenAPI client, to generate a collection.
 Outside development it is controlled by the `OpenApi__Enabled` app setting, which `infra/main.bicep`
 sets to `true`; set it to `false` and redeploy to take the contract offline. It is JSON only, with
 no UI, so the API keeps its strict `default-src 'none'` Content-Security-Policy.
+
+### Health check
+
+`GET /health` is anonymous, always mapped (every environment), and sits outside the authorisation
+and permission policies. It does a real dependency check rather than just reporting that the process
+is up: the handler in `Program.cs` calls `Database.CanConnectAsync` against the configured SQL
+database.
+
+| Database | Status | Body |
+| --- | --- | --- |
+| Reachable | `200 OK` | `{"status":"ok"}` |
+| Unreachable | `503 Service Unavailable` | `{"status":"database unreachable"}` |
+
+Three things depend on it, so a broken database connection is caught by each:
+
+- **Post-deploy smoke test.** `.github/scripts/smoke-test.sh` calls `/health` (retrying 5 times, 10 s
+  apart, for a cold start) before signing in and making an authenticated read. A failure stops the
+  workflow before any staging-slot swap, so a build that can't reach its database never goes live.
+- **App Service health check.** `infra/main.bicep` sets `healthCheckPath: '/health'`, so Azure
+  takes an unhealthy instance out of rotation instead of sending it traffic.
+- **Availability monitoring (prod only).** An Application Insights standard web test hits
+  `/health` every 5 minutes from three European locations (30 s timeout, retry on failure),
+  expects `200` and a valid TLS certificate (alerting when it has under 7 days left), and notifies
+  the action group.
+
+The 503 path is covered by an integration test
+(`Health_is_unavailable_when_the_database_is_unreachable` in `Backend.Tests/ApiIntegrationTests.cs`),
+which points the API at a database that doesn't exist and expects `503`.
 
 ## Services
 
@@ -479,7 +508,8 @@ Quality gates, in every build job:
   afterwards. Locally that is LocalDB unless `TEST_SQL_CONNECTION` points elsewhere; in CI it's
   a `mssql` service container.
 - **Coverage threshold.** `.github/scripts/coverage-gate.sh 70` fails the job below 70% line coverage.
-- **Smoke test after deploy.** `.github/scripts/smoke-test.sh` checks `/health`, signs in as
+- **Smoke test after deploy.** `.github/scripts/smoke-test.sh` checks `/health` (which
+  includes a database connectivity check, see [Health check](#health-check)), signs in as
   `SMOKE_EMAIL`, and makes one authenticated read, before any slot swap.
 
 Migrations are applied by the CD workflows (the runner opens the SQL firewall for itself, migrates,
