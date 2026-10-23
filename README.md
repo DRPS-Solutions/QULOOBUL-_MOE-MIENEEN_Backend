@@ -131,6 +131,18 @@ dotnet build "QULOOBUL _MOE'MIENEEN_Backend.slnx" -c Release -warnaserror
 dotnet test Backend.Tests
 ```
 
+128 tests, all passing. By file:
+
+| File | Covers |
+|---|---|
+| `ApiIntegrationTests` | The real API over HTTP: `/health` (including the 503 when the database is unreachable), security headers, token and role checks, profile and directory, rate limiting, push registration, and `/openapi/v1.json` being served or hidden outside development by `OpenApi:Enabled` |
+| `AccessGuardTests` | Who may see or change a task, project, file or meeting (404 vs 403, roster changes, `ManageFiles`) |
+| `StateMachineGuardTests`, `UseCaseGapTests` | The task, request and user state machines, and use-case rules (assignment, deactivation hand-over, event and meeting clashes, minutes, search) |
+| `ServiceRuleTests`, `LifecycleTests`, `DtoValidationTests` | Service rules, `MoveUser`/`EnsureRequestMove`, and rejection of unset ids and dates |
+| `MaintenanceJobTests` | The 48-hour escalation, deadline reminders, weekly task templates and oversized-upload purge |
+| `PushNotificationTests` | The push queue, muted types, payload and deep link, and push being off without a hub |
+| `MiddlewareTests` | Exception-to-status mapping (404, 403, 400, 409, 500 with a reference and no leaked text), audit rows only for successful state changes, and `set-password` returning 403 for a bad token and 400 for an invalid body |
+
 CI builds with `-warnaserror`, so a warning locally is a red build remotely. Stop a running API
 before `dotnet test` or `dotnet ef`: it locks the build output.
 
@@ -271,7 +283,9 @@ URL into Postman, or any OpenAPI client, to generate a collection.
 
 Outside development it is controlled by the `OpenApi__Enabled` app setting, which `infra/main.bicep`
 sets to `true`; set it to `false` and redeploy to take the contract offline. It is JSON only, with
-no UI, so the API keeps its strict `default-src 'none'` Content-Security-Policy.
+no UI, so the API keeps its strict `default-src 'none'` Content-Security-Policy. An integration test
+(`OpenApi_outside_development_follows_the_OpenApi_Enabled_setting`) runs the API in Production and
+expects `200` with the setting on and `404` with it off.
 
 ### Health check
 
