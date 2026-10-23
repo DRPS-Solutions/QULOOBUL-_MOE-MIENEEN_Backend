@@ -471,9 +471,18 @@ file category picker had an empty `Title`, now "Category". Cards and rows that o
 every such view the Button role ("button, double-tap to activate"), keeping any delegate MAUI already
 set. The Android target still builds with no warnings.
 
-Checked on the Android emulator by reading the accessibility tree (`uiautomator dump`), which is what
-TalkBack reads from: on the signed-out login page every control has a name, and the password eye
-button is announced as "Show password".
+Checked by reading the accessibility tree (`uiautomator dump`), which is what TalkBack reads from:
+the login page on the Android emulator, and the signed-in screens on a physical phone (a Release
+build against the staging API).
+
+- Login: every control has a name; the password eye button is "Show password".
+- Shell: the search and bell buttons are "Search" and "Notifications"; the flyout items carry their page names.
+- Daily Tasks: the week arrows are "Previous week" / "Next week", and each day cell is a Button.
+- Meetings, User Management, Event Planning and Notifications: every card in the list is a Button,
+  with its title and details as the text TalkBack reads with it.
+- Calendar and Files: the switches are "Include past events" and "Show archived"; both category
+  pickers show "Category".
+- Requests, Reports, Files: form fields read their placeholder or current value, and every button its label.
 
 **Dialogs (web).** Every MudBlazor dialog focuses its first field (`DefaultFocus.FirstChild`). Escape
 now closes every dialog, including the confirm boxes for deleting a file and changing a role,
@@ -483,8 +492,9 @@ password can't be dismissed before it is copied.
 
 Not done:
 
-- The signed-in screens of the MAUI app (the shell buttons, cards, check boxes and switches above)
-  were not checked on the emulator or a device; the changes are verified by build only.
+- MAUI screens not reached: the task check boxes (staging had no tasks that day), Search results,
+  and the create/edit forms behind "+ New". They use the same patterns checked above.
+- The flyout toggle reads "OK" while the menu is open (MAUI Shell's default), not "Close navigation drawer".
 - The web dialogs were reviewed in code, not used with the keyboard in the running app; only New
   task and Task details were tested by hand (above).
 - No screen reader pass (TalkBack, NVDA) on either client. The emulator check shows what TalkBack
