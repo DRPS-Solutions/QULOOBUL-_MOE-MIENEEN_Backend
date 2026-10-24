@@ -239,6 +239,7 @@ app.Use((c, next) =>
     c.Response.Headers.ContentSecurityPolicy = "default-src 'none'; frame-ancestors 'none'";
     c.Response.Headers.XContentTypeOptions = "nosniff";
     c.Response.Headers.CacheControl = "no-store";  // authenticated JSON must not sit in shared caches
+    c.Response.Headers["Cross-Origin-Resource-Policy"] = "same-origin";  // no-cors embeds can't read it; the web client uses CORS fetch
     return next(c);
 });
 // Middleware order matters: each component sees only what the ones before it let through.
