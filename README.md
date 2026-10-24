@@ -7,7 +7,7 @@ Serves both clients in this solution: a Blazor WebAssembly web app and a .NET MA
 **Status: API built, both clients wired to it, deployed to Azure.** The API has a DbContext,
 ten migrations, 12 controllers and 21 services. The web and MAUI clients both sign in against
 `AuthController`, read and write through the controllers using the `Shared` DTOs, and take
-live updates from the SignalR hub. See [What's not built yet](#whats-not-built-yet).
+live updates from the SignalR hub.
 
 ## Contents
 
