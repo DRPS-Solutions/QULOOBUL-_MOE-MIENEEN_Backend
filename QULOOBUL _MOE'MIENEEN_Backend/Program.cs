@@ -229,6 +229,7 @@ var app = builder.Build();
 // OpenApi__Enabled=true is set. JSON only: a UI would need a looser CSP. The global rate limiter covers it.
 if (app.Environment.IsDevelopment() || app.Configuration.GetValue("OpenApi:Enabled", false)) app.MapOpenApi();
 
+if (!app.Environment.IsDevelopment()) app.UseHsts();  // Strict-Transport-Security; flagged by the ZAP API scan
 app.UseHttpsRedirection();
 // The API only ever returns JSON, so it may load nothing and be framed by nobody. The web client's
 // own CSP lives in Frontend_BlazorWeb/wwwroot/staticwebapp.config.json.
