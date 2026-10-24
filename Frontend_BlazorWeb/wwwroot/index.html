@@ -19,7 +19,37 @@
     <script src="_content/MudBlazor/MudBlazor.min.js"></script>
     <script src="js/dictation.js"></script>
     <script src="js/download.js"></script>
-    <div id="app"></div>
+    <script>
+        // Clickable divs/spans marked role="button" act like real buttons: Enter or Space clicks them.
+        // Only when the element itself has focus, so typing in a slider/checkbox inside a card is untouched.
+        document.addEventListener("keydown", e => {
+            const el = e.target;
+            if ((e.key === "Enter" || e.key === " ") && el.getAttribute?.("role") === "button" && el.tagName !== "BUTTON") {
+                e.preventDefault();
+                el.click();
+            }
+        });
+    </script>
+    <div id="app">
+        <style>
+            .boot { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; font-family: sans-serif; color: #555; }
+            .boot h1 { margin: 0; font-size: 1.4rem; color: #222; }
+            .boot i { width: 48px; height: 48px; border: 5px solid #ddd; border-top-color: #1976d2; border-radius: 50%; animation: boot-spin 1s linear infinite; }
+            .boot .bar { width: min(280px, 70vw); height: 8px; background: #ddd; border-radius: 4px; overflow: hidden; }
+            .boot .bar b { display: block; height: 100%; width: var(--blazor-load-percentage, 0%); background: #1976d2; transition: width .2s; }
+            .boot .pct::after { content: var(--blazor-load-percentage-text, ""); }
+            .boot small { opacity: 0; animation: boot-show .4s 8s forwards; }
+            @keyframes boot-spin { to { transform: rotate(360deg); } }
+            @keyframes boot-show { to { opacity: 1; } }
+        </style>
+        <div class="boot" role="status">
+            <h1>QULOOBUL MOE'MIENEEN</h1>
+            <i></i>
+            <div class="bar"><b></b></div>
+            <div class="pct">Loading the app… </div>
+            <small>Still loading. The first visit downloads the app, so this can take a little longer on slow connections.</small>
+        </div>
+    </div>
 
     <div id="blazor-error-ui">
         An unhandled error has occurred.

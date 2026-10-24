@@ -11,7 +11,7 @@
 
         <div class="drps-page-header">
             <div>
-                <MudText Typo="Typo.h6" Style="font-weight:600;">Calendar</MudText>
+                <MudText Typo="Typo.h6" HtmlTag="h1" Style="font-weight:600;">Calendar</MudText>
                 <div class="drps-subtitle">Upcoming events, who is invited, and your RSVP.</div>
             </div>
             <MudButton Variant="Variant.Outlined"
@@ -31,7 +31,7 @@
                     }
                     @foreach (var ev in events)
                     {
-                        <div class="drps-list-item @(selected?.EventId == ev.EventId ? "selected" : "")" @onclick="() => Select(ev.EventId)">
+                        <div class="drps-list-item @(selected?.EventId == ev.EventId ? "selected" : "")" role="button" tabindex="0" aria-current="@(selected?.EventId == ev.EventId)" @onclick="() => Select(ev.EventId)">
                             <div style="font-weight:600;">@ev.Title</div>
                             <div class="drps-muted">@ev.EventDate.ToString("ddd d MMM yyyy, HH:mm")@(string.IsNullOrEmpty(ev.Location) ? "" : $" · {ev.Location}")</div>
                         </div>
@@ -91,7 +91,7 @@
                                 @if (CanManage || a.UserId == MyId)
                                 {
                                     <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small"
-                                                   title="@(a.UserId == MyId ? "Leave" : "Remove")" OnClick="@(() => Remove(a.UserId))" />
+                                                   title="@(a.UserId == MyId ? "Leave" : "Remove")" aria-label="@(a.UserId == MyId ? "Leave event" : "Remove " + AppData.UserName(a.UserId))" OnClick="@(() => Remove(a.UserId))" />
                                 }
                             </div>
                         }

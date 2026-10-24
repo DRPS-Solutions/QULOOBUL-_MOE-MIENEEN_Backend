@@ -2,9 +2,10 @@
 // TaskDetailsDialog. AppDataService turns it into API calls, so the
 // dialogs and Tasks.razor don't need to share a private nested type.
 //
-// No namespace declared here on purpose - drop this file anywhere in
-// the project and it'll be visible to the dialogs and Tasks.razor
-// without an extra @using.
+// Lives in the project's root namespace, so the dialogs and Tasks.razor
+// see it without an extra @using.
+namespace Frontend_BlazorWeb;
+
 public class NewTaskResult
 {
     public string Title { get; set; } = string.Empty;

@@ -41,6 +41,30 @@ main {
     flex-direction: column;
 }
 
+    /* Focused only by the skip link; a ring around the whole page would just be noise. */
+    main:focus {
+        outline: none !important;
+    }
+
+/* Off-screen until it gets keyboard focus, then drops in at the top-left above the navbar. */
+.skip-link {
+    position: absolute;
+    top: 0.5rem;
+    left: 0.5rem;
+    z-index: 200;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    background: #FFFFFF;
+    color: #12271F;
+    font-weight: 600;
+    text-decoration: none;
+    transform: translateY(-200%);
+}
+
+    .skip-link:focus {
+        transform: none;
+    }
+
 /* --- Login screen --- */
 .drps-login-wrap {
     flex: 1;
@@ -90,7 +114,7 @@ main {
 }
 
 .drps-login-subtitle {
-    color: #75806F;
+    color: #5E6958;
     margin-bottom: 8px;
     display: block;
 }
@@ -98,7 +122,7 @@ main {
 .drps-login-hint {
     display: block;
     text-align: left;
-    color: #75806F;
+    color: #5E6958;
     min-height: 1.2em;
 }
 

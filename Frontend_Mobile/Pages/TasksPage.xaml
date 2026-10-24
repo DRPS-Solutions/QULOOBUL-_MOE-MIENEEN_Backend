@@ -16,7 +16,7 @@
             <Border Style="{StaticResource HeaderBanner}" Padding="16">
                 <VerticalStackLayout Spacing="4">
                     <Grid ColumnDefinitions="Auto,*,Auto">
-                        <Button Text="&#x2039;"
+                        <Button Text="&#x2039;" SemanticProperties.Description="Previous week"
                                 Clicked="OnPreviousWeek"
                                 BackgroundColor="Transparent"
                                 TextColor="{StaticResource White}"
@@ -29,7 +29,7 @@
                                HorizontalTextAlignment="Center"
                                VerticalOptions="Center" />
                         <Button Grid.Column="2"
-                                Text="&#x203A;"
+                                Text="&#x203A;" SemanticProperties.Description="Next week"
                                 Clicked="OnNextWeek"
                                 BackgroundColor="Transparent"
                                 TextColor="{StaticResource White}"
@@ -139,7 +139,7 @@
                                         </VerticalStackLayout>
                                         <CheckBox Grid.Column="2"
                                                   IsChecked="{Binding IsDone, Mode=OneWay}"
-                                                  CheckedChanged="OnTaskToggled"
+                                                  CheckedChanged="OnTaskToggled" SemanticProperties.Description="Mark task done"
                                                   VerticalOptions="Center" />
                                     </Grid>
                                 </Border>
@@ -201,7 +201,7 @@
                                                     </VerticalStackLayout>
                                                     <CheckBox Grid.Column="1"
                                                               IsChecked="{Binding IsDone, Mode=OneWay}"
-                                                              CheckedChanged="OnTaskToggled"
+                                                              CheckedChanged="OnTaskToggled" SemanticProperties.Description="Mark task done"
                                                               VerticalOptions="Center" />
                                                 </Grid>
                                             </Border>

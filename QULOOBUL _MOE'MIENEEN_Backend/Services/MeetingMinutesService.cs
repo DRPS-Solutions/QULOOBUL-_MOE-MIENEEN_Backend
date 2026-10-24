@@ -141,7 +141,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
         }
 
         private static string[] Words(string? text) =>
-            Regex.Matches((text ?? "").ToLowerInvariant(), @"\w+").Select(m => m.Value).Distinct().ToArray();
+            Regex.Matches((text ?? "").ToLowerInvariant(), @"\w+", RegexOptions.None, TimeSpan.FromMilliseconds(100)).Select(m => m.Value).Distinct().ToArray();
 
         // Each search term counts its best match in the field.
         private static int Score(string[] terms, string[] words) =>

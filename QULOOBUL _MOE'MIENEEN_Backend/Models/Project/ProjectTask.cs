@@ -28,6 +28,10 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Models.Project
         /// </summary>
         public int PercentComplete { get; set; }
 
+        /// <summary>Optimistic-concurrency token: SQL Server bumps it on every update, and EF refuses a save
+        /// whose row changed since it was loaded (the API answers 409).</summary>
+        [Timestamp] public byte[] RowVersion { get; set; } = [];
+
         public Project? Project { get; set; }
         [ForeignKey(nameof(CreatedBy))] public User? Creator { get; set; }
         [ForeignKey(nameof(CompletedBy))] public User? CompletedByUser { get; set; }

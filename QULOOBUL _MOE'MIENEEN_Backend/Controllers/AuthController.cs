@@ -29,6 +29,22 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Controllers
             catch (UnauthorizedAccessException ex) { return Unauthorized(new ErrorResponse(ex.Message)); }
         }
 
+        /// <summary>Mobile "stay signed in": a refresh token for a new access token and refresh token.</summary>
+        [HttpPost("refresh"), AllowAnonymous]
+        public async Task<ActionResult<AuthResponse>> Refresh(RefreshRequest req)
+        {
+            try { return Ok(await auth.RefreshAsync(req)); }
+            catch (UnauthorizedAccessException ex) { return Unauthorized(new ErrorResponse(ex.Message)); }
+        }
+
+        /// <summary>Mobile sign-out: revokes the refresh token. Always 204, so it reveals nothing.</summary>
+        [HttpPost("logout"), AllowAnonymous]
+        public async Task<IActionResult> Logout(RefreshRequest req)
+        {
+            await auth.RevokeAsync(req);
+            return NoContent();
+        }
+
         /// <summary>SM-03 setPassword: redeem the activation / reset link's token.</summary>
         [HttpPost("set-password"), AllowAnonymous]
         public async Task<IActionResult> SetPassword(SetPasswordRequest req)

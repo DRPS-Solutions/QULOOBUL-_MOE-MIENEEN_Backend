@@ -50,7 +50,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.SharedClasses.Middleware
                 if (ctx.Response.HasStarted) throw; // too late to change the response; let the server abort it
                 ctx.Response.Clear();
                 ctx.Response.StatusCode = status;
-                await ctx.Response.WriteAsJsonAsync(new ErrorResponse(message));
+                await ctx.Response.WriteAsJsonAsync(new ErrorResponse(message), ctx.RequestAborted);
             }
         }
     }

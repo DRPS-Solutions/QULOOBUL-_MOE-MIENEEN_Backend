@@ -5,7 +5,7 @@ resource requests, meetings and file storage for one organisation's staff and vo
 Serves both clients in this solution: a Blazor WebAssembly web app and a .NET MAUI app.
 
 **Status: API built, both clients wired to it, deployed to Azure.** The API has a DbContext,
-four migrations, 12 controllers and 21 services. The web and MAUI clients both sign in against
+ten migrations, 12 controllers and 21 services. The web and MAUI clients both sign in against
 `AuthController`, read and write through the controllers using the `Shared` DTOs, and take
 live updates from the SignalR hub. See [What's not built yet](#whats-not-built-yet).
 
@@ -18,11 +18,14 @@ live updates from the SignalR hub. See [What's not built yet](#whats-not-built-y
   - [Seed accounts](#seed-accounts)
   - [Clients](#clients)
 - [Data model](#data-model)
+  - [Database integrity](#database-integrity)
 - [API](#api)
+  - [API contract (OpenAPI)](#api-contract-openapi)
 - [Services](#services)
   - [Rules worth knowing](#rules-worth-knowing)
 - [Clients](#clients-1)
   - [`Frontend_BlazorWeb` - Blazor WebAssembly](#frontend_blazorweb---blazor-webassembly)
+    - [Accessibility](#accessibility)
   - [`Frontend_Mobile` - .NET MAUI](#frontend_mobile---net-maui)
 - [CI/CD](#cicd)
 - [YouTube Video Link](#youtube-video-link)
@@ -67,7 +70,8 @@ dotnet run --project "QULOOBUL _MOE'MIENEEN_Backend/QULOOBUL _MOE'MIENEEN_Backen
 ```
 
 `http://localhost:5012`, or `https://localhost:7272` on the `https` profile. OpenAPI is at
-`/openapi/v1.json` in Development only; `/health` is anonymous and always mapped.
+`/openapi/v1.json` (see [API contract](#api-contract-openapi)); `/health` is anonymous and always
+mapped (see [Health check](#health-check)).
 
 ### Database
 
@@ -127,6 +131,19 @@ dotnet build "QULOOBUL _MOE'MIENEEN_Backend.slnx" -c Release -warnaserror
 dotnet test Backend.Tests
 ```
 
+135 tests, all passing. By file:
+
+| File | Covers |
+|---|---|
+| `ApiIntegrationTests` | The real API over HTTP: `/health` (including the 503 when the database is unreachable), security headers, token and role checks, profile and directory, rate limiting, push registration, and `/openapi/v1.json` being served or hidden outside development by `OpenApi:Enabled` |
+| `AccessGuardTests` | Who may see or change a task, project, file or meeting (404 vs 403, roster changes, `ManageFiles`) |
+| `StateMachineGuardTests`, `UseCaseGapTests` | The task, request and user state machines, and use-case rules (assignment, deactivation hand-over, event and meeting clashes, minutes, search) |
+| `ServiceRuleTests`, `LifecycleTests`, `DtoValidationTests` | Service rules, `MoveUser`/`EnsureRequestMove`, and rejection of unset ids and dates |
+| `MaintenanceJobTests` | The 48-hour escalation, deadline reminders, weekly task templates and oversized-upload purge |
+| `PushNotificationTests` | The push queue, muted types, payload and deep link, and push being off without a hub |
+| `MiddlewareTests` | Exception-to-status mapping (404, 403, 400, 409, 500 with a reference and no leaked text), audit rows only for successful state changes, and `set-password` returning 403 for a bad token and 400 for an invalid body |
+| `RefreshTokenTests` | Refresh tokens only when asked for and lasting 30 days, rotation, a replayed token revoking all of that user's, and revocation by sign-out, password change and deactivation |
+
 CI builds with `-warnaserror`, so a warning locally is a red build remotely. Stop a running API
 before `dotnet test` or `dotnet ef`: it locks the build output.
 
@@ -163,8 +180,8 @@ Six modelling decisions carry business rules and shouldn't be "tidied away":
 Delete behaviour is set per relationship: `Cascade` for rows meaningless without their parent
 (task comments and assignments, project members, meeting and event attendees), `SetNull` for a
 file's task/meeting link, and `NoAction` everywhere else, including every FK to `User` and the
-history tables. Unique pairs, a `CK_FileUpload_OneContext` check constraint, and indexes on the
-task board (`ProjectId, Status`), the unread badge (`UserId, IsRead`) and `Audit_Log.Timestamp`.
+history tables. Integrity beyond the foreign keys (unique pairs, 27 check constraints, indexes,
+defaults and concurrency tokens) is listed under [Database integrity](#database-integrity).
 
 Database-side defence in depth (migration `SecurityAndIndexes`):
 
@@ -173,7 +190,78 @@ Database-side defence in depth (migration `SecurityAndIndexes`):
   user's rows. No user (login, background jobs, migrations) means no filter.
 - **`vw_UserDirectory`**: the staff directory reads a view with no password hash or token columns.
 
-Four migrations: `InitialCreate`, `SecurityAndIndexes`, `TemporaryPassword`, `RequestDecisionNote`.
+Ten migrations: `InitialCreate`, `SecurityAndIndexes`, `TemporaryPassword`, `RequestDecisionNote`, then the
+integrity set `AddRangeCheckConstraints`, `AddAllowedValueCheckConstraints`, `AddCrossColumnCheckConstraints`,
+`AddNotBlankCheckConstraints`, `AddQueryIndexes` and `AddDefaultsAndRowVersion`.
+
+### Database integrity
+
+Every rule below is enforced by SQL Server itself, so a bad write from any path (a future endpoint, a
+script, a manual `UPDATE`) is rejected, not only one that goes through a service. The services still
+check the same rules first so the user gets a clear message; the database is the backstop. All of it
+is configured in `AppDbContext.OnModelCreating`.
+
+**Check constraints (28)**
+
+| Group | Constraint | Table | Business rule |
+|---|---|---|---|
+| Range | `CK_Task_PercentComplete` | `Task` | Progress is 0 to 100 |
+| Range | `CK_Report_PeriodOrder` | `Report` | A report period ends on or after it starts |
+| Range | `CK_User_FailedLoginCount` | `User` | The failed-login counter never goes negative |
+| Allowed values | `CK_Task_Status`, `CK_TaskStatusHistory_NewStatus` | `Task`, `Task_Status_History` | Only the SM-01 states: To Do, In Progress, Blocked, Done, Cancelled, Archived |
+| Allowed values | `CK_ResourceRequest_Status`, `CK_RequestStatusHistory_NewStatus` | `Resource_Request`, `Request_Status_History` | Only the SM-02 states: Pending, Under Review, Escalated, Approved, Declined, Completed |
+| Allowed values | `CK_User_Status` | `User` | Only the SM-03 states: Pending Activation, Active, Locked, Inactive, Anonymised |
+| Allowed values | `CK_Task_Priority`, `CK_ResourceRequest_Priority` | `Task`, `Resource_Request` | Low, Normal, Medium or High |
+| Allowed values | `CK_Project_Status` | `Project` | Active, Closed or Cancelled |
+| Allowed values | `CK_TaskSchedule_DayOfWeek` | `Task_Schedule` | A real day name, as `DayOfWeek.ToString()` writes it |
+| Cross-column | `CK_User_ActiveMatchesStatus` | `User` | `IsActive` is true exactly when `Status` is Active (`Lifecycle.MoveUser`) |
+| Cross-column | `CK_User_InactiveHasDate` | `User` | An inactive account records when it was deactivated |
+| Cross-column | `CK_User_TokenPair` | `User` | The set-password token hash and its expiry are both present or both absent |
+| Cross-column | `CK_ResourceRequest_DecisionHasReviewer` | `Resource_Request` | An approved or declined request names who decided it |
+| Cross-column | `CK_Task_DoneHasCompletedBy` | `Task` | A finished task records who completed it |
+| Cross-column | `CK_FileUpload_OneContext` | `File_Upload` | A file attaches to at most one of task, meeting, or period |
+| Non-empty text | `CK_Project_NameNotBlank`, `CK_Task_TitleNotBlank`, `CK_Meeting_TitleNotBlank`, `CK_Event_TitleNotBlank` | `Project`, `Task`, `Meeting`, `Event` | Names and titles are not empty or all spaces |
+| Non-empty text | `CK_FileUpload_FileNameNotBlank`, `CK_FileUpload_FilePathNotBlank` | `File_Upload` | A file has a name and a storage path |
+| Non-empty text | `CK_User_FirstNameNotBlank`, `CK_User_SurnameNotBlank` | `User` | A user has a first name and surname |
+| Format | `CK_User_EmailFormat` | `User` | Email has the shape `something@something.something` |
+| Range | `CK_RefreshToken_ExpiresAfterCreated` | `Refresh_Token` | A refresh token expires after it was issued |
+
+Priority and project status are free text in the services, so their lists are the values the clients and
+seeder use today; add a value to the constraint and the service together.
+
+**Unique constraints and indexes**
+
+| Index | Table | Purpose |
+|---|---|---|
+| Unique pair per junction table | `Task_Assignment`, `Project_Member`, `Meeting_Attendee`, `Event_Attendee`, `Role_Permission`, `Notification_Preference` | No duplicate membership or assignment |
+| `IX_User_Email` (unique) | `User` | One account per email |
+| `IX_User_PasswordTokenHash` (unique, filtered to non-null) | `User` | Set-password link lookup by token; no two users share a token |
+| `IX_Refresh_Token_TokenHash` (unique) | `Refresh_Token` | Refresh lookup by token hash |
+| `IX_Event_Location_EventDate` (unique, filtered to non-empty location) | `Event` | One event per venue per slot, even under concurrent bookings |
+| `(ProjectId, Status)` | `Task` | The task board |
+| `(Status, Deadline)`, `(Deadline)` | `Task` | Deadline-warning job; calendar and report date ranges |
+| `(Status, DateSubmitted)` | `Resource_Request` | 48-hour escalation job; newest-first list |
+| `(UserId, IsRead)` | `Notification` | The unread badge |
+| `(NewStatus, TimeCreated)` | `Task_Status_History` | Completed-in-period report |
+| `(UserId, Timestamp)`, `(Timestamp)` | `Audit_Log` | A user's recent activity; time-ranged audit queries |
+| `(MeetingDate)`, `(EventDate)` | `Meeting`, `Event` | Calendar and clash-check ranges |
+
+EF Core also indexes every foreign-key column, so those are not repeated here.
+
+**Defaults and concurrency**
+
+- `User.Status` defaults to `Active` and `Task.PercentComplete` to `0`, so a row inserted outside EF starts valid.
+- `Task` and `Resource_Request` carry a `RowVersion` (`rowversion`) concurrency token. A save whose row
+  changed since it was loaded fails, and the API answers 409 "Someone else changed this at the same time".
+  The clients do not send the token back, so this guards overlapping requests, not a stale screen.
+
+**Proof.** `QULOOBUL _MOE'MIENEEN_Backend/Data/CheckConstraintTests.sql` tries an invalid write for each
+rule inside a transaction it rolls back, plus a valid write as a control, and prints a failure count
+(0 = every rule held). It also checks the defaults and that a stale `RowVersion` update matches no rows.
+
+```bash
+sqlcmd -S .\SQLEXPRESS -d QuloobulMoeMieneen -E -C -W -i "QULOOBUL _MOE'MIENEEN_Backend/Data/CheckConstraintTests.sql"
+```
 
 ## API
 
@@ -182,6 +270,53 @@ doc's layering: `Api.Controller` → `Api.Services` → `Api.DataAccess`.
 
 `Auth`, `Tasks`, `TaskSchedules`, `Projects`, `Requests`, `Meetings`, `Events`, `Notifications`,
 `Users`, `Files`, `Reports`, `Search`, plus `ApiControllerBase`.
+
+### API contract (OpenAPI)
+
+The API publishes its OpenAPI 3 document in every environment, not only in development:
+
+- **Live (Azure):** `https://<API-HOSTNAME>.azurewebsites.net/openapi/v1.json`
+  <!-- TODO: replace <API-HOSTNAME> with the deployed API's host (infra/main.bicep names it app-<name>-api-<env>-<suffix>) once CD has run. -->
+- **Local:** `http://localhost:5012/openapi/v1.json`
+
+The document needs no sign-in. It lists every route with its request and response shapes, declares
+the JWT bearer scheme (use **Authorize** in a client such as Postman, with the token from
+`POST /api/auth/login`), and notes the 401, 403 and 429 responses common to the routes. Import the
+URL into Postman, or any OpenAPI client, to generate a collection.
+
+Outside development it is controlled by the `OpenApi__Enabled` app setting, which `infra/main.bicep`
+sets to `true`; set it to `false` and redeploy to take the contract offline. It is JSON only, with
+no UI, so the API keeps its strict `default-src 'none'` Content-Security-Policy. An integration test
+(`OpenApi_outside_development_follows_the_OpenApi_Enabled_setting`) runs the API in Production and
+expects `200` with the setting on and `404` with it off.
+
+### Health check
+
+`GET /health` is anonymous, always mapped (every environment), and sits outside the authorisation
+and permission policies. It does a real dependency check rather than just reporting that the process
+is up: the handler in `Program.cs` calls `Database.CanConnectAsync` against the configured SQL
+database.
+
+| Database | Status | Body |
+| --- | --- | --- |
+| Reachable | `200 OK` | `{"status":"ok"}` |
+| Unreachable | `503 Service Unavailable` | `{"status":"database unreachable"}` |
+
+Three things depend on it, so a broken database connection is caught by each:
+
+- **Post-deploy smoke test.** `.github/scripts/smoke-test.sh` calls `/health` (retrying 5 times, 10 s
+  apart, for a cold start) before signing in and making an authenticated read. A failure stops the
+  workflow before any staging-slot swap, so a build that can't reach its database never goes live.
+- **App Service health check.** `infra/main.bicep` sets `healthCheckPath: '/health'`, so Azure
+  takes an unhealthy instance out of rotation instead of sending it traffic.
+- **Availability monitoring (prod only).** An Application Insights standard web test hits
+  `/health` every 5 minutes from three European locations (30 s timeout, retry on failure),
+  expects `200` and a valid TLS certificate (alerting when it has under 7 days left), and notifies
+  the action group.
+
+The 503 path is covered by an integration test
+(`Health_is_unavailable_when_the_database_is_unreachable` in `Backend.Tests/ApiIntegrationTests.cs`),
+which points the API at a database that doesn't exist and expects `503`.
 
 ## Services
 
@@ -198,7 +333,9 @@ case; the `DbContext` is the unit of work, one `SaveChanges` per operation.
 
 `MaintenanceJobs` is the one `IHostedService`: SM-02's 48-hour escalation, SM-01's deadline
 reminders, and `Task_Schedule`'s recurring-task generation - the transitions driven by a clock
-rather than a user action. It sweeps hourly; each sweep is idempotent.
+rather than a user action. It sweeps hourly; each sweep is idempotent. The same sweep deletes any
+attachment bigger than `Files:MaxBytes` (and its metadata row): a SAS cannot cap what the holder
+writes, so the declared size is only checked up front.
 
 `AccessGuard` is the object-level authorisation check (the anti-IDOR requirement), called from
 every service that reads or changes a user's work. It reads permissions from the database, not
@@ -211,9 +348,29 @@ State machines SM-01 (`ProjectTask`), SM-02 (`ResourceRequest`) and SM-03 (`User
 ### Rules worth knowing
 
 - **Sign-in.** An account locks after 5 consecutive failed sign-ins (`AuthService.MaxFailedLogins`)
-  and the admins are notified. New accounts get an emailed set-password link. An admin's Reset
+  and the admins are notified. The lock lifts itself after 15 minutes (`AuthService.LockoutPeriod`,
+  read from the `user.locked` audit row) so a stranger cannot lock the sole admin out for good; an
+  admin's reset still unlocks it at once. New accounts get an emailed set-password link. An admin's Reset
   Password issues a temporary password, shown once; it unlocks only the change-password route
-  until the user picks their own.
+  until the user picks their own. Every sign-in failure (unknown email, wrong password, pending,
+  locked or deactivated) gets the same message (`AuthService.LoginFailed`), so nobody can probe which
+  emails have accounts. Setting a new password ends every older token (a stolen session does not
+  survive it): the token's `iat` is compared with the `user.password.set` audit row in `Program.cs`,
+  and `POST api/users/me/password` returns a fresh `AuthResponse` for the caller to carry on with.
+- **Staying signed in on the phone (refresh tokens).** Access tokens last 60 minutes for both
+  clients. The mobile app also asks for a refresh token (`IssueRefreshToken` on the login and
+  change-password requests; the web client never does). It is a random 256-bit value, valid for
+  30 days (`Jwt:RefreshLifetimeDays`), stored on the phone in `SecureStorage` and on the server only
+  as a SHA-256 hash in `Refresh_Token`. `POST api/auth/refresh` spends it for a new access token
+  and a new refresh token. Each one works once: the row is marked used in a single conditional
+  update, so of two requests racing with the same token only one wins, and presenting a spent one
+  again is treated as theft, revoking every refresh token for that user (audited as
+  `auth.refresh.reused`). It is refused for a deactivated account or one waiting on a temporary
+  password, and revoked by `POST api/auth/logout`, by any new password (`SetPasswordAsync`,
+  `ChangePasswordAsync`), and by deleting the user (cascade). A role change takes effect on the
+  next refresh, since the new access token carries the current role.
+  `GET api/users` gives colleagues names and roles only; the login email and exact account status
+  (Pending, Locked) go to `ManageUsers` holders.
 - **Forgot password** notifies the admins rather than emailing a link. The notification shows the
   account's own name, and flags it when the name typed on the form doesn't match.
 - **Deactivate / reactivate** (SM-03 Active ↔ Inactive). Deactivating reassigns the user's open tasks.
@@ -260,6 +417,113 @@ What it keeps in the browser, and why:
 The hub connection takes its token from the `HttpClient`'s auth header, not `CurrentUser`:
 `CurrentUser` is only set after the session (and the hub) has started.
 
+#### Accessibility
+
+MudBlazor gives ARIA roles and keyboard handling on its own components; the work below covers
+what its defaults don't: the hand-built `drps-*` cards and chips, the board, focus, and colour.
+
+| Area | What the web client does |
+|---|---|
+| Keyboard reach | Clickable cards, list rows, filter chips and toggles are `role="button" tabindex="0"`; one handler in `wwwroot/index.html` turns Enter/Space into a click. Filter chips use `aria-pressed`, selected rows `aria-current`. Task cards hold other controls, so only the title is the button (a button can't contain buttons). |
+| Focus | A 3px focus ring on everything focusable, blue on light surfaces and light blue on the dark navbar and in dark mode (`wwwroot/css/app.css`). A "Skip to main content" link is the first Tab stop. Dialogs focus their first field, close on Escape and return focus to what opened them. `FocusOnNavigate` lands on each page's `<h1>`. |
+| Board | The Kanban drag-and-drop has a keyboard route: each card's ⋮ menu ("Move to ...") calls the same `MoveCard` as a drop, so the same step-skipping rules apply. |
+| Names and announcements | Every icon-only button has an `aria-label` (file name or note included where there are many). The login error and "no events planned" hints are live regions; snackbars already are. |
+| Colour | Text meets WCAG 2.1 AA (4.5:1) in light and dark mode, below. Reduced-motion is honoured (`prefers-reduced-motion`). |
+
+Contrast, checked with the WCAG formula and re-checked in the running app. The palette changes
+are in the `_theme` in `MainLayout.razor`, the rest in each page's `<style>` block.
+
+| Text | Before | After |
+|---|---|---|
+| Label on a filled dark-mode button (green) | 2.72 | 6.48 (dark ink) |
+| Dark-mode Secondary text/outline on a card | 2.57 | 7.37 |
+| Dark-mode Info on a card | 3.53 | 5.86 |
+| Dark-mode empty-state text | 1.91 | 4.69 |
+| Dark-mode muted text on a task card | 4.36 | 6.44 |
+| Light-mode muted text (`#75806F`) | 3.63 - 4.14 | 5.20 - 5.77 |
+| Light-mode empty-state text | 2.12 | 4.69 |
+| White on the red unread badge | 3.68 | 5.62 |
+| Warning (orange) text on white | 2.15 | 5.86 |
+| "Completed" chip text | 2.99 | 4.66 |
+
+Automated check: axe-core 4.10.2 (WCAG 2.0/2.1 A and AA rules), run in the app signed in as a
+Facility Manager on every page, in light mode, before (commit `6256521`) and after. Counts are
+elements failing, not rules.
+
+| Page | Before | After |
+|---|---|---|
+| Home | 4 | 0 |
+| Daily Tasks, day view | 31 | 0 |
+| Daily Tasks, board view | 14 | 0 |
+| Resource Requests | 26 | 0 |
+| Meetings | 2 | 0 |
+| Event Planning | 8 | 0 |
+| Calendar | 5 | 0 |
+| Files | 7 | 0 |
+| Reports | 3 | 0 |
+| Notifications | 14 | 0 |
+| Profile | 4 | 0 |
+| Search | 3 | 0 |
+| **Total** | **121** | **0** |
+
+User Management (`/users`) was not in the before run; after the fixes it is 0 too. Dark mode was
+run after only: 0 on every page. The "before" failures were mostly low-contrast text, plus the
+unlabelled navbar menu buttons on every page and the unlabelled file and category inputs on Files.
+
+Tested by hand with the keyboard only: skip link (Tab, Enter lands in the page), a card's
+Enter/Space, the ⋮ menu moving a task In Progress to Blocked, and New task / Task details opening
+on their first field, closing on Escape and returning focus.
+
+Lighthouse 12 (accessibility category) scores 100 on the signed-out login page, with 22 audits passed
+and none failed. It was not run on the signed-in pages, which need a session; axe covers those above.
+
+**MAUI app.** Reviewed by reading the XAML, not on a device. Text buttons are read by their label
+already; what had no accessible name now has a `SemanticProperties.Description`: the search and
+notification buttons in the shell, the previous/next week arrows, the unlabelled check boxes (task
+done, all day, event staff) and the two switches. The password eye buttons already had one, and the
+file category picker had an empty `Title`, now "Category". Cards and rows that open on tap use a
+`TapGestureRecognizer`, which TalkBack reads as plain text; `Platforms/Android/TapAsButton.cs` gives
+every such view the Button role ("button, double-tap to activate"), keeping any delegate MAUI already
+set. The Android target still builds with no warnings.
+
+Checked by reading the accessibility tree (`uiautomator dump`), which is what TalkBack reads from:
+the login page on the Android emulator, and the signed-in screens on a physical phone (a Release
+build against the staging API).
+
+- Login: every control has a name; the password eye button is "Show password".
+- Shell: the search and bell buttons are "Search" and "Notifications"; the flyout items carry their page names.
+- Daily Tasks: the week arrows are "Previous week" / "Next week", and each day cell is a Button.
+- Meetings, User Management, Event Planning and Notifications: every card in the list is a Button,
+  with its title and details as the text TalkBack reads with it.
+- Calendar and Files: the switches are "Include past events" and "Show archived".
+- Pickers: a picker with a value selected showed only the value ("Low", "Equipment", "24 Sept 2026"),
+  because the label above it isn't linked to it. Every Picker, DatePicker, TimePicker and the
+  progress slider now has a `SemanticProperties.Description`, so it reads name then value:
+  "Priority, Low", "Date, 24 Oct 2026", "Report type, Task completion".
+- The "+ New" forms (New task, New event, the Events form with its staff check boxes, New meeting,
+  New user) and the Requests, Reports and Files forms: every field reads its name (placeholder or
+  description), every check box its person, and every button its label. Each form was opened and
+  cancelled; nothing was saved.
+
+**Dialogs (web).** Every MudBlazor dialog focuses its first field (`DefaultFocus.FirstChild`). Escape
+now closes every dialog, including the confirm boxes for deleting a file and changing a role,
+resetting a password, deactivating or deleting a user, through `CloseOnEscapeKey` on the
+`MudDialogProvider` in `MainLayout.razor`. The temporary-password dialog opts out on purpose, so the
+password can't be dismissed before it is copied.
+
+Not done:
+
+- MAUI screens not reached: the task check boxes (staging had no tasks that day), Search results,
+  and Task details. They use the same patterns checked above.
+- The flyout toggle reads "OK" while the menu is open (MAUI Shell's default), not "Close navigation drawer".
+- The web dialogs were reviewed in code, not used with the keyboard in the running app; only New
+  task and Task details were tested by hand (above).
+- No screen reader pass (TalkBack, NVDA) on either client. The emulator check shows what TalkBack
+  is given, not how it sounds in use.
+
+Automated tools find only part of the problems, so treat 0 as "no machine-detectable failures", not
+"accessible".
+
 ### `Frontend_Mobile` - .NET MAUI
 
 Ported from the standalone MAUI app at `C:\3rdYear\XBCAD\Mobile`, which was itself a port of
@@ -289,8 +553,15 @@ Five things about it are deliberate, not oversights:
 - **The API address is compiled in** (`AppState.ApiBase`): Debug builds use the local API
   (`https://10.0.2.2:7272/` on the Android emulator, `https://localhost:7272/` elsewhere) and
   trust the ASP.NET dev certificate; `-p:ApiEnvironment=Staging` builds use the staging App
-  Service; Release builds use production. The session token is kept in `SecureStorage` and
-  resumed on the next launch while it's still valid.
+  Service; Release builds use production. The session is kept in `SecureStorage`. On launch,
+  an access token with more than a minute left is reused; otherwise the refresh token is swapped
+  for a new pair, so the user signs in again only after 30 days, a sign-out, a password change
+  or deactivation. A request that gets a 401 mid-session renews once and retries; renewals run one
+  at a time so parallel requests never spend the same refresh token twice.
+- **Back goes Home.** Every page is a top-level Shell route, so Android's Back on any of them
+  would close the app; `AppShell.OnBackButtonPressed` sends it to Home instead (Back on Home
+  exits). Reopening while the process is still alive goes straight to Home rather than the
+  login page.
 - **Login is a Shell route, not a separate root page.** Swapping the window root between a
   `ContentPage` and a `Shell` crashes Android's fragment manager
   ([dotnet/maui#21257](https://github.com/dotnet/maui/issues/21257)), so the Shell owns the
@@ -321,7 +592,8 @@ Quality gates, in every build job:
   afterwards. Locally that is LocalDB unless `TEST_SQL_CONNECTION` points elsewhere; in CI it's
   a `mssql` service container.
 - **Coverage threshold.** `.github/scripts/coverage-gate.sh 70` fails the job below 70% line coverage.
-- **Smoke test after deploy.** `.github/scripts/smoke-test.sh` checks `/health`, signs in as
+- **Smoke test after deploy.** `.github/scripts/smoke-test.sh` checks `/health` (which
+  includes a database connectivity check, see [Health check](#health-check)), signs in as
   `SMOKE_EMAIL`, and makes one authenticated read, before any slot swap.
 
 Migrations are applied by the CD workflows (the runner opens the SQL firewall for itself, migrates,

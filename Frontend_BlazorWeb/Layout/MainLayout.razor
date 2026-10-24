@@ -7,7 +7,8 @@
 
 <MudThemeProvider IsDarkMode="isDarkMode" Theme="_theme" />
 <MudPopoverProvider />
-<MudDialogProvider />
+@* Escape closes every dialog, including the confirm message boxes, unless a call's own DialogOptions says otherwise. *@
+<MudDialogProvider CloseOnEscapeKey="true" />
 <MudSnackbarProvider />
 
 @if (restoring)
@@ -61,7 +62,7 @@ else if (AppData.CurrentUser is null or { MustChangePassword: true })
 
                 @if (loginError is not null)
                 {
-                    <MudText Typo="Typo.caption" Color="Color.Error" Class="drps-login-hint">
+                    <MudText Typo="Typo.caption" Color="Color.Error" Class="drps-login-hint" role="alert">
                         @loginError
                     </MudText>
                 }
@@ -85,6 +86,9 @@ else if (AppData.CurrentUser is null or { MustChangePassword: true })
 else
 {
     <div class="page @(isDarkMode ? "dark-mode" : "") @(isVerticalNav ? "nav-vertical" : "")">
+        @* First Tab stop: lets keyboard users jump past the nav links. Focus is moved in code because
+           a bare "#main" resolves against <base href="/"> and Blazor would navigate home instead. *@
+        <a class="skip-link" href="#main" @onclick="SkipToMain" @onclick:preventDefault>Skip to main content</a>
         <header class="top-navbar">
             <NavMenu IsDarkMode="isDarkMode"
                      IsVerticalNav="isVerticalNav"
@@ -98,7 +102,7 @@ else
                      OnLogout="Logout" />
         </header>
 
-        <main>
+        <main id="main" tabindex="-1" @ref="mainEl">
             <article class="content px-4">
                 @* Pages read the signed-in user from AppDataService. A page that throws shows
                    this message instead of taking the whole app down; navigating away resets it. *@
@@ -209,6 +213,9 @@ else
         loginError = null;
     }
 
+    private ElementReference mainEl;
+    private async Task SkipToMain() => await mainEl.FocusAsync();
+
     private ErrorBoundary? pageErrors;
 
     // The layout gets new parameters on every navigation: clear a previous page's error.
@@ -237,15 +244,24 @@ else
             Primary = "#3C7A63",
             Secondary = "#2F5C4C",
             Info = "#2A5CD1",
+            Error = "#C62828", // MudBlazor's default red gives white badge text only 3.7:1
+            Warning = "#9A5200", // the default orange is 2.2:1 as text on white
             AppbarBackground = "#12271F",
             Background = "#F5F3EC",
             Surface = "#FFFFFF"
         },
         PaletteDark = new PaletteDark
         {
+            // Contrast (WCAG AA): the light greens/blue are used as text and as button fills in dark mode,
+            // so their label colour is dark ink (>= 6.4:1) and they sit at >= 4.5:1 on Surface.
             Primary = "#6FA98C",
-            Secondary = "#3C7A63",
-            Info = "#5B84D6",
+            PrimaryContrastText = "#0B1B21",
+            Secondary = "#8FD1B0",
+            SecondaryContrastText = "#0B1B21",
+            Info = "#8FAEF0",
+            InfoContrastText = "#0B1B21",
+            Error = "#F28B82",
+            ErrorContrastText = "#0B1B21",
             AppbarBackground = "#12271F",
             Background = "#0B1B21",
             Surface = "#1E362B",

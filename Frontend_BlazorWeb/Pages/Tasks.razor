@@ -24,12 +24,12 @@
         --drps-blue-400: #6FA98C;   /* lighter blue, gradient start / highlights */
         --drps-bg: #F5F3EC;         /* overall page background */
         --drps-surface: #FFFFFF;    /* card/panel background */
-        --drps-text-muted: #75806F; /* secondary/muted text color */
+        --drps-text-muted: #5E6958; /* secondary/muted text color */
         --drps-tint-blue: #EAF2ED;  /* low-priority task card/chip tint */
         --drps-tint-amber: #F6EBD3; /* medium-priority task card/chip tint */
         --drps-tint-red: #FCEEF0;   /* high-priority task card/chip tint */
         --drps-border-soft: #E7E4D8; /* hour-row and card hairlines */
-        --drps-empty: #B7B2A0;      /* empty-state / placeholder text */
+        --drps-empty: #65705F;      /* empty-state / placeholder text */
         --drps-shadow: rgba(11, 22, 38, 0.06); /* card drop shadow */
         background: var(--drps-bg);
         min-height: 100%;
@@ -444,13 +444,13 @@
     .page.dark-mode .drps-schedule {
         --drps-bg: #0B1B21;
         --drps-surface: #1E362B;
-        --drps-text-muted: #93A69A;
+        --drps-text-muted: #A9BBB0;
         --drps-navy-800: #E9F0EA;
         --drps-tint-blue: rgba(60, 122, 99, 0.16);
         --drps-tint-amber: rgba(185, 134, 46, 0.18);
         --drps-tint-red: rgba(224, 67, 92, 0.16);
         --drps-border-soft: #2E4A3B;
-        --drps-empty: #4E5F52;
+        --drps-empty: #8DA095;
         --drps-shadow: rgba(0, 0, 0, 0.35);
     }
 </style>
@@ -473,9 +473,9 @@
 
             @* Prev/next week arrows either side of the current month/year *@
             <div class="drps-week-nav">
-                <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" Color="Color.Inherit" Size="Size.Small" OnClick="PrevWeek" />
+                <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" Color="Color.Inherit" Size="Size.Small" aria-label="Previous week" OnClick="PrevWeek" />
                 <MudText Typo="Typo.subtitle1" Style="font-weight:600;">@weekStart.ToString("MMMM yyyy")</MudText>
-                <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" Color="Color.Inherit" Size="Size.Small" OnClick="NextWeek" />
+                <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" Color="Color.Inherit" Size="Size.Small" aria-label="Next week" OnClick="NextWeek" />
             </div>
 
             @* One cell per day of the currently displayed week. Clicking
@@ -488,7 +488,7 @@
                     // plus "selected" if it's the active date, plus "today" if
                     // it's the real current date (both can apply at once).
                     var cssClass = "drps-day-cell" + (day.Date == selectedDate.Date ? " selected" : "") + (day.Date == DateTime.Today ? " today" : "");
-                    <div class="@cssClass" @onclick="() => SelectDay(day)">
+                    <div class="@cssClass" role="button" tabindex="0" aria-current="@(day.Date == selectedDate.Date)" @onclick="() => SelectDay(day)">
                         <span class="drps-day-label">@day.ToString("ddd").ToUpper()</span>
                         <span class="drps-day-number">@day.Day</span>
                         @* Dot only renders if this day has at least one task. *@
@@ -503,7 +503,7 @@
 
         @* --- Selected date heading + "New Task" button --- *@
         <div class="d-flex align-center justify-space-between flex-wrap gap-2 mb-1">
-            <MudText Typo="Typo.h6" Style="color:var(--drps-navy-800); font-weight:600;">
+            <MudText Typo="Typo.h6" HtmlTag="h1" Style="color:var(--drps-navy-800); font-weight:600;">
                 @(boardView ? $"Week of {weekStart:d MMMM}" : selectedDate.ToString("dddd, d MMMM"))
             </MudText>
 
@@ -528,8 +528,8 @@
 
         @if (boardView)
         {
-            <MudText Typo="Typo.body2" Class="mb-3" Style="color:#75806F;">
-                Drag a card to change its status. Moves that skip a step (e.g. To Do straight to Done) are refused.
+            <MudText Typo="Typo.body2" Class="mb-3" Style="color:var(--drps-text-muted);">
+                Drag a card, or use its ⋮ menu, to change its status. Moves that skip a step (e.g. To Do straight to Done) are refused.
             </MudText>
 
             <MudDropContainer T="TaskCardDto" @ref="board" Items="tasks" ItemsSelector="@((t, column) => ColumnOf(t) == column)"
@@ -549,7 +549,20 @@
                     @{ var assignees = AppData.AssigneeNames(context); }
                     <div class="drps-task-card priority-@context.Priority.ToLower() @(context.IsDone() ? "done" : "")"
                          @onclick="() => OnOpenTaskDetails(context)">
-                        <div class="drps-task-title">@context.Title</div>
+                        <div class="d-flex align-start justify-space-between">
+                            @* The card holds other controls (menu, slider), so only the title is the keyboard button. *@
+                            <div class="drps-task-title" role="button" tabindex="0" @onclick="() => OnOpenTaskDetails(context)" @onclick:stopPropagation="true">@context.Title</div>
+                            @* Keyboard alternative to dragging: Enter opens it, arrows pick a column. *@
+                            <span @onclick:stopPropagation="true">
+                                <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="Size.Small" Dense="true"
+                                         AriaLabel="@($"Move {context.Title} to another column")">
+                                    @foreach (var column in BoardColumns.Where(c => c != ColumnOf(context)))
+                                    {
+                                        <MudMenuItem OnClick="@(() => MoveCard(context, column))">Move to @column</MudMenuItem>
+                                    }
+                                </MudMenu>
+                            </span>
+                        </div>
                         <div class="drps-task-time">
                             @context.Deadline.ToString(context.IsAllDay() ? "ddd d MMM" : "ddd d MMM, h:mm tt")
                             @(assignees.Length == 0 ? "" : $" · {assignees}")
@@ -575,7 +588,7 @@
         else
         {
         @* --- Completion summary for the selected day --- *@
-        <MudText Typo="Typo.body2" Class="mb-3" Style="color:#75806F;">
+        <MudText Typo="Typo.body2" Class="mb-3" Style="color:var(--drps-text-muted);">
             @(TasksForSelectedDay.Count() == 0 ? "No tasks scheduled" : $"{TasksForSelectedDay.Count(t => t.IsDone())} of {TasksForSelectedDay.Count()} completed")
         </MudText>
 
@@ -596,7 +609,7 @@
                     <div class="drps-allday-chip priority-@task.Priority.ToLower() @(task.IsDone() ? "done" : "")"
                          @onclick="() => OnOpenTaskDetails(task)">
                         <div>
-                            <span class="drps-allday-title">@task.Title</span>
+                            <span class="drps-allday-title" role="button" tabindex="0" @onclick="() => OnOpenTaskDetails(task)" @onclick:stopPropagation="true">@task.Title</span>
                             @if (AppData.EventName(task) is { } eventName)
                             {
                                 <div class="drps-task-completed-by">Linked: @eventName</div>
@@ -651,7 +664,7 @@
                                 <div class="drps-task-card priority-@task.Priority.ToLower() @(task.IsDone() ? "done" : "")"
                                      @onclick="() => OnOpenTaskDetails(task)">
                                     <div>
-                                        <div class="drps-task-title">@task.Title</div>
+                                        <div class="drps-task-title" role="button" tabindex="0" @onclick="() => OnOpenTaskDetails(task)" @onclick:stopPropagation="true">@task.Title</div>
                                         <div class="drps-task-time">
                                             @task.Deadline.ToString("h:mm tt")
                                             @(assignees.Length == 0 ? "" : $" \u00b7 {assignees}")
@@ -833,8 +846,14 @@
     // Reference: MudBlazor, "Drop Zone - MudBlazor." Accessed: Oct. 04, 2026. [Online]. Available: https://mudblazor.com/components/dropzone
     private async Task OnCardDropped(MudItemDropInfo<TaskCardDto> drop)
     {
-        if (drop.Item is { } task && drop.DropzoneIdentifier != ColumnOf(task))
-            await AppData.MoveTaskAsync(task, drop.DropzoneIdentifier);
+        if (drop.Item is { } task) await MoveCard(task, drop.DropzoneIdentifier);
+        else board?.Refresh();
+    }
+
+    // Shared by drag-and-drop and each card's "Move to" menu (the keyboard route).
+    private async Task MoveCard(TaskCardDto task, string column)
+    {
+        if (column != ColumnOf(task)) await AppData.MoveTaskAsync(task, column);
         board?.Refresh(); // re-place every card from the refreshed list, so a refused move snaps back
     }
 

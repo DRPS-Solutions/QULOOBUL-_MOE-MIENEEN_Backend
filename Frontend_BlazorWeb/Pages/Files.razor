@@ -15,7 +15,7 @@
 
         <div class="drps-page-header">
             <div>
-                <MudText Typo="Typo.h6" Style="font-weight:600;">Files</MudText>
+                <MudText Typo="Typo.h6" HtmlTag="h1" Style="font-weight:600;">Files</MudText>
                 <div class="drps-subtitle">Upload, find and download shared documents.</div>
             </div>
         </div>
@@ -31,7 +31,7 @@
                             <MudSelectItem T="int?" Value="@c.CategoryId">@c.CategoryName</MudSelectItem>
                         }
                     </MudSelect>
-                    <InputFile OnChange="OnFilePicked" class="mb-3" />
+                    <InputFile OnChange="OnFilePicked" class="mb-3" aria-label="File to upload" />
                     <div class="drps-muted mb-3">Up to @(MaxBytes / (1024 * 1024)) MB. Office documents, PDFs, text and images.</div>
                     <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" OnClick="Upload"
                                Disabled="@uploading">
@@ -79,7 +79,7 @@
                             <MudTd DataLabel="Category">
                                 @if (CanManage)
                                 {
-                                    <MudSelect T="int" Value="context.CategoryId" Dense="true" Margin="Margin.Dense"
+                                    <MudSelect T="int" Value="context.CategoryId" Dense="true" Margin="Margin.Dense" aria-label="@($"Category for {context.FileName}")"
                                                ValueChanged="@((int v) => Recategorise(context, v))" ToStringFunc="@(id => CategoryName(id))">
                                         @foreach (var c in categories)
                                         {
@@ -94,13 +94,14 @@
                             </MudTd>
                             <MudTd DataLabel="Uploaded by">@AppData.UserName(context.UploadedBy)</MudTd>
                             <MudTd Style="white-space:nowrap; text-align:right;">
-                                <MudIconButton Icon="@Icons.Material.Filled.Download" Size="Size.Small" title="Download" OnClick="@(() => Download(context))" />
+                                <MudIconButton Icon="@Icons.Material.Filled.Download" Size="Size.Small" title="Download" aria-label="@($"Download {context.FileName}")" OnClick="@(() => Download(context))" />
                                 @if (CanManage)
                                 {
                                     <MudIconButton Icon="@(context.IsArchived ? Icons.Material.Filled.Unarchive : Icons.Material.Filled.Archive)"
                                                    Size="Size.Small" title="@(context.IsArchived ? "Unarchive" : "Archive")"
+                                                   aria-label="@($"{(context.IsArchived ? "Unarchive" : "Archive")} {context.FileName}")"
                                                    OnClick="@(() => SetArchived(context, !context.IsArchived))" />
-                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" title="Delete"
+                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" title="Delete" aria-label="@($"Delete {context.FileName}")"
                                                    OnClick="@(() => Delete(context))" />
                                 }
                             </MudTd>

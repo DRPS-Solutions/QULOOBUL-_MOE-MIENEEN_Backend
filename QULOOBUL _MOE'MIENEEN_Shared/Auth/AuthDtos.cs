@@ -20,8 +20,11 @@ namespace QULOOBUL__MOE_MIENEEN_Shared.Auth
         public string Email { get; init; } = string.Empty;
         [Required, MaxLength(128)]
         public string Password { get; init; } = string.Empty;
+        /// <summary>The mobile app asks for a refresh token so it stays signed in; the web client does not.</summary>
+        public bool IssueRefreshToken { get; init; }
     }
 //----------------------------------------------------------------------------------------------------------------------//
+    /// <summary>RefreshToken is set only when the request asked for one (and never while a temporary password is pending).</summary>
     public record AuthResponse(
         string Token,
         DateTime ExpiresAtUtc,
@@ -29,7 +32,17 @@ namespace QULOOBUL__MOE_MIENEEN_Shared.Auth
         string FullName,
         string Role,
         IReadOnlyList<string> Permissions,
-        bool MustChangePassword = false);
+        bool MustChangePassword = false,
+        string? RefreshToken = null,
+        DateTime? RefreshExpiresAtUtc = null);
+//----------------------------------------------------------------------------------------------------------------------//
+    /// <summary>Swaps a refresh token for a new access token and a new refresh token (the old one is spent);
+    /// also the body of sign-out, which revokes it.</summary>
+    public record RefreshRequest
+    {
+        [Required, MaxLength(100)]
+        public string RefreshToken { get; init; } = string.Empty;
+    }
 //----------------------------------------------------------------------------------------------------------------------//
     public record PasswordResetRequest
     {
@@ -64,6 +77,8 @@ namespace QULOOBUL__MOE_MIENEEN_Shared.Auth
         public string CurrentPassword { get; init; } = string.Empty;
         [Required, MinLength(8), MaxLength(128)]
         public string NewPassword { get; init; } = string.Empty;
+        /// <summary>As on LoginRequest: the mobile app finishing a temporary-password sign-in asks for one.</summary>
+        public bool IssueRefreshToken { get; init; }
     }
 //----------------------------------------------------------------------------------------------------------------------//
     /// <summary>Shown once to the admin, who passes it on to the user in person or by phone.</summary>
