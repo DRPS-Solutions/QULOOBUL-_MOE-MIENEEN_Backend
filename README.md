@@ -131,7 +131,7 @@ dotnet build "QULOOBUL _MOE'MIENEEN_Backend.slnx" -c Release -warnaserror
 dotnet test Backend.Tests
 ```
 
-128 tests, all passing. By file:
+135 tests, all passing. By file:
 
 | File | Covers |
 |---|---|
@@ -142,6 +142,7 @@ dotnet test Backend.Tests
 | `MaintenanceJobTests` | The 48-hour escalation, deadline reminders, weekly task templates and oversized-upload purge |
 | `PushNotificationTests` | The push queue, muted types, payload and deep link, and push being off without a hub |
 | `MiddlewareTests` | Exception-to-status mapping (404, 403, 400, 409, 500 with a reference and no leaked text), audit rows only for successful state changes, and `set-password` returning 403 for a bad token and 400 for an invalid body |
+| `RefreshTokenTests` | Refresh tokens only when asked for and lasting 30 days, rotation, a replayed token revoking all of that user's, and revocation by sign-out, password change and deactivation |
 
 CI builds with `-warnaserror`, so a warning locally is a red build remotely. Stop a running API
 before `dotnet test` or `dotnet ef`: it locks the build output.
@@ -200,7 +201,7 @@ script, a manual `UPDATE`) is rejected, not only one that goes through a service
 check the same rules first so the user gets a clear message; the database is the backstop. All of it
 is configured in `AppDbContext.OnModelCreating`.
 
-**Check constraints (27)**
+**Check constraints (28)**
 
 | Group | Constraint | Table | Business rule |
 |---|---|---|---|
@@ -223,6 +224,7 @@ is configured in `AppDbContext.OnModelCreating`.
 | Non-empty text | `CK_FileUpload_FileNameNotBlank`, `CK_FileUpload_FilePathNotBlank` | `File_Upload` | A file has a name and a storage path |
 | Non-empty text | `CK_User_FirstNameNotBlank`, `CK_User_SurnameNotBlank` | `User` | A user has a first name and surname |
 | Format | `CK_User_EmailFormat` | `User` | Email has the shape `something@something.something` |
+| Range | `CK_RefreshToken_ExpiresAfterCreated` | `Refresh_Token` | A refresh token expires after it was issued |
 
 Priority and project status are free text in the services, so their lists are the values the clients and
 seeder use today; add a value to the constraint and the service together.
@@ -234,6 +236,7 @@ seeder use today; add a value to the constraint and the service together.
 | Unique pair per junction table | `Task_Assignment`, `Project_Member`, `Meeting_Attendee`, `Event_Attendee`, `Role_Permission`, `Notification_Preference` | No duplicate membership or assignment |
 | `IX_User_Email` (unique) | `User` | One account per email |
 | `IX_User_PasswordTokenHash` (unique, filtered to non-null) | `User` | Set-password link lookup by token; no two users share a token |
+| `IX_Refresh_Token_TokenHash` (unique) | `Refresh_Token` | Refresh lookup by token hash |
 | `IX_Event_Location_EventDate` (unique, filtered to non-empty location) | `Event` | One event per venue per slot, even under concurrent bookings |
 | `(ProjectId, Status)` | `Task` | The task board |
 | `(Status, Deadline)`, `(Deadline)` | `Task` | Deadline-warning job; calendar and report date ranges |
@@ -354,6 +357,18 @@ State machines SM-01 (`ProjectTask`), SM-02 (`ResourceRequest`) and SM-03 (`User
   emails have accounts. Setting a new password ends every older token (a stolen session does not
   survive it): the token's `iat` is compared with the `user.password.set` audit row in `Program.cs`,
   and `POST api/users/me/password` returns a fresh `AuthResponse` for the caller to carry on with.
+- **Staying signed in on the phone (refresh tokens).** Access tokens last 60 minutes for both
+  clients. The mobile app also asks for a refresh token (`IssueRefreshToken` on the login and
+  change-password requests; the web client never does). It is a random 256-bit value, valid for
+  30 days (`Jwt:RefreshLifetimeDays`), stored on the phone in `SecureStorage` and on the server only
+  as a SHA-256 hash in `Refresh_Token`. `POST api/auth/refresh` spends it for a new access token
+  and a new refresh token. Each one works once: the row is marked used in a single conditional
+  update, so of two requests racing with the same token only one wins, and presenting a spent one
+  again is treated as theft, revoking every refresh token for that user (audited as
+  `auth.refresh.reused`). It is refused for a deactivated account or one waiting on a temporary
+  password, and revoked by `POST api/auth/logout`, by any new password (`SetPasswordAsync`,
+  `ChangePasswordAsync`), and by deleting the user (cascade). A role change takes effect on the
+  next refresh, since the new access token carries the current role.
   `GET api/users` gives colleagues names and roles only; the login email and exact account status
   (Pending, Locked) go to `ManageUsers` holders.
 - **Forgot password** notifies the admins rather than emailing a link. The notification shows the
@@ -532,8 +547,15 @@ Five things about it are deliberate, not oversights:
 - **The API address is compiled in** (`AppState.ApiBase`): Debug builds use the local API
   (`https://10.0.2.2:7272/` on the Android emulator, `https://localhost:7272/` elsewhere) and
   trust the ASP.NET dev certificate; `-p:ApiEnvironment=Staging` builds use the staging App
-  Service; Release builds use production. The session token is kept in `SecureStorage` and
-  resumed on the next launch while it's still valid.
+  Service; Release builds use production. The session is kept in `SecureStorage`. On launch,
+  an access token with more than a minute left is reused; otherwise the refresh token is swapped
+  for a new pair, so the user signs in again only after 30 days, a sign-out, a password change
+  or deactivation. A request that gets a 401 mid-session renews once and retries; renewals run one
+  at a time so parallel requests never spend the same refresh token twice.
+- **Back goes Home.** Every page is a top-level Shell route, so Android's Back on any of them
+  would close the app; `AppShell.OnBackButtonPressed` sends it to Home instead (Back on Home
+  exits). Reopening while the process is still alive goes straight to Home rather than the
+  login page.
 - **Login is a Shell route, not a separate root page.** Swapping the window root between a
   `ContentPage` and a `Shell` crashes Android's fragment manager
   ([dotnet/maui#21257](https://github.com/dotnet/maui/issues/21257)), so the Shell owns the

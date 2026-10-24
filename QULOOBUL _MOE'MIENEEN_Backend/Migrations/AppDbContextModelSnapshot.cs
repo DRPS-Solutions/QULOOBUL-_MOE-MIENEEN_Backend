@@ -281,6 +281,44 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
                     b.ToTable("Permission");
                 });
 
+            modelBuilder.Entity("QULOOBUL__MOE_MIENEEN_Backend.Models.IdentityAndAccess.RefreshToken", b =>
+                {
+                    b.Property<int>("RefreshTokenId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("RefreshTokenId"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<DateTime?>("UsedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("RefreshTokenId");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique();
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("Refresh_Token", t =>
+                        {
+                            t.HasCheckConstraint("CK_RefreshToken_ExpiresAfterCreated", "[ExpiresAt] > [CreatedAt]");
+                        });
+                });
+
             modelBuilder.Entity("QULOOBUL__MOE_MIENEEN_Backend.Models.IdentityAndAccess.Role", b =>
                 {
                     b.Property<int>("RoleId")
@@ -1117,6 +1155,17 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
                     b.Navigation("Task");
 
                     b.Navigation("Uploader");
+                });
+
+            modelBuilder.Entity("QULOOBUL__MOE_MIENEEN_Backend.Models.IdentityAndAccess.RefreshToken", b =>
+                {
+                    b.HasOne("QULOOBUL__MOE_MIENEEN_Backend.Models.IdentityAndAccess.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("QULOOBUL__MOE_MIENEEN_Backend.Models.IdentityAndAccess.RolePermission", b =>
