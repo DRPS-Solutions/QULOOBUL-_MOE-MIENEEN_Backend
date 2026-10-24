@@ -7,7 +7,8 @@
 
 <MudThemeProvider IsDarkMode="isDarkMode" Theme="_theme" />
 <MudPopoverProvider />
-<MudDialogProvider />
+@* Escape closes every dialog, including the confirm message boxes, unless a call's own DialogOptions says otherwise. *@
+<MudDialogProvider CloseOnEscapeKey="true" />
 <MudSnackbarProvider />
 
 @if (restoring)

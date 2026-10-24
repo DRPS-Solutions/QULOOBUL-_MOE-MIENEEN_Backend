@@ -24,6 +24,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Data
         public DbSet<Role> Roles => Set<Role>();
         public DbSet<Permission> Permissions => Set<Permission>();
         public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
+        public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 //----------------------------------------------------------------------------------------------------------------------//
         // Projects and tasks
         public DbSet<Project> Projects => Set<Project>();
@@ -102,6 +103,10 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Data
             b.Entity<TaskStatusHistory>().HasIndex(x => new { x.NewStatus, x.TimeCreated }); // completed-in-period report; the table only grows
             // Set-password links are looked up by token hash alone; unique also makes a clash impossible.
             b.Entity<User>().HasIndex(x => x.PasswordTokenHash).IsUnique().HasFilter("[PasswordTokenHash] IS NOT NULL");
+            // Refresh tokens are looked up by hash alone, and go with their user.
+            b.Entity<RefreshToken>().HasIndex(x => x.TokenHash).IsUnique();
+            b.Entity<RefreshToken>().HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+            b.Entity<RefreshToken>().ToTable(t => t.HasCheckConstraint("CK_RefreshToken_ExpiresAfterCreated", "[ExpiresAt] > [CreatedAt]"));
 
             // Staff directory reads a view that has no credential columns (defence in depth); created in
             // the SecurityAndIndexes migration alongside the Notification row-level security policy.

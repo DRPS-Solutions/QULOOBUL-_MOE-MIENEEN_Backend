@@ -131,6 +131,19 @@ dotnet build "QULOOBUL _MOE'MIENEEN_Backend.slnx" -c Release -warnaserror
 dotnet test Backend.Tests
 ```
 
+135 tests, all passing. By file:
+
+| File | Covers |
+|---|---|
+| `ApiIntegrationTests` | The real API over HTTP: `/health` (including the 503 when the database is unreachable), security headers, token and role checks, profile and directory, rate limiting, push registration, and `/openapi/v1.json` being served or hidden outside development by `OpenApi:Enabled` |
+| `AccessGuardTests` | Who may see or change a task, project, file or meeting (404 vs 403, roster changes, `ManageFiles`) |
+| `StateMachineGuardTests`, `UseCaseGapTests` | The task, request and user state machines, and use-case rules (assignment, deactivation hand-over, event and meeting clashes, minutes, search) |
+| `ServiceRuleTests`, `LifecycleTests`, `DtoValidationTests` | Service rules, `MoveUser`/`EnsureRequestMove`, and rejection of unset ids and dates |
+| `MaintenanceJobTests` | The 48-hour escalation, deadline reminders, weekly task templates and oversized-upload purge |
+| `PushNotificationTests` | The push queue, muted types, payload and deep link, and push being off without a hub |
+| `MiddlewareTests` | Exception-to-status mapping (404, 403, 400, 409, 500 with a reference and no leaked text), audit rows only for successful state changes, and `set-password` returning 403 for a bad token and 400 for an invalid body |
+| `RefreshTokenTests` | Refresh tokens only when asked for and lasting 30 days, rotation, a replayed token revoking all of that user's, and revocation by sign-out, password change and deactivation |
+
 CI builds with `-warnaserror`, so a warning locally is a red build remotely. Stop a running API
 before `dotnet test` or `dotnet ef`: it locks the build output.
 
@@ -188,7 +201,7 @@ script, a manual `UPDATE`) is rejected, not only one that goes through a service
 check the same rules first so the user gets a clear message; the database is the backstop. All of it
 is configured in `AppDbContext.OnModelCreating`.
 
-**Check constraints (27)**
+**Check constraints (28)**
 
 | Group | Constraint | Table | Business rule |
 |---|---|---|---|
@@ -211,6 +224,7 @@ is configured in `AppDbContext.OnModelCreating`.
 | Non-empty text | `CK_FileUpload_FileNameNotBlank`, `CK_FileUpload_FilePathNotBlank` | `File_Upload` | A file has a name and a storage path |
 | Non-empty text | `CK_User_FirstNameNotBlank`, `CK_User_SurnameNotBlank` | `User` | A user has a first name and surname |
 | Format | `CK_User_EmailFormat` | `User` | Email has the shape `something@something.something` |
+| Range | `CK_RefreshToken_ExpiresAfterCreated` | `Refresh_Token` | A refresh token expires after it was issued |
 
 Priority and project status are free text in the services, so their lists are the values the clients and
 seeder use today; add a value to the constraint and the service together.
@@ -222,6 +236,7 @@ seeder use today; add a value to the constraint and the service together.
 | Unique pair per junction table | `Task_Assignment`, `Project_Member`, `Meeting_Attendee`, `Event_Attendee`, `Role_Permission`, `Notification_Preference` | No duplicate membership or assignment |
 | `IX_User_Email` (unique) | `User` | One account per email |
 | `IX_User_PasswordTokenHash` (unique, filtered to non-null) | `User` | Set-password link lookup by token; no two users share a token |
+| `IX_Refresh_Token_TokenHash` (unique) | `Refresh_Token` | Refresh lookup by token hash |
 | `IX_Event_Location_EventDate` (unique, filtered to non-empty location) | `Event` | One event per venue per slot, even under concurrent bookings |
 | `(ProjectId, Status)` | `Task` | The task board |
 | `(Status, Deadline)`, `(Deadline)` | `Task` | Deadline-warning job; calendar and report date ranges |
@@ -271,7 +286,9 @@ URL into Postman, or any OpenAPI client, to generate a collection.
 
 Outside development it is controlled by the `OpenApi__Enabled` app setting, which `infra/main.bicep`
 sets to `true`; set it to `false` and redeploy to take the contract offline. It is JSON only, with
-no UI, so the API keeps its strict `default-src 'none'` Content-Security-Policy.
+no UI, so the API keeps its strict `default-src 'none'` Content-Security-Policy. An integration test
+(`OpenApi_outside_development_follows_the_OpenApi_Enabled_setting`) runs the API in Production and
+expects `200` with the setting on and `404` with it off.
 
 ### Health check
 
@@ -340,6 +357,18 @@ State machines SM-01 (`ProjectTask`), SM-02 (`ResourceRequest`) and SM-03 (`User
   emails have accounts. Setting a new password ends every older token (a stolen session does not
   survive it): the token's `iat` is compared with the `user.password.set` audit row in `Program.cs`,
   and `POST api/users/me/password` returns a fresh `AuthResponse` for the caller to carry on with.
+- **Staying signed in on the phone (refresh tokens).** Access tokens last 60 minutes for both
+  clients. The mobile app also asks for a refresh token (`IssueRefreshToken` on the login and
+  change-password requests; the web client never does). It is a random 256-bit value, valid for
+  30 days (`Jwt:RefreshLifetimeDays`), stored on the phone in `SecureStorage` and on the server only
+  as a SHA-256 hash in `Refresh_Token`. `POST api/auth/refresh` spends it for a new access token
+  and a new refresh token. Each one works once: the row is marked used in a single conditional
+  update, so of two requests racing with the same token only one wins, and presenting a spent one
+  again is treated as theft, revoking every refresh token for that user (audited as
+  `auth.refresh.reused`). It is refused for a deactivated account or one waiting on a temporary
+  password, and revoked by `POST api/auth/logout`, by any new password (`SetPasswordAsync`,
+  `ChangePasswordAsync`), and by deleting the user (cascade). A role change takes effect on the
+  next refresh, since the new access token carries the current role.
   `GET api/users` gives colleagues names and roles only; the login email and exact account status
   (Pending, Locked) go to `ManageUsers` holders.
 - **Forgot password** notifies the admins rather than emailing a link. The notification shows the
@@ -443,9 +472,57 @@ unlabelled navbar menu buttons on every page and the unlabelled file and categor
 
 Tested by hand with the keyboard only: skip link (Tab, Enter lands in the page), a card's
 Enter/Space, the ⋮ menu moving a task In Progress to Blocked, and New task / Task details opening
-on their first field, closing on Escape and returning focus. Not done: a screen reader pass,
-Lighthouse, keyboard use of every dialog, and the MAUI app, none of which axe covers. Automated
-tools find only part of the problems, so treat 0 as "no machine-detectable failures", not "accessible".
+on their first field, closing on Escape and returning focus.
+
+Lighthouse 12 (accessibility category) scores 100 on the signed-out login page, with 22 audits passed
+and none failed. It was not run on the signed-in pages, which need a session; axe covers those above.
+
+**MAUI app.** Reviewed by reading the XAML, not on a device. Text buttons are read by their label
+already; what had no accessible name now has a `SemanticProperties.Description`: the search and
+notification buttons in the shell, the previous/next week arrows, the unlabelled check boxes (task
+done, all day, event staff) and the two switches. The password eye buttons already had one, and the
+file category picker had an empty `Title`, now "Category". Cards and rows that open on tap use a
+`TapGestureRecognizer`, which TalkBack reads as plain text; `Platforms/Android/TapAsButton.cs` gives
+every such view the Button role ("button, double-tap to activate"), keeping any delegate MAUI already
+set. The Android target still builds with no warnings.
+
+Checked by reading the accessibility tree (`uiautomator dump`), which is what TalkBack reads from:
+the login page on the Android emulator, and the signed-in screens on a physical phone (a Release
+build against the staging API).
+
+- Login: every control has a name; the password eye button is "Show password".
+- Shell: the search and bell buttons are "Search" and "Notifications"; the flyout items carry their page names.
+- Daily Tasks: the week arrows are "Previous week" / "Next week", and each day cell is a Button.
+- Meetings, User Management, Event Planning and Notifications: every card in the list is a Button,
+  with its title and details as the text TalkBack reads with it.
+- Calendar and Files: the switches are "Include past events" and "Show archived".
+- Pickers: a picker with a value selected showed only the value ("Low", "Equipment", "24 Sept 2026"),
+  because the label above it isn't linked to it. Every Picker, DatePicker, TimePicker and the
+  progress slider now has a `SemanticProperties.Description`, so it reads name then value:
+  "Priority, Low", "Date, 24 Oct 2026", "Report type, Task completion".
+- The "+ New" forms (New task, New event, the Events form with its staff check boxes, New meeting,
+  New user) and the Requests, Reports and Files forms: every field reads its name (placeholder or
+  description), every check box its person, and every button its label. Each form was opened and
+  cancelled; nothing was saved.
+
+**Dialogs (web).** Every MudBlazor dialog focuses its first field (`DefaultFocus.FirstChild`). Escape
+now closes every dialog, including the confirm boxes for deleting a file and changing a role,
+resetting a password, deactivating or deleting a user, through `CloseOnEscapeKey` on the
+`MudDialogProvider` in `MainLayout.razor`. The temporary-password dialog opts out on purpose, so the
+password can't be dismissed before it is copied.
+
+Not done:
+
+- MAUI screens not reached: the task check boxes (staging had no tasks that day), Search results,
+  and Task details. They use the same patterns checked above.
+- The flyout toggle reads "OK" while the menu is open (MAUI Shell's default), not "Close navigation drawer".
+- The web dialogs were reviewed in code, not used with the keyboard in the running app; only New
+  task and Task details were tested by hand (above).
+- No screen reader pass (TalkBack, NVDA) on either client. The emulator check shows what TalkBack
+  is given, not how it sounds in use.
+
+Automated tools find only part of the problems, so treat 0 as "no machine-detectable failures", not
+"accessible".
 
 ### `Frontend_Mobile` - .NET MAUI
 
@@ -476,8 +553,15 @@ Five things about it are deliberate, not oversights:
 - **The API address is compiled in** (`AppState.ApiBase`): Debug builds use the local API
   (`https://10.0.2.2:7272/` on the Android emulator, `https://localhost:7272/` elsewhere) and
   trust the ASP.NET dev certificate; `-p:ApiEnvironment=Staging` builds use the staging App
-  Service; Release builds use production. The session token is kept in `SecureStorage` and
-  resumed on the next launch while it's still valid.
+  Service; Release builds use production. The session is kept in `SecureStorage`. On launch,
+  an access token with more than a minute left is reused; otherwise the refresh token is swapped
+  for a new pair, so the user signs in again only after 30 days, a sign-out, a password change
+  or deactivation. A request that gets a 401 mid-session renews once and retries; renewals run one
+  at a time so parallel requests never spend the same refresh token twice.
+- **Back goes Home.** Every page is a top-level Shell route, so Android's Back on any of them
+  would close the app; `AppShell.OnBackButtonPressed` sends it to Home instead (Back on Home
+  exits). Reopening while the process is still alive goes straight to Home rather than the
+  login page.
 - **Login is a Shell route, not a separate root page.** Swapping the window root between a
   `ContentPage` and a `Shell` crashes Android's fragment manager
   ([dotnet/maui#21257](https://github.com/dotnet/maui/issues/21257)), so the Shell owns the

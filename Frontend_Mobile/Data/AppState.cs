@@ -127,7 +127,7 @@ public sealed class AppState : Observable
         try
         {
             res = await _http.PostAsJsonAsync("api/auth/login",
-                new LoginRequest { Email = email.Trim(), Password = password });
+                new LoginRequest { Email = email.Trim(), Password = password, IssueRefreshToken = true });
         }
         catch (HttpRequestException)
         {
@@ -160,7 +160,7 @@ public sealed class AppState : Observable
         if (_pendingAuth is null) return false;
         // A new password ends every older token, so carry on with the fresh one the API returns.
         if (await SendAsync<AuthResponse>(HttpMethod.Post, "api/users/me/password",
-                new ChangePasswordRequest { CurrentPassword = current, NewPassword = next }) is not { } auth) return false;
+                new ChangePasswordRequest { CurrentPassword = current, NewPassword = next, IssueRefreshToken = true }) is not { } auth) return false;
         _pendingAuth = null;
         await StartSessionAsync(auth);
         await RememberAsync(auth);
@@ -175,20 +175,62 @@ public sealed class AppState : Observable
         catch (Exception) { /* no secure store on this platform: the session just isn't remembered */ }
     }
 
-    /// <summary>Resumes the last session from SecureStorage if its token hasn't expired.</summary>
+    /// <summary>
+    /// Resumes the last session from SecureStorage. The access token lasts an hour, so after that the stored
+    /// 30-day refresh token is swapped for a new pair; only when that has expired or been revoked (sign-out
+    /// elsewhere, password change, deactivation) does the user sign in again.
+    /// </summary>
     public async Task<bool> TryRestoreAsync()
     {
         string? json = null;
         try { json = await SecureStorage.Default.GetAsync(SessionKey); }
         catch (Exception) { /* keystore unavailable or reset: sign in again */ }
 
-        if (json is null
-            || JsonSerializer.Deserialize<AuthResponse>(json) is not { } auth
-            || auth.ExpiresAtUtc <= DateTime.UtcNow.AddMinutes(1))
-            return false;
+        if (json is null || JsonSerializer.Deserialize<AuthResponse>(json) is not { } auth) return false;
+        if (auth.ExpiresAtUtc <= DateTime.UtcNow.AddMinutes(1))
+        {
+            if (auth.RefreshToken is null || await RenewAsync(auth.RefreshToken) is not { } renewed) return false;
+            auth = renewed;
+        }
 
         await StartSessionAsync(auth);
         return IsLoggedIn;
+    }
+
+    // One renewal at a time: the refresh token is single-use, and the API treats a second use as theft.
+    private readonly SemaphoreSlim _renewLock = new(1, 1);
+
+    /// <summary>Spends the refresh token for a new pair and remembers it. Null if the API refused it.</summary>
+    private async Task<AuthResponse?> RenewAsync(string refreshToken)
+    {
+        try
+        {
+            var res = await _http.PostAsJsonAsync("api/auth/refresh", new RefreshRequest { RefreshToken = refreshToken });
+            if (!res.IsSuccessStatusCode) return null;
+            var auth = await res.Content.ReadFromJsonAsync<AuthResponse>();
+            if (auth is not null) await RememberAsync(auth);
+            return auth;
+        }
+        catch (HttpRequestException) { return null; }
+    }
+
+    /// <summary>
+    /// A request came back 401 mid-session (the hour is up): renew once and let the caller retry. If another
+    /// request renewed while this one waited, the token it was sent with is stale, so just retry with the new one.
+    /// </summary>
+    private async Task<bool> RenewAfter401Async(string? sentWith)
+    {
+        await _renewLock.WaitAsync();
+        try
+        {
+            if (CurrentUser is not { } user) return false;
+            if (user.Token != sentWith) return true;
+            if (user.RefreshToken is null || await RenewAsync(user.RefreshToken) is not { } auth) return false;
+            _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth.Token);
+            CurrentUser = auth;
+            return true;
+        }
+        finally { _renewLock.Release(); }
     }
 
     private async Task StartSessionAsync(AuthResponse auth)
@@ -205,6 +247,12 @@ public sealed class AppState : Observable
 
     public async Task LogoutAsync()
     {
+        // Revoke the 30-day sign-in on the server too, not just forget it here. Offline: it still expires.
+        if (CurrentUser?.RefreshToken is { } refresh)
+        {
+            try { await _http.PostAsJsonAsync("api/auth/logout", new RefreshRequest { RefreshToken = refresh }); }
+            catch (HttpRequestException) { }
+        }
         CurrentUser = null;
         _pendingAuth = null;
         // While the token is still on the client, so the API can take this phone off the hub
@@ -565,9 +613,10 @@ public sealed class AppState : Observable
     public async Task<bool> SendAsync(HttpMethod method, string url, object? body = null) =>
         await Send(method, url, body) is not null;
 //----------------------------------------------------------------------------------------------------------------------//
-    private async Task<HttpResponseMessage?> Send(HttpMethod method, string url, object? body)
+    private async Task<HttpResponseMessage?> Send(HttpMethod method, string url, object? body, bool retried = false)
     {
         HttpResponseMessage res;
+        var sentWith = _http.DefaultRequestHeaders.Authorization?.Parameter;
         try
         {
             res = await _http.SendAsync(new HttpRequestMessage(method, url)
@@ -581,6 +630,10 @@ public sealed class AppState : Observable
             return null;
         }
         if (res.IsSuccessStatusCode) return res;
+
+        // The access token ran out while the app was open: renew it and try once more before signing out.
+        if (res.StatusCode == HttpStatusCode.Unauthorized && !retried && await RenewAfter401Async(sentWith))
+            return await Send(method, url, body, retried: true);
 
         if (res.StatusCode != HttpStatusCode.Unauthorized)
         {

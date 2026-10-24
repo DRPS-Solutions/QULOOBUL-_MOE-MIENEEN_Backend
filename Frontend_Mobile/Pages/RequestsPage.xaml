@@ -33,7 +33,7 @@
                     <VerticalStackLayout>
                         <Label Text="Category" Style="{StaticResource LabelSmall}" />
                         <Border Style="{StaticResource FieldBox}">
-                            <Picker x:Name="TypePicker"
+                            <Picker x:Name="TypePicker" SemanticProperties.Description="Category"
                                     Title="Category"
                                     SelectedIndexChanged="OnFormChanged" />
                         </Border>
@@ -46,7 +46,7 @@
                     <VerticalStackLayout>
                         <Label Text="Link to (optional)" Style="{StaticResource LabelSmall}" />
                         <Border Style="{StaticResource FieldBox}">
-                            <Picker x:Name="LinkTypePicker" Title="Link to" SelectedIndexChanged="OnLinkTypeChanged" />
+                            <Picker x:Name="LinkTypePicker" SemanticProperties.Description="Link to" Title="Link to" SelectedIndexChanged="OnLinkTypeChanged" />
                         </Border>
                     </VerticalStackLayout>
 
@@ -54,7 +54,7 @@
                     <VerticalStackLayout x:Name="LinkedNameSection" IsVisible="False">
                         <Label x:Name="LinkedNameLabel" Style="{StaticResource LabelSmall}" />
                         <Border Style="{StaticResource FieldBox}">
-                            <Picker x:Name="LinkedNamePicker" SelectedIndexChanged="OnFormChanged" />
+                            <Picker x:Name="LinkedNamePicker" SemanticProperties.Description="{Binding Text, Source={x:Reference LinkedNameLabel}}" SelectedIndexChanged="OnFormChanged" />
                         </Border>
                     </VerticalStackLayout>
 

@@ -29,7 +29,7 @@
                     <VerticalStackLayout>
                         <Label Text="Category" Style="{StaticResource LabelSmall}" />
                         <Border Style="{StaticResource FieldBox}">
-                            <Picker x:Name="CategoryPicker" Title="" SelectedIndexChanged="OnUploadFormChanged" />
+                            <Picker x:Name="CategoryPicker" SemanticProperties.Description="Upload category" Title="Category" SelectedIndexChanged="OnUploadFormChanged" />
                         </Border>
                     </VerticalStackLayout>
 
@@ -52,11 +52,11 @@
                     </Border>
 
                     <Border Style="{StaticResource FieldBox}">
-                        <Picker x:Name="FilterCategoryPicker" Title="Category" SelectedIndexChanged="OnFilterChanged" />
+                        <Picker x:Name="FilterCategoryPicker" SemanticProperties.Description="Filter by category" Title="Category" SelectedIndexChanged="OnFilterChanged" />
                     </Border>
 
                     <HorizontalStackLayout x:Name="ShowArchivedRow" Spacing="8" IsVisible="False">
-                        <Switch x:Name="ShowArchivedSwitch" Toggled="OnShowArchivedToggled" />
+                        <Switch x:Name="ShowArchivedSwitch" SemanticProperties.Description="Show archived" Toggled="OnShowArchivedToggled" />
                         <Label Text="Show archived" VerticalOptions="Center" />
                     </HorizontalStackLayout>
                 </VerticalStackLayout>

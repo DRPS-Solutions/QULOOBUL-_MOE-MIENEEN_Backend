@@ -21,7 +21,10 @@ public partial class LoginPage : ContentPage
     protected override async void OnAppearing()
     {
         base.OnAppearing();
-        if (AppState.Current.IsLoggedIn || AppState.Current.MustChangePassword) return;
+        if (AppState.Current.MustChangePassword) return;
+        // Back closes the window but not the process, so reopening builds a new Shell (which starts here)
+        // while the session is still live: carry straight on into the app.
+        if (AppState.Current.IsLoggedIn) { await AppShell.EnterAppAsync(); return; }
         EmailEntry.Text = string.Empty;
         PasswordEntry.Text = string.Empty;
         ErrorLabel.IsVisible = false;

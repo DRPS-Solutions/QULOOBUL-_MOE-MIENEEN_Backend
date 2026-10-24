@@ -88,14 +88,16 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
                 throw new UnauthorizedAccessException(LoginFailed);
             }
 
-            var response = await IssueAsync(user);
+            // No refresh token while a temporary password is pending: ChangePasswordAsync issues it once replaced.
+            var response = await IssueAsync(user, req.IssueRefreshToken && !user.MustChangePassword);
             user.FailedLoginCount = 0; // "consecutive": a success resets the count
             await audit.RecordAndSaveAsync(user.UserId, "auth.login", nameof(User), user.UserId);
             return response;
         }
 //----------------------------------------------------------------------------------------------------------------------//
-        /// <summary>The signed token and the user details a client needs, for sign-in and for a password change.</summary>
-        private async Task<AuthResponse> IssueAsync(User user)
+        /// <summary>The signed token and the user details a client needs, for sign-in and for a password change.
+        /// With <paramref name="withRefresh"/>, also a new refresh token (its row is added; the caller saves).</summary>
+        private async Task<AuthResponse> IssueAsync(User user, bool withRefresh = false)
         {
             var permissions = await (
                 from rp in db.RolePermissions
@@ -105,9 +107,67 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
 
             var roleName = user.Role?.RoleName ?? "Staff";
             var (token, expires) = tokens.Create(user, roleName, permissions);
-            return new AuthResponse(token, expires, user.UserId,
+            var response = new AuthResponse(token, expires, user.UserId,
                 $"{user.FirstName} {user.Surname}", roleName, permissions, user.MustChangePassword);
+            if (!withRefresh) return response;
+
+            var now = DateTime.UtcNow;
+            var refresh = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+            var refreshExpires = now.AddDays(config.GetValue("Jwt:RefreshLifetimeDays", 30));
+            // Spent and expired rows are only kept to spot a replay; once expired they can go.
+            await db.RefreshTokens.Where(r => r.UserId == user.UserId && r.ExpiresAt <= now).ExecuteDeleteAsync();
+            db.RefreshTokens.Add(new RefreshToken
+            {
+                UserId = user.UserId, TokenHash = HashToken(refresh), CreatedAt = now, ExpiresAt = refreshExpires,
+            });
+            return response with { RefreshToken = refresh, RefreshExpiresAtUtc = refreshExpires };
         }
+//----------------------------------------------------------------------------------------------------------------------//
+        public const string SessionEnded = "Your session has ended. Please sign in again.";
+
+        /// <summary>
+        /// The mobile app's "stay signed in": spends a refresh token for a fresh access token and a new refresh
+        /// token. A token presented a second time means a copy is in someone else's hands, so every refresh
+        /// token for that user is revoked. The account must still be active and not waiting on a temporary password.
+        /// Reference: D. Hardt, Ed., "The OAuth 2.0 Authorization Framework," RFC 6749, Section 1.5, Oct. 2012. Accessed: Oct. 24, 2026. [Online]. Available: https://www.rfc-editor.org/rfc/rfc6749#section-1.5
+        /// Reference: OWASP Foundation, "OAuth 2.0 Protocol Cheatsheet - Refresh Token rotation." Accessed: Oct. 24, 2026. [Online]. Available: https://cheatsheetseries.owasp.org/cheatsheets/OAuth2_Cheat_Sheet.html
+        /// </summary>
+        public async Task<AuthResponse> RefreshAsync(RefreshRequest req)
+        {
+            var hash = HashToken(req.RefreshToken);
+            var now = DateTime.UtcNow;
+            var row = await db.RefreshTokens.AsNoTracking().FirstOrDefaultAsync(r => r.TokenHash == hash);
+            if (row is null || row.ExpiresAt <= now) throw new UnauthorizedAccessException(SessionEnded);
+
+            // Spend it atomically: of two requests racing with the same token, exactly one wins.
+            var spent = await db.RefreshTokens.Where(r => r.RefreshTokenId == row.RefreshTokenId && r.UsedAt == null)
+                .ExecuteUpdateAsync(s => s.SetProperty(r => r.UsedAt, now));
+            if (spent == 0)
+            {
+                await db.RefreshTokens.Where(r => r.UserId == row.UserId).ExecuteDeleteAsync();
+                log.LogWarning("Refresh token reused for user {UserId}; all their refresh tokens revoked", row.UserId);
+                await audit.RecordAndSaveAsync(row.UserId, "auth.refresh.reused", nameof(User), row.UserId);
+                throw new UnauthorizedAccessException(SessionEnded);
+            }
+
+            var user = await db.Users.Include(u => u.Role).FirstAsync(u => u.UserId == row.UserId);
+            if (!user.IsActive || user.MustChangePassword) throw new UnauthorizedAccessException(SessionEnded);
+
+            var response = await IssueAsync(user, withRefresh: true);
+            await db.SaveChangesAsync();
+            return response;
+        }
+//----------------------------------------------------------------------------------------------------------------------//
+        /// <summary>Sign-out on the phone: the refresh token stops working. Unknown tokens are ignored.</summary>
+        public Task RevokeAsync(RefreshRequest req)
+        {
+            var hash = HashToken(req.RefreshToken);
+            return db.RefreshTokens.Where(r => r.TokenHash == hash).ExecuteDeleteAsync();
+        }
+//----------------------------------------------------------------------------------------------------------------------//
+        /// <summary>A new password ends every stay-signed-in session, as it ends every access token (Program.cs).</summary>
+        private Task RevokeAllAsync(int userId) =>
+            db.RefreshTokens.Where(r => r.UserId == userId).ExecuteDeleteAsync();
 //----------------------------------------------------------------------------------------------------------------------//
         /// <summary>SM-03 setPassword [password meets policy]: redeem an emailed one-time token.
         /// Activates a pending account; for an active one it completes an admin reset.</summary>
@@ -130,6 +190,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             user.PasswordTokenExpires = null;
             user.FailedLoginCount = 0;
             user.MustChangePassword = false;
+            await RevokeAllAsync(user.UserId);
             await audit.RecordAndSaveAsync(user.UserId, PasswordSetAction, nameof(User), user.UserId);
         }
 //----------------------------------------------------------------------------------------------------------------------//
@@ -152,8 +213,12 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             user.MustChangePassword = false;
             user.PasswordTokenHash = null;
             user.PasswordTokenExpires = null;
+            await RevokeAllAsync(userId);
+            // Saved before issuing, so the new token's "iat" is never earlier than the change (Program.cs).
             await audit.RecordAndSaveAsync(userId, PasswordSetAction, nameof(User), userId);
-            return await IssueAsync(user);
+            var response = await IssueAsync(user, req.IssueRefreshToken);
+            if (req.IssueRefreshToken) await db.SaveChangesAsync();
+            return response;
         }
 //----------------------------------------------------------------------------------------------------------------------//
         /// <summary>A one-off password an admin can read out: 6 letters + 4 digits so it meets the policy,

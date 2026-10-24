@@ -21,6 +21,9 @@ public static class MauiProgram
 				fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
 			});
 
+#if ANDROID
+		TapAsButton.Register();
+#endif
 #if DEBUG
 		builder.Logging.AddDebug();
 #endif
