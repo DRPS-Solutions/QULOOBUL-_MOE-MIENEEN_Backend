@@ -46,7 +46,7 @@ No High findings. The scanner's SQL injection, XSS, path traversal, command inje
 | F3 | CSP `style-src 'unsafe-inline'` | Web client | Medium | Accepted risk | Documented |
 | F4 | Re-examine Cache-control directives | API, web client | Informational | **Valid** (API) | **Fixed** for the API |
 | F5 | Suspicious comments in `dictation.js` | Web client | Informational | False positive | No action |
-| F6 | `Cross-Origin-Resource-Policy` header missing (`/health`, `/api/Auth/logout`, `/api/Auth/forgot-password`) | API | Low | **Valid** | **Fixed**, pending redeploy and rescan |
+| F6 | `Cross-Origin-Resource-Policy` header missing (`/health`, `/api/Auth/logout`, `/api/Auth/forgot-password`) | API | Low | **Valid** | **Fixed and verified**: present in `api-scan-auth-after.html`, gone from `api-scan-auth-final.html` |
 
 ### F1: HSTS not set (fixed)
 
@@ -74,9 +74,13 @@ A single match in `/js/dictation.js`: ZAP's pattern `\bFROM\b` hit the word "fro
 
 Surfaced by the after scan once the earlier warnings cleared. Without the header, other sites can embed API responses in no-cors requests (a Spectre-style side-channel concern). Fix: `Cross-Origin-Resource-Policy: same-origin` on every API response. The web client lives on a different origin but calls the API with CORS `fetch`, which this header does not restrict, so the app should be unaffected. Confirm after deploy by signing in on the staging web app and checking the browser console for blocked requests.
 
-### After-scan summary (`api-scan-auth-after.html`)
+### Rescan history (authenticated, admin token, staging)
 
-0 failures, 119 passes, 3 warning groups: the F2 metadata probes (two rules) and F6. HSTS (F1) no longer appears.
+| Report | State of the API | Result |
+|---|---|---|
+| `api-scan-auth.html` | before any fix | 0 failures, 112 passes; HSTS (F1) flagged |
+| `api-scan-auth-after.html` | HSTS and `no-store` deployed | 0 failures, 119 passes; HSTS gone, F6 newly flagged |
+| `api-scan-auth-final.html` | `Cross-Origin-Resource-Policy` deployed | 0 failures, 120 passes; only the F2 metadata false positives remain |
 
 ## 5. Controls observed working
 
@@ -98,7 +102,7 @@ Surfaced by the after scan once the earlier warnings cleared. Without the header
 
 | Item | Owner | Status |
 |---|---|---|
-| Deploy F1 and F4 to staging (merge to `develop`) and rerun the authenticated scan as `api-scan-auth-after.html` | | Open |
+| Deploy F1, F4 and F6 to staging and rerun the authenticated scan | | Done (`api-scan-auth-after.html`, `api-scan-auth-final.html`) |
 | Manual access-control tests: user A against user B's records; a normal user against admin endpoints | | Open |
 | SignalR hub `/hubs/notifications` without a token | | Open |
 | Repeat the authenticated scan with a non-admin token | | Open |
