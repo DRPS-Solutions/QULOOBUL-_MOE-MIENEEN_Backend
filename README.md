@@ -586,22 +586,23 @@ flowchart LR
     D -->|"cd-mobile.yml"| M["Signed Android APK<br/>(staging API)"]
     S -->|"PR + merge"| P["master / main"]
     P -->|"cd-production.yml"| SL["Prod staging slot<br/>migrate, smoke test"]
-    SL -->|"manual approval"| PR["Production<br/>slot swap + web client"]
+    SL -->|"promote-production.yml<br/>(manual run)"| PR["Production<br/>slot swap + web client"]
 ```
 
 | Branch | Workflow | Lands on | Human step |
 |---|---|---|---|
 | any other | `ci.yml` | build and test only | none |
 | `dev` / `develop` | `cd-staging.yml`, `cd-mobile.yml` | staging API and web client, staging-API APK | none (hands-off) |
-| `master` / `main` | `cd-production.yml`, `cd-mobile.yml` | prod slot, then production | required reviewer approves the swap |
+| `master` / `main` | `cd-production.yml`, `cd-mobile.yml`, then `promote-production.yml` | prod slot, then production | someone runs `promote-production.yml` to swap |
 
-Four workflows in `.github/workflows/`:
+Five workflows in `.github/workflows/`:
 
 | Workflow | Trigger | Does |
 |---|---|---|
 | `ci.yml` | every branch except deploy branches, + PRs into them | restore, build, test, upload coverage. Holds no credentials. |
 | `cd-staging.yml` | push to `develop` / `dev` | build → deploy API to the staging app and the web client to Static Web Apps → EF migrations → smoke test |
-| `cd-production.yml` | push to `main` / `master` | build → deploy to the prod staging slot → migrations → smoke test → **manual-approval swap** → web client |
+| `cd-production.yml` | push to `main` / `master` | build → deploy to the prod staging slot → migrations → smoke test. Stops there: production is untouched. |
+| `promote-production.yml` | manual (Actions → Run workflow), `master` / `main` only | **the approval gate**: swap the smoke-tested slot into production → web client. Required reviewers need a paid plan on a private repo, so the manual run is the gate; only collaborators with write access can start it. Run it again to roll back. |
 | `cd-mobile.yml` | changes under `Frontend_Mobile/**` or `Shared/**` on a deploy branch, or a manual run | Android Release build → signed APK artifact (14-day retention). `dev`/`develop` builds talk to the staging API. |
 
 Quality gates, in every build job:
