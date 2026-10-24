@@ -1,0 +1,6316 @@
+{
+  "openapi": "3.1.1",
+  "info": {
+    "title": "QULOOBUL__MOE_MIENEEN_Backend | v1",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://localhost:7272/"
+    }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": [
+          "QULOOBUL__MOE_MIENEEN_Backend"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      }
+    },
+    "/api/Auth/login": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      }
+    },
+    "/api/Auth/refresh": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      }
+    },
+    "/api/Auth/logout": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      }
+    },
+    "/api/Auth/set-password": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetPasswordRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetPasswordRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetPasswordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      }
+    },
+    "/api/Auth/forgot-password": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForgotPasswordRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForgotPasswordRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForgotPasswordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      }
+    },
+    "/api/Events": {
+      "get": {
+        "tags": [
+          "Events"
+        ],
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EventDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EventDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EventDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Events"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateEventRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateEventRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateEventRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      }
+    },
+    "/api/Events/{id}": {
+      "get": {
+        "tags": [
+          "Events"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      }
+    },
+    "/api/Events/{id}/attendees": {
+      "get": {
+        "tags": [
+          "Events"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EventAttendeeDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EventAttendeeDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EventAttendeeDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Events"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddEventAttendeeRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddEventAttendeeRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddEventAttendeeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      }
+    },
+    "/api/Events/{id}/response": {
+      "post": {
+        "tags": [
+          "Events"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RespondToEventRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RespondToEventRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/RespondToEventRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      }
+    },
+    "/api/Events/{id}/attendees/{userId}": {
+      "delete": {
+        "tags": [
+          "Events"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      }
+    },
+    "/api/Files": {
+      "get": {
+        "tags": [
+          "Files"
+        ],
+        "parameters": [
+          {
+            "name": "taskId",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          },
+          {
+            "name": "meetingId",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          },
+          {
+            "name": "categoryId",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "includeArchived",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FileMetadataDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FileMetadataDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FileMetadataDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Files"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FileUploadInitRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FileUploadInitRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/FileUploadInitRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileUploadResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileUploadResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileUploadResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      }
+    },
+    "/api/Files/categories": {
+      "get": {
+        "tags": [
+          "Files"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FileCategoryDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FileCategoryDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FileCategoryDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      }
+    },
+    "/api/Files/{id}/download": {
+      "get": {
+        "tags": [
+          "Files"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileDownloadResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileDownloadResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileDownloadResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      }
+    },
+    "/api/Files/{id}/category": {
+      "patch": {
+        "tags": [
+          "Files"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecategoriseFileRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecategoriseFileRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecategoriseFileRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      }
+    },
+    "/api/Files/{id}/archive": {
+      "post": {
+        "tags": [
+          "Files"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Files"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      }
+    },
+    "/api/Files/{id}": {
+      "delete": {
+        "tags": [
+          "Files"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      }
+    },
+    "/api/Meetings": {
+      "get": {
+        "tags": [
+          "Meetings"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MeetingDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MeetingDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MeetingDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Meetings"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMeetingRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMeetingRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMeetingRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "pattern": "^-?(?:0|[1-9]\\d*)$",
+                  "type": [
+                    "integer",
+                    "string"
+                  ],
+                  "format": "int32"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "pattern": "^-?(?:0|[1-9]\\d*)$",
+                  "type": [
+                    "integer",
+                    "string"
+                  ],
+                  "format": "int32"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "pattern": "^-?(?:0|[1-9]\\d*)$",
+                  "type": [
+                    "integer",
+                    "string"
+                  ],
+                  "format": "int32"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      }
+    },
+    "/api/Meetings/{id}/minutes": {
+      "post": {
+        "tags": [
+          "Meetings"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordMinutesRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordMinutesRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordMinutesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeetingMinutesDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeetingMinutesDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeetingMinutesDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      }
+    },
+    "/api/Meetings/minutes/{minutesId}": {
+      "put": {
+        "tags": [
+          "Meetings"
+        ],
+        "parameters": [
+          {
+            "name": "minutesId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EditMinutesRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EditMinutesRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/EditMinutesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeetingMinutesDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeetingMinutesDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeetingMinutesDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      }
+    },
+    "/api/Meetings/minutes/{minutesId}/approve": {
+      "post": {
+        "tags": [
+          "Meetings"
+        ],
+        "parameters": [
+          {
+            "name": "minutesId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeetingMinutesDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeetingMinutesDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeetingMinutesDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      }
+    },
+    "/api/Meetings/minutes": {
+      "get": {
+        "tags": [
+          "Meetings"
+        ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MeetingMinutesDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MeetingMinutesDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MeetingMinutesDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      }
+    },
+    "/api/Notifications": {
+      "get": {
+        "tags": [
+          "Notifications"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NotificationDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NotificationDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NotificationDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      }
+    },
+    "/api/Notifications/read": {
+      "post": {
+        "tags": [
+          "Notifications"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarkReadRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarkReadRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarkReadRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      }
+    },
+    "/api/Notifications/preferences": {
+      "get": {
+        "tags": [
+          "Notifications"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NotificationPreferenceDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NotificationPreferenceDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NotificationPreferenceDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Notifications"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateNotificationPreferencesRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateNotificationPreferencesRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateNotificationPreferencesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      }
+    },
+    "/api/Notifications/installations": {
+      "put": {
+        "tags": [
+          "Notifications"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PushInstallationRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PushInstallationRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/PushInstallationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      }
+    },
+    "/api/Notifications/installations/{installationId}": {
+      "delete": {
+        "tags": [
+          "Notifications"
+        ],
+        "parameters": [
+          {
+            "name": "installationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      }
+    },
+    "/api/Notifications/send": {
+      "post": {
+        "tags": [
+          "Notifications"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendNotificationRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendNotificationRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendNotificationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      }
+    },
+    "/api/Projects": {
+      "get": {
+        "tags": [
+          "Projects"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ProjectSummaryDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ProjectSummaryDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ProjectSummaryDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Projects"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateProjectRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateProjectRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateProjectRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      }
+    },
+    "/api/Projects/{id}": {
+      "get": {
+        "tags": [
+          "Projects"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Projects"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProjectRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProjectRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProjectRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      }
+    },
+    "/api/Projects/{id}/cancel": {
+      "post": {
+        "tags": [
+          "Projects"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CancelProjectRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CancelProjectRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CancelProjectRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      }
+    },
+    "/api/Projects/{id}/members": {
+      "get": {
+        "tags": [
+          "Projects"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ProjectMemberDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ProjectMemberDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ProjectMemberDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Projects"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddProjectMemberRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddProjectMemberRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddProjectMemberRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      }
+    },
+    "/api/Projects/{id}/members/{userId}": {
+      "delete": {
+        "tags": [
+          "Projects"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      }
+    },
+    "/api/Reports": {
+      "post": {
+        "tags": [
+          "Reports"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      }
+    },
+    "/api/Reports/export": {
+      "post": {
+        "tags": [
+          "Reports"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportExportResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportExportResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportExportResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      }
+    },
+    "/api/Requests": {
+      "get": {
+        "tags": [
+          "Requests"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ResourceRequestDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ResourceRequestDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ResourceRequestDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Requests"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateResourceRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateResourceRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateResourceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "pattern": "^-?(?:0|[1-9]\\d*)$",
+                  "type": [
+                    "integer",
+                    "string"
+                  ],
+                  "format": "int32"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "pattern": "^-?(?:0|[1-9]\\d*)$",
+                  "type": [
+                    "integer",
+                    "string"
+                  ],
+                  "format": "int32"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "pattern": "^-?(?:0|[1-9]\\d*)$",
+                  "type": [
+                    "integer",
+                    "string"
+                  ],
+                  "format": "int32"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      }
+    },
+    "/api/Requests/categories": {
+      "get": {
+        "tags": [
+          "Requests"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RequestCategoryDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RequestCategoryDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RequestCategoryDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      }
+    },
+    "/api/Requests/{id}/begin-review": {
+      "post": {
+        "tags": [
+          "Requests"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      }
+    },
+    "/api/Requests/{id}/review": {
+      "post": {
+        "tags": [
+          "Requests"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewRequestRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewRequestRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewRequestRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      }
+    },
+    "/api/Requests/{id}/resubmit": {
+      "post": {
+        "tags": [
+          "Requests"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResubmitRequestRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResubmitRequestRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResubmitRequestRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      }
+    },
+    "/api/Requests/{id}/complete": {
+      "post": {
+        "tags": [
+          "Requests"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      }
+    },
+    "/api/Search": {
+      "get": {
+        "tags": [
+          "Search"
+        ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SearchResultDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SearchResultDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SearchResultDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      }
+    },
+    "/api/TaskSchedules": {
+      "get": {
+        "tags": [
+          "TaskSchedules"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TaskScheduleDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TaskScheduleDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TaskScheduleDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "TaskSchedules"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTaskScheduleRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTaskScheduleRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTaskScheduleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskScheduleDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskScheduleDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskScheduleDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      }
+    },
+    "/api/TaskSchedules/{id}": {
+      "patch": {
+        "tags": [
+          "TaskSchedules"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTaskScheduleRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTaskScheduleRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTaskScheduleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskScheduleDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskScheduleDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskScheduleDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      }
+    },
+    "/api/projects/{projectId}/board": {
+      "get": {
+        "tags": [
+          "Tasks"
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TaskCardDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TaskCardDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TaskCardDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      }
+    },
+    "/api/Tasks": {
+      "get": {
+        "tags": [
+          "Tasks"
+        ],
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "assigneeId",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TaskCardDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TaskCardDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TaskCardDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Tasks"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTaskRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTaskRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTaskRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskCardDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskCardDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskCardDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      }
+    },
+    "/api/Tasks/{id}": {
+      "get": {
+        "tags": [
+          "Tasks"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskDetailDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskDetailDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskDetailDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Tasks"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTaskRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTaskRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTaskRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskCardDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskCardDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskCardDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      }
+    },
+    "/api/Tasks/{id}/move": {
+      "post": {
+        "tags": [
+          "Tasks"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MoveTaskRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MoveTaskRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/MoveTaskRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      }
+    },
+    "/api/Tasks/{id}/assignments": {
+      "post": {
+        "tags": [
+          "Tasks"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignTaskRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignTaskRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignTaskRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      }
+    },
+    "/api/Tasks/{id}/assignments/{userId}": {
+      "delete": {
+        "tags": [
+          "Tasks"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      }
+    },
+    "/api/Tasks/{id}/comments": {
+      "post": {
+        "tags": [
+          "Tasks"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddTaskCommentRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddTaskCommentRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddTaskCommentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskCommentDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskCommentDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskCommentDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      }
+    },
+    "/api/Users": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserSummaryDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserSummaryDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserSummaryDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Users"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUserRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUserRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUserRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      }
+    },
+    "/api/Users/overview": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/StaffOverviewRow"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/StaffOverviewRow"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/StaffOverviewRow"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      }
+    },
+    "/api/Users/{id}/audit": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "take",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32",
+              "default": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AuditEntryDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AuditEntryDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AuditEntryDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      }
+    },
+    "/api/Users/me": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      }
+    },
+    "/api/Users/me/password-link": {
+      "post": {
+        "tags": [
+          "Users"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      }
+    },
+    "/api/Users/me/password": {
+      "post": {
+        "tags": [
+          "Users"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      }
+    },
+    "/api/Users/{id}": {
+      "patch": {
+        "tags": [
+          "Users"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Users"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      }
+    },
+    "/api/Users/{id}/deactivate": {
+      "post": {
+        "tags": [
+          "Users"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      }
+    },
+    "/api/Users/{id}/reactivate": {
+      "post": {
+        "tags": [
+          "Users"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      }
+    },
+    "/api/Users/{id}/reset-password": {
+      "post": {
+        "tags": [
+          "Users"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemporaryPasswordDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemporaryPasswordDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemporaryPasswordDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      }
+    },
+    "/api/Users/{id}/anonymise": {
+      "post": {
+        "tags": [
+          "Users"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      }
+    },
+    "/api/roles": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RoleDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RoleDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RoleDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token."
+          },
+          "403": {
+            "description": "Authenticated, but the role lacks the required permission."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AddEventAttendeeRequest": {
+        "required": [
+          "userId"
+        ],
+        "type": "object",
+        "properties": {
+          "userId": {
+            "maximum": 2147483647,
+            "minimum": 1,
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "AddProjectMemberRequest": {
+        "required": [
+          "userId"
+        ],
+        "type": "object",
+        "properties": {
+          "userId": {
+            "maximum": 2147483647,
+            "minimum": 1,
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "AddTaskCommentRequest": {
+        "required": [
+          "comment"
+        ],
+        "type": "object",
+        "properties": {
+          "comment": {
+            "maxLength": 2000,
+            "type": "string"
+          }
+        }
+      },
+      "AssignTaskRequest": {
+        "required": [
+          "assigneeId"
+        ],
+        "type": "object",
+        "properties": {
+          "assigneeId": {
+            "maximum": 2147483647,
+            "minimum": 1,
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "AuditEntryDto": {
+        "required": [
+          "timestamp",
+          "action",
+          "entityType",
+          "entityId"
+        ],
+        "type": "object",
+        "properties": {
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "action": {
+            "type": "string"
+          },
+          "entityType": {
+            "type": "string"
+          },
+          "entityId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "AuthResponse": {
+        "required": [
+          "token",
+          "expiresAtUtc",
+          "userId",
+          "fullName",
+          "role",
+          "permissions"
+        ],
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string"
+          },
+          "expiresAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "userId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "fullName": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "mustChangePassword": {
+            "type": "boolean",
+            "default": false
+          },
+          "refreshToken": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "refreshExpiresAtUtc": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "CancelProjectRequest": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "maxLength": 500,
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "ChangePasswordRequest": {
+        "required": [
+          "currentPassword",
+          "newPassword"
+        ],
+        "type": "object",
+        "properties": {
+          "currentPassword": {
+            "maxLength": 128,
+            "type": "string"
+          },
+          "newPassword": {
+            "maxLength": 128,
+            "minLength": 8,
+            "type": "string"
+          },
+          "issueRefreshToken": {
+            "type": "boolean"
+          }
+        }
+      },
+      "CreateEventRequest": {
+        "required": [
+          "title",
+          "eventDate"
+        ],
+        "type": "object",
+        "properties": {
+          "title": {
+            "maxLength": 200,
+            "type": "string"
+          },
+          "eventDate": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "location": {
+            "maxLength": 200,
+            "type": "string"
+          }
+        }
+      },
+      "CreateMeetingRequest": {
+        "required": [
+          "title",
+          "meetingDate"
+        ],
+        "type": "object",
+        "properties": {
+          "title": {
+            "maxLength": 200,
+            "type": "string"
+          },
+          "meetingDate": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "attendeeIds": {
+            "type": "array",
+            "items": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          }
+        }
+      },
+      "CreateProjectRequest": {
+        "required": [
+          "projectName"
+        ],
+        "type": "object",
+        "properties": {
+          "projectName": {
+            "maxLength": 200,
+            "type": "string"
+          },
+          "status": {
+            "maxLength": 30,
+            "type": "string"
+          },
+          "description": {
+            "maxLength": 2000,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "ownerId": {
+            "maximum": 2147483647,
+            "minimum": 1,
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "CreateResourceRequest": {
+        "required": [
+          "categoryId"
+        ],
+        "type": "object",
+        "properties": {
+          "categoryId": {
+            "maximum": 2147483647,
+            "minimum": 1,
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "priority": {
+            "maxLength": 20,
+            "pattern": "Low|Normal|Medium|High",
+            "type": "string"
+          },
+          "detail": {
+            "maxLength": 1000,
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "CreateTaskRequest": {
+        "required": [
+          "projectId",
+          "title",
+          "deadline"
+        ],
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "maximum": 2147483647,
+            "minimum": 1,
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "title": {
+            "maxLength": 200,
+            "type": "string"
+          },
+          "description": {
+            "maxLength": 2000,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "priority": {
+            "maxLength": 20,
+            "pattern": "Low|Normal|Medium|High",
+            "type": "string"
+          },
+          "deadline": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CreateTaskScheduleRequest": {
+        "required": [
+          "title",
+          "dayOfWeek",
+          "assignedTo"
+        ],
+        "type": "object",
+        "properties": {
+          "title": {
+            "maxLength": 200,
+            "type": "string"
+          },
+          "dayOfWeek": {
+            "maxLength": 10,
+            "type": "string"
+          },
+          "assignedTo": {
+            "maximum": 2147483647,
+            "minimum": 1,
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "CreateUserRequest": {
+        "required": [
+          "firstName",
+          "surname",
+          "email",
+          "cellNo",
+          "roleId"
+        ],
+        "type": "object",
+        "properties": {
+          "firstName": {
+            "maxLength": 100,
+            "type": "string"
+          },
+          "surname": {
+            "maxLength": 100,
+            "type": "string"
+          },
+          "email": {
+            "maxLength": 256,
+            "type": "string"
+          },
+          "cellNo": {
+            "maxLength": 20,
+            "type": "string"
+          },
+          "roleId": {
+            "maximum": 2147483647,
+            "minimum": 1,
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "EditMinutesRequest": {
+        "required": [
+          "minutesText"
+        ],
+        "type": "object",
+        "properties": {
+          "minutesText": {
+            "maxLength": 20000,
+            "type": "string"
+          },
+          "append": {
+            "type": "boolean"
+          }
+        }
+      },
+      "EventAttendeeDto": {
+        "required": [
+          "userId",
+          "fullName",
+          "status"
+        ],
+        "type": "object",
+        "properties": {
+          "userId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "fullName": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        }
+      },
+      "EventDto": {
+        "required": [
+          "eventId",
+          "organiserId",
+          "title",
+          "eventDate",
+          "location"
+        ],
+        "type": "object",
+        "properties": {
+          "eventId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "organiserId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "title": {
+            "type": "string"
+          },
+          "eventDate": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "location": {
+            "type": "string"
+          }
+        }
+      },
+      "FileCategoryDto": {
+        "required": [
+          "categoryId",
+          "categoryName"
+        ],
+        "type": "object",
+        "properties": {
+          "categoryId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "categoryName": {
+            "type": "string"
+          }
+        }
+      },
+      "FileDownloadResponse": {
+        "required": [
+          "fileId",
+          "fileName",
+          "downloadUrl",
+          "expiresAtUtc"
+        ],
+        "type": "object",
+        "properties": {
+          "fileId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "downloadUrl": {
+            "type": "string"
+          },
+          "expiresAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "FileMetadataDto": {
+        "required": [
+          "fileId",
+          "fileName",
+          "fileType",
+          "categoryId",
+          "categoryName",
+          "uploadedBy",
+          "taskId",
+          "meetingId",
+          "periodMonth",
+          "isArchived"
+        ],
+        "type": "object",
+        "properties": {
+          "fileId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "fileType": {
+            "type": "string"
+          },
+          "categoryId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "categoryName": {
+            "type": "string"
+          },
+          "uploadedBy": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "taskId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "meetingId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "periodMonth": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "isArchived": {
+            "type": "boolean"
+          }
+        }
+      },
+      "FileUploadInitRequest": {
+        "required": [
+          "fileName",
+          "fileType",
+          "sizeBytes",
+          "categoryId"
+        ],
+        "type": "object",
+        "properties": {
+          "fileName": {
+            "maxLength": 260,
+            "type": "string"
+          },
+          "fileType": {
+            "maxLength": 100,
+            "type": "string"
+          },
+          "sizeBytes": {
+            "maximum": 9223372036854776000,
+            "minimum": 1,
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "categoryId": {
+            "maximum": 2147483647,
+            "minimum": 1,
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "taskId": {
+            "maximum": 2147483647,
+            "minimum": 1,
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "meetingId": {
+            "maximum": 2147483647,
+            "minimum": 1,
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "periodMonth": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "FileUploadResponse": {
+        "required": [
+          "fileId",
+          "uploadUrl",
+          "expiresAtUtc"
+        ],
+        "type": "object",
+        "properties": {
+          "fileId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "uploadUrl": {
+            "type": "string"
+          },
+          "expiresAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ForgotPasswordRequest": {
+        "required": [
+          "firstName",
+          "surname",
+          "email"
+        ],
+        "type": "object",
+        "properties": {
+          "firstName": {
+            "maxLength": 100,
+            "type": "string"
+          },
+          "surname": {
+            "maxLength": 100,
+            "type": "string"
+          },
+          "email": {
+            "maxLength": 256,
+            "type": "string"
+          }
+        }
+      },
+      "LoginRequest": {
+        "required": [
+          "email",
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "email": {
+            "maxLength": 256,
+            "type": "string"
+          },
+          "password": {
+            "maxLength": 128,
+            "type": "string"
+          },
+          "issueRefreshToken": {
+            "type": "boolean"
+          }
+        }
+      },
+      "MarkReadRequest": {
+        "required": [
+          "notificationIds"
+        ],
+        "type": "object",
+        "properties": {
+          "notificationIds": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          }
+        }
+      },
+      "MeetingDto": {
+        "required": [
+          "meetingId",
+          "organiserId",
+          "title",
+          "meetingDate",
+          "attendeeIds",
+          "minutes"
+        ],
+        "type": "object",
+        "properties": {
+          "meetingId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "organiserId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "title": {
+            "type": "string"
+          },
+          "meetingDate": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "attendeeIds": {
+            "type": "array",
+            "items": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          },
+          "minutes": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/MeetingMinutesDto"
+              }
+            ]
+          }
+        }
+      },
+      "MeetingMinutesDto": {
+        "required": [
+          "minutesId",
+          "meetingId",
+          "recordedBy",
+          "timeRecorded",
+          "minutesText",
+          "isAiDraft",
+          "approvedBy"
+        ],
+        "type": "object",
+        "properties": {
+          "minutesId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "meetingId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "recordedBy": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "timeRecorded": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "minutesText": {
+            "type": "string"
+          },
+          "isAiDraft": {
+            "type": "boolean"
+          },
+          "approvedBy": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "MoveTaskRequest": {
+        "required": [
+          "newStatus"
+        ],
+        "type": "object",
+        "properties": {
+          "newStatus": {
+            "maxLength": 30,
+            "type": "string"
+          },
+          "completedBy": {
+            "maximum": 2147483647,
+            "minimum": 1,
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "NotificationDto": {
+        "required": [
+          "notificationId",
+          "type",
+          "message",
+          "isRead",
+          "entityType",
+          "entityId"
+        ],
+        "type": "object",
+        "properties": {
+          "notificationId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "type": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "isRead": {
+            "type": "boolean"
+          },
+          "entityType": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "entityId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "NotificationPreferenceDto": {
+        "required": [
+          "type",
+          "enabled"
+        ],
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "canMute": {
+            "type": "boolean"
+          },
+          "label": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "ProgressPoint": {
+        "required": [
+          "bucketStart",
+          "completed",
+          "cumulativeCompleted"
+        ],
+        "type": "object",
+        "properties": {
+          "bucketStart": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "completed": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "cumulativeCompleted": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "ProjectDto": {
+        "required": [
+          "projectId",
+          "ownerId",
+          "projectName",
+          "status",
+          "description"
+        ],
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "ownerId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "projectName": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "ProjectMemberDto": {
+        "required": [
+          "userId",
+          "fullName",
+          "dateAdded"
+        ],
+        "type": "object",
+        "properties": {
+          "userId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "fullName": {
+            "type": "string"
+          },
+          "dateAdded": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ProjectProgressStat": {
+        "required": [
+          "projectId",
+          "projectName",
+          "total",
+          "done",
+          "percentComplete"
+        ],
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "projectName": {
+            "type": "string"
+          },
+          "total": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "done": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "percentComplete": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        }
+      },
+      "ProjectSummaryDto": {
+        "required": [
+          "projectId",
+          "projectName",
+          "status",
+          "memberCount",
+          "openTaskCount"
+        ],
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "projectName": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "memberCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "openTaskCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "PushInstallationRequest": {
+        "required": [
+          "installationId",
+          "pushChannel"
+        ],
+        "type": "object",
+        "properties": {
+          "installationId": {
+            "maxLength": 64,
+            "type": "string"
+          },
+          "pushChannel": {
+            "maxLength": 4096,
+            "type": "string"
+          },
+          "platform": {
+            "maxLength": 20,
+            "type": "string"
+          }
+        }
+      },
+      "RecategoriseFileRequest": {
+        "required": [
+          "categoryId"
+        ],
+        "type": "object",
+        "properties": {
+          "categoryId": {
+            "maximum": 2147483647,
+            "minimum": 1,
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "RecordMinutesRequest": {
+        "required": [
+          "minutesText"
+        ],
+        "type": "object",
+        "properties": {
+          "minutesText": {
+            "maxLength": 20000,
+            "type": "string"
+          },
+          "isAiDraft": {
+            "type": "boolean"
+          }
+        }
+      },
+      "RefreshRequest": {
+        "required": [
+          "refreshToken"
+        ],
+        "type": "object",
+        "properties": {
+          "refreshToken": {
+            "maxLength": 100,
+            "type": "string"
+          }
+        }
+      },
+      "ReportDto": {
+        "required": [
+          "reportType",
+          "periodStart",
+          "periodEnd",
+          "completion",
+          "workload",
+          "progress",
+          "trend"
+        ],
+        "type": "object",
+        "properties": {
+          "reportType": {
+            "type": "string"
+          },
+          "periodStart": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "periodEnd": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "completion": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskCompletionStat"
+            }
+          },
+          "workload": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkloadStat"
+            }
+          },
+          "progress": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectProgressStat"
+            }
+          },
+          "trend": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProgressPoint"
+            }
+          }
+        }
+      },
+      "ReportExportResponse": {
+        "required": [
+          "reportId",
+          "downloadUrl",
+          "expiresAtUtc"
+        ],
+        "type": "object",
+        "properties": {
+          "reportId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "downloadUrl": {
+            "type": "string"
+          },
+          "expiresAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ReportRequest": {
+        "required": [
+          "periodStart",
+          "periodEnd",
+          "reportType"
+        ],
+        "type": "object",
+        "properties": {
+          "periodStart": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "periodEnd": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "reportType": {
+            "pattern": "TaskCompletion|Workload|ProjectProgress",
+            "type": "string"
+          },
+          "subjectUserId": {
+            "maximum": 2147483647,
+            "minimum": 1,
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "RequestCategoryDto": {
+        "required": [
+          "categoryId",
+          "categoryName"
+        ],
+        "type": "object",
+        "properties": {
+          "categoryId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "categoryName": {
+            "type": "string"
+          }
+        }
+      },
+      "RequestStatusHistoryDto": {
+        "required": [
+          "newStatus",
+          "changedBy",
+          "timeCreated"
+        ],
+        "type": "object",
+        "properties": {
+          "newStatus": {
+            "type": "string"
+          },
+          "changedBy": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "timeCreated": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "note": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "ResourceRequestDto": {
+        "required": [
+          "requestId",
+          "requestedBy",
+          "categoryId",
+          "categoryName",
+          "status",
+          "priority",
+          "dateSubmitted",
+          "reviewedBy",
+          "history",
+          "detail"
+        ],
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "requestedBy": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "categoryId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "categoryName": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "priority": {
+            "type": "string"
+          },
+          "dateSubmitted": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "reviewedBy": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RequestStatusHistoryDto"
+            }
+          },
+          "detail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "RespondToEventRequest": {
+        "required": [
+          "status"
+        ],
+        "type": "object",
+        "properties": {
+          "status": {
+            "pattern": "Invited|Accepted|Declined",
+            "type": "string"
+          }
+        }
+      },
+      "ResubmitRequestRequest": {
+        "type": "object",
+        "properties": {
+          "detail": {
+            "maxLength": 1000,
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "ReviewRequestRequest": {
+        "required": [
+          "approve"
+        ],
+        "type": "object",
+        "properties": {
+          "approve": {
+            "type": "boolean"
+          },
+          "note": {
+            "maxLength": 500,
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "RoleDto": {
+        "required": [
+          "roleId",
+          "roleName",
+          "hierarchyLevel"
+        ],
+        "type": "object",
+        "properties": {
+          "roleId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "roleName": {
+            "type": "string"
+          },
+          "hierarchyLevel": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "SearchResultDto": {
+        "required": [
+          "kind",
+          "id",
+          "title",
+          "detail"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "id": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "title": {
+            "type": "string"
+          },
+          "detail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "SendNotificationRequest": {
+        "required": [
+          "userIds",
+          "message"
+        ],
+        "type": "object",
+        "properties": {
+          "userIds": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          },
+          "message": {
+            "maxLength": 500,
+            "type": "string"
+          },
+          "type": {
+            "maxLength": 100,
+            "type": "string"
+          }
+        }
+      },
+      "SetPasswordRequest": {
+        "required": [
+          "token",
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "token": {
+            "maxLength": 100,
+            "type": "string"
+          },
+          "password": {
+            "maxLength": 128,
+            "minLength": 8,
+            "type": "string"
+          }
+        }
+      },
+      "StaffOverviewRow": {
+        "required": [
+          "userId",
+          "fullName",
+          "role",
+          "activeTasks",
+          "overdueTasks",
+          "openRequests"
+        ],
+        "type": "object",
+        "properties": {
+          "userId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "fullName": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "activeTasks": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "overdueTasks": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "openRequests": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "TaskCardDto": {
+        "required": [
+          "taskId",
+          "projectId",
+          "title",
+          "status",
+          "priority",
+          "percentComplete",
+          "deadline",
+          "assigneeIds",
+          "description",
+          "completedBy"
+        ],
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "projectId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "priority": {
+            "type": "string"
+          },
+          "percentComplete": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "deadline": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "assigneeIds": {
+            "type": "array",
+            "items": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "completedBy": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "TaskCommentDto": {
+        "required": [
+          "commentId",
+          "userId",
+          "comment",
+          "timeCreated"
+        ],
+        "type": "object",
+        "properties": {
+          "commentId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "userId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "comment": {
+            "type": "string"
+          },
+          "timeCreated": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "TaskCompletionStat": {
+        "required": [
+          "bucket",
+          "completed",
+          "outstanding"
+        ],
+        "type": "object",
+        "properties": {
+          "bucket": {
+            "type": "string"
+          },
+          "completed": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "outstanding": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "TaskDetailDto": {
+        "required": [
+          "taskId",
+          "projectId",
+          "title",
+          "status",
+          "priority",
+          "percentComplete",
+          "deadline",
+          "createdBy",
+          "completedBy",
+          "comments",
+          "history",
+          "description"
+        ],
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "projectId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "priority": {
+            "type": "string"
+          },
+          "percentComplete": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "deadline": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdBy": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "completedBy": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "comments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskCommentDto"
+            }
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskStatusHistoryDto"
+            }
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "TaskScheduleDto": {
+        "required": [
+          "scheduleId",
+          "title",
+          "dayOfWeek",
+          "assignedTo",
+          "createdBy",
+          "isActive"
+        ],
+        "type": "object",
+        "properties": {
+          "scheduleId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "title": {
+            "type": "string"
+          },
+          "dayOfWeek": {
+            "type": "string"
+          },
+          "assignedTo": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "createdBy": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "isActive": {
+            "type": "boolean"
+          }
+        }
+      },
+      "TaskStatusHistoryDto": {
+        "required": [
+          "newStatus",
+          "changedBy",
+          "timeCreated"
+        ],
+        "type": "object",
+        "properties": {
+          "newStatus": {
+            "type": "string"
+          },
+          "changedBy": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "timeCreated": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "TemporaryPasswordDto": {
+        "required": [
+          "temporaryPassword"
+        ],
+        "type": "object",
+        "properties": {
+          "temporaryPassword": {
+            "type": "string"
+          }
+        }
+      },
+      "UpdateNotificationPreferencesRequest": {
+        "required": [
+          "preferences"
+        ],
+        "type": "object",
+        "properties": {
+          "preferences": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NotificationPreferenceDto"
+            }
+          }
+        }
+      },
+      "UpdateProjectRequest": {
+        "type": "object",
+        "properties": {
+          "projectName": {
+            "maxLength": 200,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "status": {
+            "maxLength": 30,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "description": {
+            "maxLength": 2000,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "ownerId": {
+            "maximum": 2147483647,
+            "minimum": 1,
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "UpdateTaskRequest": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "maxLength": 200,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "description": {
+            "maxLength": 2000,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "priority": {
+            "maxLength": 20,
+            "pattern": "Low|Normal|Medium|High",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "deadline": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "percentComplete": {
+            "maximum": 100,
+            "minimum": 0,
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "projectId": {
+            "maximum": 2147483647,
+            "minimum": 1,
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "UpdateTaskScheduleRequest": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "maxLength": 200,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "dayOfWeek": {
+            "maxLength": 10,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "assignedTo": {
+            "maximum": 2147483647,
+            "minimum": 1,
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "isActive": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          }
+        }
+      },
+      "UpdateUserRequest": {
+        "type": "object",
+        "properties": {
+          "firstName": {
+            "maxLength": 100,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "surname": {
+            "maxLength": 100,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "cellNo": {
+            "maxLength": 20,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "email": {
+            "maxLength": 256,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "roleId": {
+            "maximum": 2147483647,
+            "minimum": 1,
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "UserDto": {
+        "required": [
+          "userId",
+          "firstName",
+          "surname",
+          "email",
+          "cellNo",
+          "role",
+          "isActive"
+        ],
+        "type": "object",
+        "properties": {
+          "userId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "firstName": {
+            "type": "string"
+          },
+          "surname": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "cellNo": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string",
+            "default": "Active"
+          }
+        }
+      },
+      "UserSummaryDto": {
+        "required": [
+          "userId",
+          "fullName",
+          "email",
+          "role",
+          "isActive"
+        ],
+        "type": "object",
+        "properties": {
+          "userId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "fullName": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string",
+            "default": "Active"
+          }
+        }
+      },
+      "WorkloadStat": {
+        "required": [
+          "userId",
+          "fullName",
+          "assigned",
+          "completed",
+          "overdue"
+        ],
+        "type": "object",
+        "properties": {
+          "userId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "fullName": {
+            "type": "string"
+          },
+          "assigned": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "completed": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "overdue": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "Bearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  },
+  "security": [
+    {
+      "Bearer": [ ]
+    }
+  ],
+  "tags": [
+    {
+      "name": "QULOOBUL__MOE_MIENEEN_Backend"
+    },
+    {
+      "name": "Auth"
+    },
+    {
+      "name": "Events"
+    },
+    {
+      "name": "Files"
+    },
+    {
+      "name": "Meetings"
+    },
+    {
+      "name": "Notifications"
+    },
+    {
+      "name": "Projects"
+    },
+    {
+      "name": "Reports"
+    },
+    {
+      "name": "Requests"
+    },
+    {
+      "name": "Search"
+    },
+    {
+      "name": "TaskSchedules"
+    },
+    {
+      "name": "Tasks"
+    },
+    {
+      "name": "Users"
+    }
+  ]
+}

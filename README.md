@@ -574,6 +574,27 @@ Five things about it are deliberate, not oversights:
 
 ## CI/CD
 
+Overview: code moves feature branch → `dev` → `master`, and each step is automated. Every build runs
+the same gates (restore, build with zero warnings, tests, 70% coverage); only the last hop to production
+waits for a human.
+
+```mermaid
+flowchart LR
+    F["Feature branch<br/>push / PR"] -->|"ci.yml"| CI["Build + test<br/>coverage gate<br/>no credentials"]
+    CI -->|"merge"| D["dev / develop"]
+    D -->|"cd-staging.yml"| S["Staging<br/>API + web client<br/>migrate, smoke test"]
+    D -->|"cd-mobile.yml"| M["Signed Android APK<br/>(staging API)"]
+    S -->|"PR + merge"| P["master / main"]
+    P -->|"cd-production.yml"| SL["Prod staging slot<br/>migrate, smoke test"]
+    SL -->|"manual approval"| PR["Production<br/>slot swap + web client"]
+```
+
+| Branch | Workflow | Lands on | Human step |
+|---|---|---|---|
+| any other | `ci.yml` | build and test only | none |
+| `dev` / `develop` | `cd-staging.yml`, `cd-mobile.yml` | staging API and web client, staging-API APK | none (hands-off) |
+| `master` / `main` | `cd-production.yml`, `cd-mobile.yml` | prod slot, then production | required reviewer approves the swap |
+
 Four workflows in `.github/workflows/`:
 
 | Workflow | Trigger | Does |
