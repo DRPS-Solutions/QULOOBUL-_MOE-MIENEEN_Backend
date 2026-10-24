@@ -42,7 +42,7 @@
     @foreach (var s in schedules)
     {
         <div class="d-flex align-center gap-3 py-2" style="border-top:1px solid var(--drps-border-soft);">
-            <div style="flex:1; min-width:0; @(s.IsActive ? "" : "opacity:0.55;")">
+            <div style="flex:1; min-width:0; @(s.IsActive ? "" : "font-style:italic;")">
                 <div style="font-weight:500;">@s.Title</div>
                 <div class="drps-muted">Every @s.DayOfWeek · @AppData.UserName(s.AssignedTo)@(s.IsActive ? "" : " · Paused")</div>
             </div>

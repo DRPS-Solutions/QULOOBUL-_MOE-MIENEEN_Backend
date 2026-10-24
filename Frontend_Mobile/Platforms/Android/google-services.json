@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "619321912616",
+    "project_id": "quloobul-moe-mieneen",
+    "storage_bucket": "quloobul-moe-mieneen.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:619321912616:android:c7f2da052a692a5fb5f41d",
+        "android_client_info": {
+          "package_name": "com.qulloobul.moemienen"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA498mtx92Gji4aeAaYVNqD-_AB0GGNDow"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

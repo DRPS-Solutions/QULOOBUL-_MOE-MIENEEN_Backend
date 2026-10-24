@@ -26,6 +26,8 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
         /// </summary>
         public async Task<TaskAssignment> AssignAsync(int taskId, int assigneeId, int assignedById)
         {
+            // Without this a stranger could assign themselves, and an assignee may open the task.
+            await guard.EnsureTaskAsync(assignedById, taskId);
             var task = await db.Tasks.FindAsync(taskId)
                 ?? throw new KeyNotFoundException($"Task {taskId} not found.");
 
@@ -61,6 +63,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
         /// assigning: nobody removes someone more senior than themselves.</summary>
         public async Task UnassignAsync(int taskId, int userId, int actorId)
         {
+            await guard.EnsureTaskAsync(actorId, taskId);
             var assignment = await db.TaskAssignments.Include(a => a.User).Include(a => a.Task)
                 .FirstOrDefaultAsync(a => a.TaskId == taskId && a.UserId == userId)
                 ?? throw new KeyNotFoundException("That user is not assigned to this task.");
@@ -97,6 +100,11 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
                 throw new InvalidOperationException("Assign the task to someone before starting it.");
             if (completedById is { } cid && !await db.Users.AnyAsync(u => u.UserId == cid && u.IsActive))
                 throw new InvalidOperationException("The person who completed the task must be an active user.");
+            // Crediting someone else is a manager's call (a daily task ticked off on a team member's behalf),
+            // so only someone senior to them may; anyone could otherwise put their work on a colleague's record.
+            if (completedById is { } who && who != changedById
+                && await LevelOfUserAsync(changedById) >= await LevelOfUserAsync(who))
+                throw new UnauthorizedAccessException("You can only credit completion to someone below you in the hierarchy.");
 
             MoveStatus(task, newStatus, changedById, completedById);
 
@@ -224,6 +232,9 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             if (strictlyDown && from == to)
                 throw new InvalidOperationException("Daily tasks are assigned to someone below you in the hierarchy.");
         }
+//----------------------------------------------------------------------------------------------------------------------//
+        private Task<int> LevelOfUserAsync(int userId) =>
+            db.Users.Where(u => u.UserId == userId).Select(u => u.Role!.HierarchyLevel).FirstAsync();
 //----------------------------------------------------------------------------------------------------------------------//
         private async Task<int> LevelOf(int roleId)
         {

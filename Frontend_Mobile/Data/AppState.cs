@@ -127,7 +127,7 @@ public sealed class AppState : Observable
         try
         {
             res = await _http.PostAsJsonAsync("api/auth/login",
-                new LoginRequest { Email = email.Trim(), Password = password });
+                new LoginRequest { Email = email.Trim(), Password = password, IssueRefreshToken = true });
         }
         catch (HttpRequestException)
         {
@@ -157,10 +157,11 @@ public sealed class AppState : Observable
     /// <summary>Replaces the temporary password and starts the session. False if the API refused it (already alerted).</summary>
     public async Task<bool> ChangePasswordAsync(string current, string next)
     {
-        if (_pendingAuth is not { } auth || !await SendAsync(HttpMethod.Post, "api/users/me/password",
-                new ChangePasswordRequest { CurrentPassword = current, NewPassword = next })) return false;
+        if (_pendingAuth is null) return false;
+        // A new password ends every older token, so carry on with the fresh one the API returns.
+        if (await SendAsync<AuthResponse>(HttpMethod.Post, "api/users/me/password",
+                new ChangePasswordRequest { CurrentPassword = current, NewPassword = next, IssueRefreshToken = true }) is not { } auth) return false;
         _pendingAuth = null;
-        auth = auth with { MustChangePassword = false };
         await StartSessionAsync(auth);
         await RememberAsync(auth);
         return true;
@@ -174,20 +175,62 @@ public sealed class AppState : Observable
         catch (Exception) { /* no secure store on this platform: the session just isn't remembered */ }
     }
 
-    /// <summary>Resumes the last session from SecureStorage if its token hasn't expired.</summary>
+    /// <summary>
+    /// Resumes the last session from SecureStorage. The access token lasts an hour, so after that the stored
+    /// 30-day refresh token is swapped for a new pair; only when that has expired or been revoked (sign-out
+    /// elsewhere, password change, deactivation) does the user sign in again.
+    /// </summary>
     public async Task<bool> TryRestoreAsync()
     {
         string? json = null;
         try { json = await SecureStorage.Default.GetAsync(SessionKey); }
         catch (Exception) { /* keystore unavailable or reset: sign in again */ }
 
-        if (json is null
-            || JsonSerializer.Deserialize<AuthResponse>(json) is not { } auth
-            || auth.ExpiresAtUtc <= DateTime.UtcNow.AddMinutes(1))
-            return false;
+        if (json is null || JsonSerializer.Deserialize<AuthResponse>(json) is not { } auth) return false;
+        if (auth.ExpiresAtUtc <= DateTime.UtcNow.AddMinutes(1))
+        {
+            if (auth.RefreshToken is null || await RenewAsync(auth.RefreshToken) is not { } renewed) return false;
+            auth = renewed;
+        }
 
         await StartSessionAsync(auth);
         return IsLoggedIn;
+    }
+
+    // One renewal at a time: the refresh token is single-use, and the API treats a second use as theft.
+    private readonly SemaphoreSlim _renewLock = new(1, 1);
+
+    /// <summary>Spends the refresh token for a new pair and remembers it. Null if the API refused it.</summary>
+    private async Task<AuthResponse?> RenewAsync(string refreshToken)
+    {
+        try
+        {
+            var res = await _http.PostAsJsonAsync("api/auth/refresh", new RefreshRequest { RefreshToken = refreshToken });
+            if (!res.IsSuccessStatusCode) return null;
+            var auth = await res.Content.ReadFromJsonAsync<AuthResponse>();
+            if (auth is not null) await RememberAsync(auth);
+            return auth;
+        }
+        catch (HttpRequestException) { return null; }
+    }
+
+    /// <summary>
+    /// A request came back 401 mid-session (the hour is up): renew once and let the caller retry. If another
+    /// request renewed while this one waited, the token it was sent with is stale, so just retry with the new one.
+    /// </summary>
+    private async Task<bool> RenewAfter401Async(string? sentWith)
+    {
+        await _renewLock.WaitAsync();
+        try
+        {
+            if (CurrentUser is not { } user) return false;
+            if (user.Token != sentWith) return true;
+            if (user.RefreshToken is null || await RenewAsync(user.RefreshToken) is not { } auth) return false;
+            _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth.Token);
+            CurrentUser = auth;
+            return true;
+        }
+        finally { _renewLock.Release(); }
     }
 
     private async Task StartSessionAsync(AuthResponse auth)
@@ -197,12 +240,23 @@ public sealed class AppState : Observable
         await Task.WhenAll(RefreshUsersAsync(), RefreshProjectsAsync(), RefreshNotificationsAsync());
         CurrentUser = auth;
         await ConnectHubAsync();
+
+        // Not awaited: the permission prompt and push registration should not hold up the first screen
+        _ = PushNotifications.EnableAsync();
     }
 
     public async Task LogoutAsync()
     {
+        // Revoke the 30-day sign-in on the server too, not just forget it here. Offline: it still expires.
+        if (CurrentUser?.RefreshToken is { } refresh)
+        {
+            try { await _http.PostAsJsonAsync("api/auth/logout", new RefreshRequest { RefreshToken = refresh }); }
+            catch (HttpRequestException) { }
+        }
         CurrentUser = null;
         _pendingAuth = null;
+        // While the token is still on the client, so the API can take this phone off the hub
+        await PushNotifications.DisableAsync();
         _http.DefaultRequestHeaders.Authorization = null;
         try { SecureStorage.Default.Remove(SessionKey); }
         catch (Exception) { /* nothing was stored */ }
@@ -521,9 +575,32 @@ public sealed class AppState : Observable
             await Alert("Live updates are unavailable; other people's changes appear when you reopen a page.");
         }
     }
-
+//----------------------------------------------------------------------------------------------------------------------//
     private void On(string eventName, params Func<Task>[] refreshes) =>
         _hub!.On<JsonElement>(eventName, _ => Task.WhenAll(refreshes.Select(refresh => refresh())));
+
+    // Phone push (see PushNotifications). These bypass Send on purpose: they run in the
+    // background, so a failure must not pop up an alert, and a 401 here must not trigger another
+    // sign-out (LogoutAsync itself calls RemovePushInstallationAsync)
+    public async Task RegisterPushInstallationAsync(string installationId, string token)
+    {
+        try
+        {
+            await _http.PutAsJsonAsync("api/notifications/installations", new PushInstallationRequest
+            {
+                InstallationId = installationId,
+                PushChannel = token,
+                Platform = DeviceInfo.Platform.ToString().ToLowerInvariant(),
+            });
+        }
+        catch (Exception) { /* offline: the next sign-in registers again */ }
+    }
+
+    public async Task RemovePushInstallationAsync(string installationId)
+    {
+        try { await _http.DeleteAsync($"api/notifications/installations/{Uri.EscapeDataString(installationId)}"); }
+        catch (Exception) { /* offline: deleting the FCM token still stops delivery */ }
+    }
 
     // ----- HTTP. A failed call shows an alert and returns null/false. -----
 
@@ -535,10 +612,11 @@ public sealed class AppState : Observable
 
     public async Task<bool> SendAsync(HttpMethod method, string url, object? body = null) =>
         await Send(method, url, body) is not null;
-
-    private async Task<HttpResponseMessage?> Send(HttpMethod method, string url, object? body)
+//----------------------------------------------------------------------------------------------------------------------//
+    private async Task<HttpResponseMessage?> Send(HttpMethod method, string url, object? body, bool retried = false)
     {
         HttpResponseMessage res;
+        var sentWith = _http.DefaultRequestHeaders.Authorization?.Parameter;
         try
         {
             res = await _http.SendAsync(new HttpRequestMessage(method, url)
@@ -553,6 +631,10 @@ public sealed class AppState : Observable
         }
         if (res.IsSuccessStatusCode) return res;
 
+        // The access token ran out while the app was open: renew it and try once more before signing out.
+        if (res.StatusCode == HttpStatusCode.Unauthorized && !retried && await RenewAfter401Async(sentWith))
+            return await Send(method, url, body, retried: true);
+
         if (res.StatusCode != HttpStatusCode.Unauthorized)
         {
             await Alert(await ErrorMessage(res));
@@ -564,7 +646,7 @@ public sealed class AppState : Observable
         }
         return null;
     }
-
+//----------------------------------------------------------------------------------------------------------------------//
     // The API's own errors are ErrorResponse { message }; model validation failures are ProblemDetails.
     private static async Task<string> ErrorMessage(HttpResponseMessage res)
     {
@@ -623,3 +705,4 @@ public sealed class AppState : Observable
         return new UriBuilder(serverUri) { Host = "10.0.2.2" }.Uri;
     }
 }
+//---------------------------DDDDDDDDDDDoooooooooooooo END OF FILE DDDDDDDDDDDoooooooooooooo---------------------------//

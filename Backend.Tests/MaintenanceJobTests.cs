@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
+using QULOOBUL__MOE_MIENEEN_Backend.Models.File;
 using QULOOBUL__MOE_MIENEEN_Backend.Data;
 using QULOOBUL__MOE_MIENEEN_Backend.Models.IdentityAndAccess;
 using QULOOBUL__MOE_MIENEEN_Backend.Models.Project;
@@ -159,6 +161,33 @@ public class MaintenanceJobTests
     }
 //----------------------------------------------------------------------------------------------------------------------//
     // Every sweep needs the seeded System account to own the history row it writes.
+    // A SAS cannot cap a write, so the size the client declared is only checked up front; this is the real limit.
+    [Fact]
+    public async Task An_upload_bigger_than_the_limit_is_deleted_with_its_metadata_row_and_others_are_kept()
+    {
+        var (db, _) = await NewAsync();
+        db.FileUploads.AddRange(
+            new FileUpload { FileName = "big.pdf", FilePath = "attachments/big.pdf" },
+            new FileUpload { FileName = "ok.pdf", FilePath = "attachments/ok.pdf" });
+        await db.SaveChangesAsync();
+        var blob = new FakeBlob("big.pdf");
+
+        var purged = await MaintenanceJobs.PurgeOversizedUploadsAsync(db, blob, 25L * 1024 * 1024, NullLogger.Instance);
+
+        Assert.Equal(1, purged);
+        Assert.Equal(["big.pdf"], blob.Deleted);
+        Assert.Equal("ok.pdf", (await db.FileUploads.SingleAsync()).FileName);
+    }
+
+    /// <summary>Storage with one oversized blob; no Azure client is needed.</summary>
+    private sealed class FakeBlob(string oversized) : BlobStorageService(null!)
+    {
+        public List<string> Deleted { get; } = [];
+        public override Task<List<string>> BlobsLargerThanAsync(string container, long maxBytes, CancellationToken ct = default) =>
+            Task.FromResult(new List<string> { oversized });
+        public override Task DeleteAsync(string container, string blobName) { Deleted.Add(blobName); return Task.CompletedTask; }
+    }
+//----------------------------------------------------------------------------------------------------------------------//
     private static async Task<(AppDbContext Db, NotificationService Notify)> NewAsync()
     {
         // Reference: Microsoft, "Testing without your production database system - EF Core." Accessed: Oct. 04, 2026. [Online]. Available: https://learn.microsoft.com/en-us/ef/core/testing/testing-without-the-database

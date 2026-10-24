@@ -30,21 +30,21 @@
                     <VerticalStackLayout>
                         <Label Text="From" Style="{StaticResource LabelSmall}" />
                         <Border Style="{StaticResource FieldBox}">
-                            <DatePicker x:Name="FromPicker" Format="d MMM yyyy" DateSelected="OnDateChanged" />
+                            <DatePicker x:Name="FromPicker" SemanticProperties.Description="From" Format="d MMM yyyy" DateSelected="OnDateChanged" />
                         </Border>
                     </VerticalStackLayout>
 
                     <VerticalStackLayout>
                         <Label Text="To" Style="{StaticResource LabelSmall}" />
                         <Border Style="{StaticResource FieldBox}">
-                            <DatePicker x:Name="ToPicker" Format="d MMM yyyy" DateSelected="OnDateChanged" />
+                            <DatePicker x:Name="ToPicker" SemanticProperties.Description="To" Format="d MMM yyyy" DateSelected="OnDateChanged" />
                         </Border>
                     </VerticalStackLayout>
 
                     <VerticalStackLayout>
                         <Label Text="Report" Style="{StaticResource LabelSmall}" />
                         <Border Style="{StaticResource FieldBox}">
-                            <Picker x:Name="ReportTypePicker" Title="Report" SelectedIndexChanged="OnFormChanged" />
+                            <Picker x:Name="ReportTypePicker" SemanticProperties.Description="Report type" Title="Report" SelectedIndexChanged="OnFormChanged" />
                         </Border>
                     </VerticalStackLayout>
 

@@ -27,6 +27,21 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
         public const string FailedAction = "auth.login.failed";
         public const int MaxFailedLogins = 5;
         public static readonly TimeSpan PasswordTokenLifetime = TimeSpan.FromDays(3);
+        public static readonly TimeSpan LockoutPeriod = TimeSpan.FromMinutes(15);
+
+        /// <summary>Audit action for a new password; a token issued before the latest one is refused (Program.cs).</summary>
+        public const string PasswordSetAction = "user.password.set";
+
+        /// <summary>
+        /// Every sign-in failure says this, whether the email is unknown, the password wrong, or the account
+        /// pending, locked or deactivated: telling them apart would let anyone probe which emails have accounts
+        /// and what state they are in. It explains the lock so a locked-out user is not left guessing.
+        /// </summary>
+        public static readonly string LoginFailed =
+            $"Invalid email or password. {MaxFailedLogins} failed attempts lock an account for {LockoutPeriod.TotalMinutes:0} minutes; use Forgot password to ask an admin for help.";
+
+        // Checked against when the email is unknown, so that case costs as much time as a real attempt.
+        private static readonly string DummyHash = Hasher.HashPassword(new User(), "not-a-real-password");
 //----------------------------------------------------------------------------------------------------------------------//
         public async Task<AuthResponse> LoginAsync(LoginRequest req)
         {
@@ -37,33 +52,53 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             {
                 // SD-01 writes LOGIN_FAILED against a user id; an unknown address has none, and
                 // Audit_Log's FK must resolve to a real person. Logged instead of audited.
+                Hasher.VerifyHashedPassword(new User(), DummyHash, req.Password);
                 log.LogWarning("Login attempt for unknown email address");
-                throw new UnauthorizedAccessException("Invalid email or password.");
+                throw new UnauthorizedAccessException(LoginFailed);
             }
 
-            // SM-03 note: pending, locked and deactivated are all "not active" but are told apart at login.
+            // Anyone who knows an email can lock that account with failed sign-ins, so the lock lifts itself;
+            // otherwise the sole admin could be locked out for good.
+            if (user.Status == Lifecycle.UserLocked && await LockedAtAsync(user.UserId) is { } at
+                && DateTime.UtcNow - at >= LockoutPeriod)
+            {
+                Lifecycle.MoveUser(user, Lifecycle.UserActive);
+                user.FailedLoginCount = 0;
+                audit.Record(user.UserId, "user.unlocked", nameof(User), user.UserId);
+            }
+
+            // Verified even for an inactive account (and never acted on), so timing does not reveal its state.
+            var passwordOk = Hasher.VerifyHashedPassword(user, user.PasswordHash, req.Password)
+                != PasswordVerificationResult.Failed;
+
+            // SM-03 note: pending, locked and deactivated are all "not active"; the caller is told nothing more.
             if (!user.IsActive)
             {
                 await RecordFailureAsync(user.UserId);
-                throw new UnauthorizedAccessException(user.Status switch
-                {
-                    Lifecycle.UserPending => "This account has not been activated. Use the link in your activation email.",
-                    Lifecycle.UserLocked => "This account is locked after too many failed sign-ins. Use the Forgot password link to ask the system admin for a temporary password.",
-                    _ => "This account is deactivated.",
-                });
+                throw new UnauthorizedAccessException(LoginFailed);
             }
 
-            if (Hasher.VerifyHashedPassword(user, user.PasswordHash, req.Password)
-                == PasswordVerificationResult.Failed)
+            if (!passwordOk)
             {
                 // SD-01, alt [valid = false]; SM-03 Authenticate [5 consecutive failures] → Locked.
                 user.FailedLoginCount++;
                 audit.Record(user.UserId, FailedAction, nameof(User), user.UserId);
                 if (user.FailedLoginCount >= MaxFailedLogins) await LockAsync(user);
                 else await db.SaveChangesAsync();
-                throw new UnauthorizedAccessException("Invalid email or password.");
+                throw new UnauthorizedAccessException(LoginFailed);
             }
 
+            // No refresh token while a temporary password is pending: ChangePasswordAsync issues it once replaced.
+            var response = await IssueAsync(user, req.IssueRefreshToken && !user.MustChangePassword);
+            user.FailedLoginCount = 0; // "consecutive": a success resets the count
+            await audit.RecordAndSaveAsync(user.UserId, "auth.login", nameof(User), user.UserId);
+            return response;
+        }
+//----------------------------------------------------------------------------------------------------------------------//
+        /// <summary>The signed token and the user details a client needs, for sign-in and for a password change.
+        /// With <paramref name="withRefresh"/>, also a new refresh token (its row is added; the caller saves).</summary>
+        private async Task<AuthResponse> IssueAsync(User user, bool withRefresh = false)
+        {
             var permissions = await (
                 from rp in db.RolePermissions
                 join p in db.Permissions on rp.PermissionId equals p.PermissionId
@@ -72,12 +107,67 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
 
             var roleName = user.Role?.RoleName ?? "Staff";
             var (token, expires) = tokens.Create(user, roleName, permissions);
-
-            user.FailedLoginCount = 0; // "consecutive": a success resets the count
-            await audit.RecordAndSaveAsync(user.UserId, "auth.login", nameof(User), user.UserId);
-            return new AuthResponse(token, expires, user.UserId,
+            var response = new AuthResponse(token, expires, user.UserId,
                 $"{user.FirstName} {user.Surname}", roleName, permissions, user.MustChangePassword);
+            if (!withRefresh) return response;
+
+            var now = DateTime.UtcNow;
+            var refresh = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+            var refreshExpires = now.AddDays(config.GetValue("Jwt:RefreshLifetimeDays", 30));
+            // Spent and expired rows are only kept to spot a replay; once expired they can go.
+            await db.RefreshTokens.Where(r => r.UserId == user.UserId && r.ExpiresAt <= now).ExecuteDeleteAsync();
+            db.RefreshTokens.Add(new RefreshToken
+            {
+                UserId = user.UserId, TokenHash = HashToken(refresh), CreatedAt = now, ExpiresAt = refreshExpires,
+            });
+            return response with { RefreshToken = refresh, RefreshExpiresAtUtc = refreshExpires };
         }
+//----------------------------------------------------------------------------------------------------------------------//
+        public const string SessionEnded = "Your session has ended. Please sign in again.";
+
+        /// <summary>
+        /// The mobile app's "stay signed in": spends a refresh token for a fresh access token and a new refresh
+        /// token. A token presented a second time means a copy is in someone else's hands, so every refresh
+        /// token for that user is revoked. The account must still be active and not waiting on a temporary password.
+        /// Reference: D. Hardt, Ed., "The OAuth 2.0 Authorization Framework," RFC 6749, Section 1.5, Oct. 2012. Accessed: Oct. 24, 2026. [Online]. Available: https://www.rfc-editor.org/rfc/rfc6749#section-1.5
+        /// Reference: OWASP Foundation, "OAuth 2.0 Protocol Cheatsheet - Refresh Token rotation." Accessed: Oct. 24, 2026. [Online]. Available: https://cheatsheetseries.owasp.org/cheatsheets/OAuth2_Cheat_Sheet.html
+        /// </summary>
+        public async Task<AuthResponse> RefreshAsync(RefreshRequest req)
+        {
+            var hash = HashToken(req.RefreshToken);
+            var now = DateTime.UtcNow;
+            var row = await db.RefreshTokens.AsNoTracking().FirstOrDefaultAsync(r => r.TokenHash == hash);
+            if (row is null || row.ExpiresAt <= now) throw new UnauthorizedAccessException(SessionEnded);
+
+            // Spend it atomically: of two requests racing with the same token, exactly one wins.
+            var spent = await db.RefreshTokens.Where(r => r.RefreshTokenId == row.RefreshTokenId && r.UsedAt == null)
+                .ExecuteUpdateAsync(s => s.SetProperty(r => r.UsedAt, now));
+            if (spent == 0)
+            {
+                await db.RefreshTokens.Where(r => r.UserId == row.UserId).ExecuteDeleteAsync();
+                log.LogWarning("Refresh token reused for user {UserId}; all their refresh tokens revoked", row.UserId);
+                await audit.RecordAndSaveAsync(row.UserId, "auth.refresh.reused", nameof(User), row.UserId);
+                throw new UnauthorizedAccessException(SessionEnded);
+            }
+
+            var user = await db.Users.Include(u => u.Role).FirstAsync(u => u.UserId == row.UserId);
+            if (!user.IsActive || user.MustChangePassword) throw new UnauthorizedAccessException(SessionEnded);
+
+            var response = await IssueAsync(user, withRefresh: true);
+            await db.SaveChangesAsync();
+            return response;
+        }
+//----------------------------------------------------------------------------------------------------------------------//
+        /// <summary>Sign-out on the phone: the refresh token stops working. Unknown tokens are ignored.</summary>
+        public Task RevokeAsync(RefreshRequest req)
+        {
+            var hash = HashToken(req.RefreshToken);
+            return db.RefreshTokens.Where(r => r.TokenHash == hash).ExecuteDeleteAsync();
+        }
+//----------------------------------------------------------------------------------------------------------------------//
+        /// <summary>A new password ends every stay-signed-in session, as it ends every access token (Program.cs).</summary>
+        private Task RevokeAllAsync(int userId) =>
+            db.RefreshTokens.Where(r => r.UserId == userId).ExecuteDeleteAsync();
 //----------------------------------------------------------------------------------------------------------------------//
         /// <summary>SM-03 setPassword [password meets policy]: redeem an emailed one-time token.
         /// Activates a pending account; for an active one it completes an admin reset.</summary>
@@ -100,14 +190,20 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             user.PasswordTokenExpires = null;
             user.FailedLoginCount = 0;
             user.MustChangePassword = false;
-            await audit.RecordAndSaveAsync(user.UserId, "user.password.set", nameof(User), user.UserId);
+            await RevokeAllAsync(user.UserId);
+            await audit.RecordAndSaveAsync(user.UserId, PasswordSetAction, nameof(User), user.UserId);
         }
 //----------------------------------------------------------------------------------------------------------------------//
-        /// <summary>A signed-in user swaps their current (possibly temporary) password for one of their own.</summary>
-        public async Task ChangePasswordAsync(int userId, ChangePasswordRequest req)
+        /// <summary>
+        /// A signed-in user swaps their current (possibly temporary) password for one of their own. Every token
+        /// issued before now stops working (Program.cs), so a stolen session ends here; the caller gets a fresh
+        /// token to carry on with.
+        /// </summary>
+        public async Task<AuthResponse> ChangePasswordAsync(int userId, ChangePasswordRequest req)
         {
             EnsurePolicy(req.NewPassword);
-            var user = await db.Users.FindAsync(userId) ?? throw new KeyNotFoundException($"User {userId} not found.");
+            var user = await db.Users.Include(u => u.Role).FirstOrDefaultAsync(u => u.UserId == userId)
+                ?? throw new KeyNotFoundException($"User {userId} not found.");
             if (Hasher.VerifyHashedPassword(user, user.PasswordHash, req.CurrentPassword) == PasswordVerificationResult.Failed)
                 throw new InvalidOperationException("Your current password is incorrect.");
             if (req.NewPassword == req.CurrentPassword)
@@ -117,7 +213,12 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
             user.MustChangePassword = false;
             user.PasswordTokenHash = null;
             user.PasswordTokenExpires = null;
-            await audit.RecordAndSaveAsync(userId, "user.password.set", nameof(User), userId);
+            await RevokeAllAsync(userId);
+            // Saved before issuing, so the new token's "iat" is never earlier than the change (Program.cs).
+            await audit.RecordAndSaveAsync(userId, PasswordSetAction, nameof(User), userId);
+            var response = await IssueAsync(user, req.IssueRefreshToken);
+            if (req.IssueRefreshToken) await db.SaveChangesAsync();
+            return response;
         }
 //----------------------------------------------------------------------------------------------------------------------//
         /// <summary>A one-off password an admin can read out: 6 letters + 4 digits so it meets the policy,
@@ -215,6 +316,11 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
 //----------------------------------------------------------------------------------------------------------------------//
         private static string HashToken(string token) =>
             Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
+//----------------------------------------------------------------------------------------------------------------------//
+        /// <summary>When the account was last locked: the audit trail already holds it, so no extra column.</summary>
+        private Task<DateTime?> LockedAtAsync(int userId) =>
+            db.AuditLogs.Where(a => a.UserId == userId && a.Action == "user.locked")
+                .MaxAsync(a => (DateTime?)a.Timestamp);
 //----------------------------------------------------------------------------------------------------------------------//
         private Task RecordFailureAsync(int userId) =>
             audit.RecordAndSaveAsync(userId, FailedAction, nameof(User), userId);

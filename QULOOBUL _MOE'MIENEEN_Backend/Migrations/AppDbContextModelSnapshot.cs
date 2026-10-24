@@ -17,7 +17,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.11")
+                .HasAnnotation("ProductVersion", "10.0.13")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
@@ -48,13 +48,18 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
 
                     b.HasKey("EventId");
 
+                    b.HasIndex("EventDate");
+
                     b.HasIndex("OrganiserId");
 
                     b.HasIndex("Location", "EventDate")
                         .IsUnique()
                         .HasFilter("[Location] <> ''");
 
-                    b.ToTable("Event");
+                    b.ToTable("Event", t =>
+                        {
+                            t.HasCheckConstraint("CK_Event_TitleNotBlank", "LEN(LTRIM(RTRIM([Title]))) > 0");
+                        });
                 });
 
             modelBuilder.Entity("QULOOBUL__MOE_MIENEEN_Backend.Models.Collaboration.EventAttendee", b =>
@@ -107,9 +112,14 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
 
                     b.HasKey("MeetingId");
 
+                    b.HasIndex("MeetingDate");
+
                     b.HasIndex("OrganiserId");
 
-                    b.ToTable("Meeting");
+                    b.ToTable("Meeting", t =>
+                        {
+                            t.HasCheckConstraint("CK_Meeting_TitleNotBlank", "LEN(LTRIM(RTRIM([Title]))) > 0");
+                        });
                 });
 
             modelBuilder.Entity("QULOOBUL__MOE_MIENEEN_Backend.Models.Collaboration.MeetingAttendee", b =>
@@ -245,6 +255,10 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
 
                     b.ToTable("File_Upload", t =>
                         {
+                            t.HasCheckConstraint("CK_FileUpload_FileNameNotBlank", "LEN(LTRIM(RTRIM([FileName]))) > 0");
+
+                            t.HasCheckConstraint("CK_FileUpload_FilePathNotBlank", "LEN(LTRIM(RTRIM([FilePath]))) > 0");
+
                             t.HasCheckConstraint("CK_FileUpload_OneContext", "((CASE WHEN [TaskId] IS NULL THEN 0 ELSE 1 END) + (CASE WHEN [MeetingId] IS NULL THEN 0 ELSE 1 END) + (CASE WHEN [PeriodMonth] IS NULL THEN 0 ELSE 1 END)) <= 1");
                         });
                 });
@@ -265,6 +279,44 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
                     b.HasKey("PermissionId");
 
                     b.ToTable("Permission");
+                });
+
+            modelBuilder.Entity("QULOOBUL__MOE_MIENEEN_Backend.Models.IdentityAndAccess.RefreshToken", b =>
+                {
+                    b.Property<int>("RefreshTokenId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("RefreshTokenId"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<DateTime?>("UsedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("RefreshTokenId");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique();
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("Refresh_Token", t =>
+                        {
+                            t.HasCheckConstraint("CK_RefreshToken_ExpiresAfterCreated", "[ExpiresAt] > [CreatedAt]");
+                        });
                 });
 
             modelBuilder.Entity("QULOOBUL__MOE_MIENEEN_Backend.Models.IdentityAndAccess.Role", b =>
@@ -364,8 +416,10 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
 
                     b.Property<string>("Status")
                         .IsRequired()
+                        .ValueGeneratedOnAdd()
                         .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)");
+                        .HasColumnType("nvarchar(30)")
+                        .HasDefaultValue("Active");
 
                     b.Property<string>("Surname")
                         .IsRequired()
@@ -377,9 +431,30 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
                     b.HasIndex("Email")
                         .IsUnique();
 
+                    b.HasIndex("PasswordTokenHash")
+                        .IsUnique()
+                        .HasFilter("[PasswordTokenHash] IS NOT NULL");
+
                     b.HasIndex("RoleId");
 
-                    b.ToTable("User");
+                    b.ToTable("User", t =>
+                        {
+                            t.HasCheckConstraint("CK_User_ActiveMatchesStatus", "([IsActive] = 1 AND [Status] = 'Active') OR ([IsActive] = 0 AND [Status] <> 'Active')");
+
+                            t.HasCheckConstraint("CK_User_EmailFormat", "[Email] LIKE '%_@_%._%'");
+
+                            t.HasCheckConstraint("CK_User_FailedLoginCount", "[FailedLoginCount] >= 0");
+
+                            t.HasCheckConstraint("CK_User_FirstNameNotBlank", "LEN(LTRIM(RTRIM([FirstName]))) > 0");
+
+                            t.HasCheckConstraint("CK_User_InactiveHasDate", "[Status] <> 'Inactive' OR [DeactivatedAt] IS NOT NULL");
+
+                            t.HasCheckConstraint("CK_User_Status", "[Status] IN ('Pending Activation', 'Active', 'Locked', 'Inactive', 'Anonymised')");
+
+                            t.HasCheckConstraint("CK_User_SurnameNotBlank", "LEN(LTRIM(RTRIM([Surname]))) > 0");
+
+                            t.HasCheckConstraint("CK_User_TokenPair", "([PasswordTokenHash] IS NULL AND [PasswordTokenExpires] IS NULL) OR ([PasswordTokenHash] IS NOT NULL AND [PasswordTokenExpires] IS NOT NULL)");
+                        });
                 });
 
             modelBuilder.Entity("QULOOBUL__MOE_MIENEEN_Backend.Models.IdentityAndAccess.UserDirectoryEntry", b =>
@@ -442,7 +517,7 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
 
                     b.HasIndex("Timestamp");
 
-                    b.HasIndex("UserId");
+                    b.HasIndex("UserId", "Timestamp");
 
                     b.ToTable("Audit_Log");
                 });
@@ -568,7 +643,10 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
 
                     b.HasIndex("SubjectUserId");
 
-                    b.ToTable("Report");
+                    b.ToTable("Report", t =>
+                        {
+                            t.HasCheckConstraint("CK_Report_PeriodOrder", "[PeriodEnd] >= [PeriodStart]");
+                        });
                 });
 
             modelBuilder.Entity("QULOOBUL__MOE_MIENEEN_Backend.Models.Project.Project", b =>
@@ -599,7 +677,12 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
 
                     b.HasIndex("OwnerId");
 
-                    b.ToTable("Project");
+                    b.ToTable("Project", t =>
+                        {
+                            t.HasCheckConstraint("CK_Project_NameNotBlank", "LEN(LTRIM(RTRIM([ProjectName]))) > 0");
+
+                            t.HasCheckConstraint("CK_Project_Status", "[Status] IN ('Active', 'Closed', 'Cancelled')");
+                        });
                 });
 
             modelBuilder.Entity("QULOOBUL__MOE_MIENEEN_Backend.Models.Project.ProjectMember", b =>
@@ -651,7 +734,9 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
                         .HasColumnType("nvarchar(2000)");
 
                     b.Property<int>("PercentComplete")
-                        .HasColumnType("int");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
 
                     b.Property<string>("Priority")
                         .IsRequired()
@@ -660,6 +745,12 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
 
                     b.Property<int>("ProjectId")
                         .HasColumnType("int");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
 
                     b.Property<int?>("ScheduleId")
                         .HasColumnType("int");
@@ -680,11 +771,26 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
 
                     b.HasIndex("CreatedBy");
 
+                    b.HasIndex("Deadline");
+
                     b.HasIndex("ScheduleId");
 
                     b.HasIndex("ProjectId", "Status");
 
-                    b.ToTable("Task");
+                    b.HasIndex("Status", "Deadline");
+
+                    b.ToTable("Task", t =>
+                        {
+                            t.HasCheckConstraint("CK_Task_DoneHasCompletedBy", "[Status] <> 'Done' OR [CompletedBy] IS NOT NULL");
+
+                            t.HasCheckConstraint("CK_Task_PercentComplete", "[PercentComplete] BETWEEN 0 AND 100");
+
+                            t.HasCheckConstraint("CK_Task_Priority", "[Priority] IN ('Low', 'Normal', 'Medium', 'High')");
+
+                            t.HasCheckConstraint("CK_Task_Status", "[Status] IN ('To Do', 'In Progress', 'Blocked', 'Done', 'Cancelled', 'Archived')");
+
+                            t.HasCheckConstraint("CK_Task_TitleNotBlank", "LEN(LTRIM(RTRIM([Title]))) > 0");
+                        });
                 });
 
             modelBuilder.Entity("QULOOBUL__MOE_MIENEEN_Backend.Models.Request.RequestCategory", b =>
@@ -737,7 +843,10 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
 
                     b.HasIndex("RequestId");
 
-                    b.ToTable("Request_Status_History");
+                    b.ToTable("Request_Status_History", t =>
+                        {
+                            t.HasCheckConstraint("CK_RequestStatusHistory_NewStatus", "[NewStatus] IN ('Pending', 'Under Review', 'Escalated', 'Approved', 'Declined', 'Completed')");
+                        });
                 });
 
             modelBuilder.Entity("QULOOBUL__MOE_MIENEEN_Backend.Models.Request.ResourceRequest", b =>
@@ -769,6 +878,12 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
                     b.Property<int?>("ReviewedBy")
                         .HasColumnType("int");
 
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(30)
@@ -782,7 +897,16 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
 
                     b.HasIndex("ReviewedBy");
 
-                    b.ToTable("Resource_Request");
+                    b.HasIndex("Status", "DateSubmitted");
+
+                    b.ToTable("Resource_Request", t =>
+                        {
+                            t.HasCheckConstraint("CK_ResourceRequest_DecisionHasReviewer", "[Status] NOT IN ('Approved', 'Declined') OR [ReviewedBy] IS NOT NULL");
+
+                            t.HasCheckConstraint("CK_ResourceRequest_Priority", "[Priority] IN ('Low', 'Normal', 'Medium', 'High')");
+
+                            t.HasCheckConstraint("CK_ResourceRequest_Status", "[Status] IN ('Pending', 'Under Review', 'Escalated', 'Approved', 'Declined', 'Completed')");
+                        });
                 });
 
             modelBuilder.Entity("QULOOBUL__MOE_MIENEEN_Backend.Models.Task.TaskAssignment", b =>
@@ -872,7 +996,10 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
 
                     b.HasIndex("CreatedBy");
 
-                    b.ToTable("Task_Schedule");
+                    b.ToTable("Task_Schedule", t =>
+                        {
+                            t.HasCheckConstraint("CK_TaskSchedule_DayOfWeek", "[DayOfWeek] IN ('Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday')");
+                        });
                 });
 
             modelBuilder.Entity("QULOOBUL__MOE_MIENEEN_Backend.Models.Task.TaskStatusHistory", b =>
@@ -903,7 +1030,12 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
 
                     b.HasIndex("TaskId");
 
-                    b.ToTable("Task_Status_History");
+                    b.HasIndex("NewStatus", "TimeCreated");
+
+                    b.ToTable("Task_Status_History", t =>
+                        {
+                            t.HasCheckConstraint("CK_TaskStatusHistory_NewStatus", "[NewStatus] IN ('To Do', 'In Progress', 'Blocked', 'Done', 'Cancelled', 'Archived')");
+                        });
                 });
 
             modelBuilder.Entity("QULOOBUL__MOE_MIENEEN_Backend.Models.Collaboration.Event", b =>
@@ -1023,6 +1155,17 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Migrations
                     b.Navigation("Task");
 
                     b.Navigation("Uploader");
+                });
+
+            modelBuilder.Entity("QULOOBUL__MOE_MIENEEN_Backend.Models.IdentityAndAccess.RefreshToken", b =>
+                {
+                    b.HasOne("QULOOBUL__MOE_MIENEEN_Backend.Models.IdentityAndAccess.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("QULOOBUL__MOE_MIENEEN_Backend.Models.IdentityAndAccess.RolePermission", b =>

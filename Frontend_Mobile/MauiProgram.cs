@@ -21,6 +21,9 @@ public static class MauiProgram
 				fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
 			});
 
+#if ANDROID
+		TapAsButton.Register();
+#endif
 #if DEBUG
 		builder.Logging.AddDebug();
 #endif
@@ -28,3 +31,4 @@ public static class MauiProgram
 		return builder.Build();
 	}
 }
+//---------------------------DDDDDDDDDDDoooooooooooooo END OF FILE DDDDDDDDDDDoooooooooooooo---------------------------//

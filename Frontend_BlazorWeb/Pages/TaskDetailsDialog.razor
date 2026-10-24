@@ -12,7 +12,7 @@
 @using MudBlazor
 @inject AppDataService AppData
 
-<MudDialog Style="border-radius:16px;">
+<MudDialog Style="border-radius:16px;" DefaultFocus="DefaultFocus.FirstChild">
     <TitleContent>
         <MudText Typo="Typo.h6" Style="font-weight:600;">Task details</MudText>
     </TitleContent>
@@ -76,7 +76,7 @@
             }
             else
             {
-                <MudText Typo="Typo.caption" Color="Color.Error" Class="mb-3 d-block">No events planned yet - create one on the Events page first.</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Error" Class="mb-3 d-block" role="status">No events planned yet - create one on the Events page first.</MudText>
             }
         }
 

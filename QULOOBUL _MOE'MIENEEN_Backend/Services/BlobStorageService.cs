@@ -43,10 +43,25 @@ namespace QULOOBUL__MOE_MIENEEN_Backend.Services
         /// <param name="container"></param>
         /// <param name="blobName"></param>
         /// <returns></returns>
-        public async Task DeleteAsync(string container, string blobName)
+        public virtual async Task DeleteAsync(string container, string blobName)
         {
             var blob = await GetBlobClientAsync(container, blobName);
             await blob.DeleteIfExistsAsync();
+        }
+//----------------------------------------------------------------------------------------------------------------------//
+        /// <summary>
+        /// Names of blobs bigger than <paramref name="maxBytes"/>. A SAS cannot cap the size of a write, so the
+        /// limit checked before the SAS is issued (the client's declared size) is enforced here afterwards.
+        /// ponytail: lists the whole container each sweep; switch to a Blob-created Event Grid trigger if it grows large.
+        /// </summary>
+        public virtual async Task<List<string>> BlobsLargerThanAsync(string container, long maxBytes, CancellationToken ct = default)
+        {
+            var c = client.GetBlobContainerClient(container);
+            await c.CreateIfNotExistsAsync(PublicAccessType.None, cancellationToken: ct);
+            var oversized = new List<string>();
+            await foreach (var b in c.GetBlobsAsync(cancellationToken: ct))
+                if (b.Properties.ContentLength > maxBytes) oversized.Add(b.Name);
+            return oversized;
         }
 //----------------------------------------------------------------------------------------------------------------------//
         /// <summary>

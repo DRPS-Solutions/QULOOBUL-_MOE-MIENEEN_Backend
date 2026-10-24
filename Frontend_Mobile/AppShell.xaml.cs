@@ -20,6 +20,9 @@ public partial class AppShell : Shell
         if (Current is not AppShell shell) return;
         shell.FlyoutBehavior = FlyoutBehavior.Flyout;
         await Current.GoToAsync("//home");
+
+        // Opened the app by tapping a push notification: go on to what it was about
+        await PushNotifications.OpenPendingAsync();
     }
 
     public static async Task SignOutAsync()
@@ -38,4 +41,15 @@ public partial class AppShell : Shell
         await GoToAsync("//search");
 
     private async void OnLogout(object? sender, EventArgs e) => await SignOutAsync();
+
+    // Every page is a top-level route, so Android's Back on anything but Home would close the app.
+    // Back goes Home first (pushed pages still pop normally); Back on Home or the login page exits.
+    protected override bool OnBackButtonPressed()
+    {
+        var onHome = CurrentState.Location.OriginalString.StartsWith("//home", StringComparison.OrdinalIgnoreCase);
+        if (FlyoutBehavior != FlyoutBehavior.Flyout || onHome || Navigation.NavigationStack.Count > 1)
+            return base.OnBackButtonPressed();
+        _ = GoToAsync("//home");
+        return true;
+    }
 }
