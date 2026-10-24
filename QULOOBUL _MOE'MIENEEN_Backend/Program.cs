@@ -238,6 +238,7 @@ app.Use((c, next) =>
 {
     c.Response.Headers.ContentSecurityPolicy = "default-src 'none'; frame-ancestors 'none'";
     c.Response.Headers.XContentTypeOptions = "nosniff";
+    c.Response.Headers.CacheControl = "no-store";  // authenticated JSON must not sit in shared caches
     return next(c);
 });
 // Middleware order matters: each component sees only what the ones before it let through.
