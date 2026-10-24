@@ -46,14 +46,14 @@
                     <VerticalStackLayout>
                         <Label Text="Date" Style="{StaticResource LabelSmall}" />
                         <Border Style="{StaticResource FieldBox}">
-                            <DatePicker x:Name="EventDatePicker" Format="d MMM yyyy" />
+                            <DatePicker x:Name="EventDatePicker" SemanticProperties.Description="Event date" Format="d MMM yyyy" />
                         </Border>
                     </VerticalStackLayout>
 
                     <VerticalStackLayout>
                         <Label Text="Time" Style="{StaticResource LabelSmall}" />
                         <Border Style="{StaticResource FieldBox}">
-                            <TimePicker x:Name="EventTimePicker" Format="h:mm tt" />
+                            <TimePicker x:Name="EventTimePicker" SemanticProperties.Description="Event time" Format="h:mm tt" />
                         </Border>
                     </VerticalStackLayout>
 
@@ -165,7 +165,7 @@
                     <VerticalStackLayout x:Name="InviteSection" Spacing="8" Margin="0,16,0,0" IsVisible="False">
                         <Label Text="Invite someone" Style="{StaticResource LabelSmall}" />
                         <Border Style="{StaticResource FieldBox}">
-                            <Picker x:Name="InviteePicker" Title="Invite someone" SelectedIndexChanged="OnInviteeChanged" />
+                            <Picker x:Name="InviteePicker" SemanticProperties.Description="Invite someone" Title="Invite someone" SelectedIndexChanged="OnInviteeChanged" />
                         </Border>
                         <Button x:Name="InviteButton" Text="Invite" Clicked="OnInvite" IsEnabled="False" />
                     </VerticalStackLayout>

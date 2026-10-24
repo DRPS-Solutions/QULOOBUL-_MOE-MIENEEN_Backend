@@ -140,7 +140,7 @@
                         <VerticalStackLayout>
                             <Label Text="Lead Coordinator" Style="{StaticResource LabelSmall}" />
                             <Border Style="{StaticResource FieldBox}">
-                                <Picker x:Name="CoordinatorPicker" Title="Lead Coordinator" />
+                                <Picker x:Name="CoordinatorPicker" SemanticProperties.Description="Lead coordinator" Title="Lead Coordinator" />
                             </Border>
                         </VerticalStackLayout>
 

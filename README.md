@@ -495,9 +495,15 @@ build against the staging API).
 - Daily Tasks: the week arrows are "Previous week" / "Next week", and each day cell is a Button.
 - Meetings, User Management, Event Planning and Notifications: every card in the list is a Button,
   with its title and details as the text TalkBack reads with it.
-- Calendar and Files: the switches are "Include past events" and "Show archived"; both category
-  pickers show "Category".
-- Requests, Reports, Files: form fields read their placeholder or current value, and every button its label.
+- Calendar and Files: the switches are "Include past events" and "Show archived".
+- Pickers: a picker with a value selected showed only the value ("Low", "Equipment", "24 Sept 2026"),
+  because the label above it isn't linked to it. Every Picker, DatePicker, TimePicker and the
+  progress slider now has a `SemanticProperties.Description`, so it reads name then value:
+  "Priority, Low", "Date, 24 Oct 2026", "Report type, Task completion".
+- The "+ New" forms (New task, New event, the Events form with its staff check boxes, New meeting,
+  New user) and the Requests, Reports and Files forms: every field reads its name (placeholder or
+  description), every check box its person, and every button its label. Each form was opened and
+  cancelled; nothing was saved.
 
 **Dialogs (web).** Every MudBlazor dialog focuses its first field (`DefaultFocus.FirstChild`). Escape
 now closes every dialog, including the confirm boxes for deleting a file and changing a role,
@@ -508,7 +514,7 @@ password can't be dismissed before it is copied.
 Not done:
 
 - MAUI screens not reached: the task check boxes (staging had no tasks that day), Search results,
-  and the create/edit forms behind "+ New". They use the same patterns checked above.
+  and Task details. They use the same patterns checked above.
 - The flyout toggle reads "OK" while the menu is open (MAUI Shell's default), not "Close navigation drawer".
 - The web dialogs were reviewed in code, not used with the keyboard in the running app; only New
   task and Task details were tested by hand (above).

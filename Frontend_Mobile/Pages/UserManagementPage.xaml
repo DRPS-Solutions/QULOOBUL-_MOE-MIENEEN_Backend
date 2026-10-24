@@ -161,7 +161,7 @@
 
                         <Label Text="System Role" Style="{StaticResource LabelSmall}" />
                         <Border Style="{StaticResource FieldBox}">
-                            <Picker x:Name="RolePicker" Title="Select a role" SelectedIndexChanged="OnFormChanged" />
+                            <Picker x:Name="RolePicker" SemanticProperties.Description="System role" Title="Select a role" SelectedIndexChanged="OnFormChanged" />
                         </Border>
 
                         <Grid ColumnDefinitions="*,*" ColumnSpacing="10">

@@ -21,13 +21,13 @@
                 <VerticalStackLayout>
                     <Label Text="Date" Style="{StaticResource LabelSmall}" />
                     <Border Style="{StaticResource FieldBox}">
-                        <DatePicker x:Name="DateField" Format="dd MMM yyyy" />
+                        <DatePicker x:Name="DateField" SemanticProperties.Description="Date" Format="dd MMM yyyy" />
                     </Border>
                 </VerticalStackLayout>
                 <VerticalStackLayout x:Name="TimeSection" Grid.Column="1">
                     <Label Text="Time" Style="{StaticResource LabelSmall}" />
                     <Border Style="{StaticResource FieldBox}">
-                        <TimePicker x:Name="TimeField" Format="h:mm tt" />
+                        <TimePicker x:Name="TimeField" SemanticProperties.Description="Time" Format="h:mm tt" />
                     </Border>
                 </VerticalStackLayout>
             </Grid>
@@ -40,7 +40,7 @@
             <VerticalStackLayout>
                 <Label Text="Priority" Style="{StaticResource LabelSmall}" />
                 <Border Style="{StaticResource FieldBox}">
-                    <Picker x:Name="PriorityPicker" Title="Priority" />
+                    <Picker x:Name="PriorityPicker" SemanticProperties.Description="Priority" Title="Priority" />
                 </Border>
             </VerticalStackLayout>
 

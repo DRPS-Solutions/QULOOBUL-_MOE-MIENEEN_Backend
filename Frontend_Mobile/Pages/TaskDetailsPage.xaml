@@ -21,13 +21,13 @@
                  a skipped step (e.g. To Do straight to Done) and the picker snaps back. -->
             <Label Text="Status" Style="{StaticResource LabelSmall}" Margin="0,6,0,0" />
             <Border Style="{StaticResource FieldBox}">
-                <Picker x:Name="StatusPicker" SelectedIndexChanged="OnStatusChanged" />
+                <Picker x:Name="StatusPicker" SemanticProperties.Description="Status" SelectedIndexChanged="OnStatusChanged" />
             </Border>
 
             <!-- Percent complete (T4): only while In Progress; Done sets 100 server-side. -->
             <VerticalStackLayout x:Name="ProgressSection" Spacing="2">
                 <Label x:Name="ProgressLabel" Style="{StaticResource LabelSmall}" />
-                <Slider x:Name="ProgressSlider" Minimum="0" Maximum="100"
+                <Slider x:Name="ProgressSlider" SemanticProperties.Description="Percent complete" Minimum="0" Maximum="100"
                         ValueChanged="OnProgressSliding" DragCompleted="OnProgressReleased" />
             </VerticalStackLayout>
 
