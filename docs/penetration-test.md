@@ -41,11 +41,12 @@ No High findings. The scanner's SQL injection, XSS, path traversal, command inje
 
 | ID | Finding | Where | Risk | Verdict | Status |
 |---|---|---|---|---|---|
-| F1 | `Strict-Transport-Security` header not set | API | Low | **Valid** | **Fixed**, pending redeploy and rescan |
+| F1 | `Strict-Transport-Security` header not set | API | Low | **Valid** | **Fixed and verified**: absent in the first scan, gone from the after scan (`api-scan-auth-after.html`) |
 | F2 | Server error (503) and unexpected content type on `/latest/meta-data/`, `/computeMetadata/v1/`, `/opc/v1/instance/`, `/opc/v2/instance/`, `/metadata/instance` | API | Low | False positive | No action |
 | F3 | CSP `style-src 'unsafe-inline'` | Web client | Medium | Accepted risk | Documented |
 | F4 | Re-examine Cache-control directives | API, web client | Informational | **Valid** (API) | **Fixed** for the API |
 | F5 | Suspicious comments in `dictation.js` | Web client | Informational | False positive | No action |
+| F6 | `Cross-Origin-Resource-Policy` header missing (`/health`, `/api/Auth/logout`, `/api/Auth/forgot-password`) | API | Low | **Valid** | **Fixed**, pending redeploy and rescan |
 
 ### F1: HSTS not set (fixed)
 
@@ -68,6 +69,14 @@ API responses carry authenticated JSON. Fix: `Cache-Control: no-store` is now se
 ### F5: Suspicious comments (accepted)
 
 A single match in `/js/dictation.js`: ZAP's pattern `\bFROM\b` hit the word "from" in a source-citation comment (`// Reference: Microsoft, "Call .NET methods from JavaScript ..."`). It is a harmless reference, not a leaked secret or internal detail. The client is public by design, and the only config value it ships is the public API URL.
+
+### F6: Cross-Origin-Resource-Policy missing (fixed)
+
+Surfaced by the after scan once the earlier warnings cleared. Without the header, other sites can embed API responses in no-cors requests (a Spectre-style side-channel concern). Fix: `Cross-Origin-Resource-Policy: same-origin` on every API response. The web client lives on a different origin but calls the API with CORS `fetch`, which this header does not restrict, so the app should be unaffected. Confirm after deploy by signing in on the staging web app and checking the browser console for blocked requests.
+
+### After-scan summary (`api-scan-auth-after.html`)
+
+0 failures, 119 passes, 3 warning groups: the F2 metadata probes (two rules) and F6. HSTS (F1) no longer appears.
 
 ## 5. Controls observed working
 
